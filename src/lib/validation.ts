@@ -102,7 +102,74 @@ export function normalizeBankAccount(value: string): string {
     );
   }
 
+  const [, prefix = "", number] = account.match(
+    /^(?:(\d{1,6})-)?(\d{2,10})\/\d{4}$/,
+  )!;
+  const prefixWeights = [10, 5, 8, 4, 2, 1];
+  const numberWeights = [6, 3, 7, 9, 10, 5, 8, 4, 2, 1];
+  const checksum = (digits: string, weights: number[]) =>
+    digits
+      .padStart(weights.length, "0")
+      .split("")
+      .reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0) %
+    11;
+
+  if (
+    (prefix && checksum(prefix, prefixWeights) !== 0) ||
+    checksum(number, numberWeights) !== 0
+  ) {
+    throw new InputError(
+      "invalid_bank_account",
+      "Číslo účtu nemá platnou českou kontrolní číslici.",
+    );
+  }
+
   return account;
+}
+
+export function parseCzkAmount(value: string): number {
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  if (!/^\d{1,8}(?:\.\d{1,2})?$/.test(normalized)) {
+    throw new InputError(
+      "invalid_amount",
+      "Částku zadejte v Kč, nejvýše se dvěma desetinnými místy.",
+    );
+  }
+  const [crowns, pennies = ""] = normalized.split(".");
+  const amountHalere = Number(crowns) * 100 + Number(pennies.padEnd(2, "0"));
+  if (amountHalere < 1 || amountHalere > 2_000_000_000) {
+    throw new InputError("invalid_amount", "Částka musí být kladná a přiměřená.");
+  }
+  return amountHalere;
+}
+
+export function validateDueDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new InputError("invalid_due_date", "Zadejte platné datum splatnosti.");
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new InputError("invalid_due_date", "Zadejte platné datum splatnosti.");
+  }
+  return value;
+}
+
+export function validatePaymentMessage(value: string): string {
+  const message = value.trim().replace(/\s+/g, " ");
+  if (message.length < 2 || message.length > 60) {
+    throw new InputError(
+      "invalid_payment_message",
+      "Zpráva pro příjemce musí mít 2 až 60 znaků.",
+    );
+  }
+  return message;
+}
+
+export function validateUuid(value: string, label = "Identifikátor"): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new InputError("invalid_id", `${label} není platný.`);
+  }
+  return value;
 }
 
 export function validatePersonName(value: string, label: string): string {

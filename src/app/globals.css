@@ -320,6 +320,98 @@ h3 {
   margin-top: 1.5rem;
 }
 
+.assessment-form {
+  padding: 1.5rem;
+}
+
+.payment-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  gap: 2rem;
+}
+
+.payment-summary dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.payment-summary dl div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 1.3fr);
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.6rem;
+}
+
+.payment-summary dt {
+  color: var(--muted);
+}
+
+.payment-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.qr-panel {
+  text-align: center;
+}
+
+.qr-panel img {
+  width: min(100%, 20rem);
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.copy-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.copy-status {
+  width: 100%;
+  min-height: 1.25rem;
+  color: var(--muted);
+}
+
+.technical-details {
+  padding: 1rem 1.5rem;
+}
+
+.technical-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.technical-details code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 1rem;
+}
+
+.status-overdue,
+.status-open {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.status-overdue {
+  background: #fff0f0;
+  color: #8f1d1d;
+}
+
+.status-open {
+  background: #eef6ff;
+  color: #174f8f;
+}
+
 @media (max-width: 35rem) {
   .button-row,
   .button-row > *,
@@ -329,6 +421,10 @@ h3 {
   }
 
   .inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-detail {
     grid-template-columns: 1fr;
   }
 }

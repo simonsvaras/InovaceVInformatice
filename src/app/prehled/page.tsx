@@ -6,6 +6,9 @@ import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getUserContexts } from "@/modules/clubs/service";
 import { getGuardianMemberships } from "@/modules/memberships/service";
+import { getGuardianReceivables } from "@/modules/assessments/service";
+import { formatCzk } from "@/modules/payments/qr";
+import { todayInPrague } from "@/lib/dates";
 
 export default async function DashboardPage({
   searchParams,
@@ -13,11 +16,13 @@ export default async function DashboardPage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const user = await requireUser();
-  const [contexts, guardianMemberships, query] = await Promise.all([
+  const [contexts, guardianMemberships, receivables, query] = await Promise.all([
     getUserContexts(user.id),
     getGuardianMemberships(user.id),
+    getGuardianReceivables(user.id),
     searchParams,
   ]);
+  const today = todayInPrague();
 
   return (
     <main className="dashboard-shell">
@@ -99,6 +104,27 @@ export default async function DashboardPage({
                   ) : <span>Bez aktivního členství.</span>}
                 </section>
               ))}
+            </div>
+          </article>
+        ) : null}
+        {receivables.length ? (
+          <article className="panel">
+            <h2>Dluhy a platební údaje</h2>
+            <p>Seřazeno podle nejbližší splatnosti. Platíte přímo na účet klubu nebo týmu.</p>
+            <div className="card-grid">
+              {receivables.map((debt) => {
+                const overdue = debt.dueDate < today;
+                return (
+                  <section className="subcard" key={debt.id}>
+                    <strong>{debt.title}</strong>
+                    <span>{debt.athleteFirstName} {debt.athleteLastName}</span>
+                    <span>{debt.clubName} · {debt.teamName ?? "celý klub"}</span>
+                    <span>{formatCzk(debt.amountHalere)} · splatnost {debt.dueDate}</span>
+                    <span className={overdue ? "status-overdue" : "status-open"}>{overdue ? "Po splatnosti" : "K úhradě"}</span>
+                    <Link className="button-link" href={`/dluhy/${debt.id}`}>Platební údaje a QR</Link>
+                  </section>
+                );
+              })}
             </div>
           </article>
         ) : null}

@@ -105,7 +105,7 @@ export async function acceptMemberInvitationAction(formData: FormData) {
     );
   }
 
-  redirect("/prehled?success=Sportovec byl přidán do týmu.");
+  redirect(`/prehled?success=${encodeURIComponent("Sportovec byl přidán do týmu.")}`);
 }
 
 export async function requestJoinByCodeAction(formData: FormData) {
@@ -121,7 +121,7 @@ export async function requestJoinByCodeAction(formData: FormData) {
     redirect(`/vstup?error=${encodeURIComponent(message(error))}`);
   }
 
-  redirect("/prehled?success=Žádost čeká na schválení trenérem.");
+  redirect(`/prehled?success=${encodeURIComponent("Žádost čeká na schválení trenérem.")}`);
 }
 
 export async function reviewJoinRequestAction(formData: FormData) {
@@ -143,7 +143,7 @@ export async function reviewJoinRequestAction(formData: FormData) {
     redirect(`/tymy/${teamId}?error=${encodeURIComponent(message(error))}`);
   }
 
-  redirect(`/tymy/${teamId}?success=Žádost byla vyřízena.`);
+  redirect(`/tymy/${teamId}?success=${encodeURIComponent("Žádost byla vyřízena.")}`);
 }
 
 export async function revokeInvitationAction(formData: FormData) {
@@ -160,5 +160,5 @@ export async function revokeInvitationAction(formData: FormData) {
     redirect(`/tymy/${teamId}?error=${encodeURIComponent(message(error))}`);
   }
 
-  redirect(`/tymy/${teamId}?success=Pozvánka byla zrušena.`);
+  redirect(`/tymy/${teamId}?success=${encodeURIComponent("Pozvánka byla zrušena.")}`);
 }

@@ -66,7 +66,7 @@ export async function loginAction(formData: FormData) {
 
 export async function logoutAction() {
   await destroyCurrentSession();
-  redirect("/prihlaseni?success=Byli jste odhlášeni.");
+  redirect(`/prihlaseni?success=${encodeURIComponent("Byli jste odhlášeni.")}`);
 }
 
 export async function requestPasswordResetAction(formData: FormData) {
@@ -78,9 +78,7 @@ export async function requestPasswordResetAction(formData: FormData) {
     }
   }
 
-  redirect(
-    "/zapomenute-heslo?success=Pokud účet existuje, odeslali jsme odkaz pro změnu hesla.",
-  );
+  redirect(`/zapomenute-heslo?success=${encodeURIComponent("Pokud účet existuje, odeslali jsme odkaz pro změnu hesla.")}`);
 }
 
 export async function resetPasswordAction(formData: FormData) {
@@ -101,5 +99,5 @@ export async function resetPasswordAction(formData: FormData) {
     );
   }
 
-  redirect("/prihlaseni?success=Heslo bylo změněno. Přihlaste se znovu.");
+  redirect(`/prihlaseni?success=${encodeURIComponent("Heslo bylo změněno. Přihlaste se znovu.")}`);
 }

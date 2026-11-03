@@ -9,6 +9,7 @@ import { MemberInviteForm } from "@/components/member-invite-form";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getTeamMembershipDashboard } from "@/modules/memberships/service";
+import { setTeamBankAccountAction } from "@/app/actions/assessments";
 
 export default async function TeamPage({
   params,
@@ -31,6 +32,21 @@ export default async function TeamPage({
       <section className="content-stack">
         <div><p className="eyebrow">Správa týmu</p><h1>{team.name}</h1></div>
         <Message error={query.error} success={query.success} />
+        <article className="panel">
+          <h2>Předpisy a účet týmu</h2>
+          <p>Týmový účet je volitelný. Není-li nastaven, předpis použije výchozí účet klubu.</p>
+          <div className="button-row">
+            <Link className="button-link" href={`/predpisy/novy?teamId=${team.id}`}>Nový týmový předpis</Link>
+          </div>
+          <form action={setTeamBankAccountAction} className="form-stack inline-form">
+            <input name="teamId" type="hidden" value={team.id} />
+            <label>
+              Český účet týmu
+              <input name="accountNumber" placeholder="19-2000145399/0800" required />
+            </label>
+            <button className="button-secondary" type="submit">Uložit týmový účet</button>
+          </form>
+        </article>
         <article className="panel">
           <h2>Členové a žádosti</h2>
           {team.pendingRequests.length ? (

@@ -2,7 +2,10 @@ import { sql } from "drizzle-orm";
 import {
   index,
   integer,
+  bigint,
   boolean,
+  check,
+  date,
   jsonb,
   pgTable,
   text,
@@ -88,15 +91,24 @@ export const notificationDeliveries = pgTable(
     }),
     recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
     kind: varchar("kind", { length: 40 }).notNull(),
+    referenceId: uuid("reference_id"),
     status: varchar("status", { length: 20 }).notNull(),
     providerId: text("provider_id"),
     errorCode: varchar("error_code", { length: 80 }),
+    attemptStartedAt: timestamp("attempt_started_at", { withTimezone: true }),
+    attemptToken: uuid("attempt_token"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }),
   },
-  (table) => [index("notification_user_id_idx").on(table.userId)],
+  (table) => [
+    index("notification_user_id_idx").on(table.userId),
+    uniqueIndex("notification_kind_reference_idx").on(
+      table.kind,
+      table.referenceId,
+    ),
+  ],
 );
 
 export const clubs = pgTable("clubs", {
@@ -162,6 +174,9 @@ export const teams = pgTable(
       .notNull()
       .references(() => clubs.id, { onDelete: "restrict" }),
     name: varchar("name", { length: 160 }).notNull(),
+    bankAccountId: uuid("bank_account_id").references(() => bankAccounts.id, {
+      onDelete: "restrict",
+    }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -387,5 +402,85 @@ export const joinRequests = pgTable(
       .where(sql`${table.status} = 'pending'`),
     index("join_requests_team_status_idx").on(table.teamId, table.status),
     index("join_requests_guardian_idx").on(table.guardianUserId),
+  ],
+);
+
+export const variableSymbolSequences = pgTable("variable_symbol_sequences", {
+  bankAccountId: uuid("bank_account_id")
+    .primaryKey()
+    .references(() => bankAccounts.id, { onDelete: "restrict" }),
+  nextValue: bigint("next_value", { mode: "number" }).notNull(),
+});
+
+export const assessments = pgTable(
+  "assessments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clubId: uuid("club_id")
+      .notNull()
+      .references(() => clubs.id, { onDelete: "restrict" }),
+    teamId: uuid("team_id").references(() => teams.id, {
+      onDelete: "restrict",
+    }),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    amountHalere: integer("amount_halere").notNull(),
+    dueDate: date("due_date", { mode: "string" }).notNull(),
+    paymentMessage: varchar("payment_message", { length: 60 }).notNull(),
+    idempotencyKey: uuid("idempotency_key").notNull().unique(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("assessments_club_created_idx").on(table.clubId, table.createdAt),
+    index("assessments_team_created_idx").on(table.teamId, table.createdAt),
+    check("assessments_amount_positive", sql`${table.amountHalere} > 0`),
+  ],
+);
+
+export const receivables = pgTable(
+  "receivables",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    assessmentId: uuid("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "restrict" }),
+    athleteId: uuid("athlete_id")
+      .notNull()
+      .references(() => athletes.id, { onDelete: "restrict" }),
+    originTeamId: uuid("origin_team_id").references(() => teams.id, {
+      onDelete: "restrict",
+    }),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    amountHalere: integer("amount_halere").notNull(),
+    variableSymbol: varchar("variable_symbol", { length: 10 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("receivables_assessment_athlete_idx").on(
+      table.assessmentId,
+      table.athleteId,
+    ),
+    uniqueIndex("receivables_account_vs_idx").on(
+      table.bankAccountId,
+      table.variableSymbol,
+    ),
+    index("receivables_athlete_idx").on(table.athleteId),
+    check("receivables_amount_positive", sql`${table.amountHalere} > 0`),
+    check(
+      "receivables_vs_digits",
+      sql`${table.variableSymbol} ~ '^[0-9]{1,10}$'`,
+    ),
   ],
 );

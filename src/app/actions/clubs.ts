@@ -41,7 +41,7 @@ export async function createClubAction(formData: FormData) {
     redirect(`/kluby/novy?error=${encodeURIComponent(message(error))}`);
   }
 
-  redirect(`/kluby/${clubId}?success=Klub a první tým byly založeny.`);
+  redirect(`/kluby/${clubId}?success=${encodeURIComponent("Klub a první tým byly založeny.")}`);
 }
 
 export async function createTeamAction(formData: FormData) {
@@ -58,7 +58,7 @@ export async function createTeamAction(formData: FormData) {
     redirect(`/kluby/${clubId}?error=${encodeURIComponent(message(error))}`);
   }
 
-  redirect(`/kluby/${clubId}?success=Tým byl vytvořen.`);
+  redirect(`/kluby/${clubId}?success=${encodeURIComponent("Tým byl vytvořen.")}`);
 }
 
 export async function inviteCoachAction(formData: FormData) {
@@ -80,7 +80,7 @@ export async function inviteCoachAction(formData: FormData) {
   }
 
   redirect(
-    `/kluby/${clubId}?success=Pozvánka trenéra byla vytvořena.&inviteLink=${encodeURIComponent(inviteLink)}`,
+    `/kluby/${clubId}?success=${encodeURIComponent("Pozvánka trenéra byla vytvořena.")}&inviteLink=${encodeURIComponent(inviteLink)}`,
   );
 }
 
@@ -98,7 +98,7 @@ export async function acceptCoachInvitationAction(formData: FormData) {
     );
   }
 
-  redirect(`/tymy/${teamId}?success=Pozvánka trenéra byla přijata.`);
+  redirect(`/tymy/${teamId}?success=${encodeURIComponent("Pozvánka trenéra byla přijata.")}`);
 }
 
 export async function switchCoachTeamAction(formData: FormData) {
