@@ -17,6 +17,13 @@ body {
   min-height: 100%;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 body {
   margin: 0;
   background: var(--background);
@@ -70,4 +77,157 @@ a:focus-visible {
   border-radius: 0.2rem;
   outline: 0.2rem solid var(--accent);
   outline-offset: 0.2rem;
+}
+
+.auth-shell,
+.dashboard-shell {
+  min-height: 100vh;
+}
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 0.75rem 2rem rgb(21 32 51 / 6%);
+}
+
+.auth-card {
+  width: min(100%, 31rem);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+}
+
+.brand-link {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.form-stack,
+.content-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-stack {
+  margin-top: 1.5rem;
+}
+
+.form-stack label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.form-stack input,
+.form-stack select,
+.form-stack textarea {
+  width: 100%;
+  border: 1px solid #aebbd0;
+  border-radius: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  background: #fff;
+  color: var(--text);
+}
+
+.form-stack input:focus,
+.form-stack select:focus,
+.form-stack textarea:focus {
+  border-color: var(--accent);
+  outline: 0.16rem solid rgb(24 89 169 / 18%);
+}
+
+.form-stack small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+button,
+.button-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  border-radius: 0.65rem;
+  padding: 0.65rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.button-secondary {
+  border-color: var(--border);
+  background: #fff;
+  color: var(--text);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.secondary-link {
+  margin-top: 1.25rem;
+  text-align: center;
+}
+
+.message {
+  border-radius: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  color: var(--text);
+}
+
+.message-error {
+  border: 1px solid #efb3b3;
+  background: #fff0f0;
+}
+
+.message-success {
+  border: 1px solid #a8d5bd;
+  background: #edfff5;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+  padding: 1rem clamp(1rem, 4vw, 3rem);
+}
+
+.dashboard-shell .content-stack {
+  width: min(100% - 2rem, 72rem);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.dashboard-shell .panel {
+  padding: 1.5rem;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+@media (max-width: 35rem) {
+  .button-row,
+  .button-row > *,
+  .button-row form,
+  .button-row button {
+    width: 100%;
+  }
 }
