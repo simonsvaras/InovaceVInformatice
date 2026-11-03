@@ -10,6 +10,7 @@ Stav k 2026-11-03. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 | A-02 | Pracovní pravidlo | Doménová logika mimo UI a HTTP handlery; bankovní adaptér za rozhraním. E-mail odeslat přes Resend po DB zápisu, chybu doručení uložit pro ruční opakování. Bez fronty a samostatného workeru v demo MVP. |
 | A-03 | Schváleno zadavatelem | Nasazení: stáhnout repozitář na vlastní server a spustit přes Docker Compose. ECS, RDS a další spravované AWS služby nejsou součástí projektu. |
 | A-04 | Schváleno zadavatelem | Lead Agent vždy navrhuje, implementuje, sjednocuje a dokumentuje. Subagenti pouze nezávisle kontrolují; soubory neupravují. Nikdy nepsat automatizované testy. Ověření je ruční průchod scénářů a kontrola build/lint/migrací. |
+| A-05 | Pracovní pravidlo | Typovaný přístup k PostgreSQL zajišťuje Drizzle ORM nad `postgres.js`; Drizzle Kit generuje verzované SQL migrace. V Docker Compose čeká aplikace na zdravou DB, provede čekající migrace a až potom spustí Next.js. Health endpoint ověřuje spojení i marker verze schématu. PostgreSQL používá pojmenované volume a nemá publikovaný hostitelský port. |
 
 ## Produktová pravidla MVP
 

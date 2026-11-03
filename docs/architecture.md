@@ -8,13 +8,15 @@ Stav: aktualizováno podle rozhodnutí zadavatele 2026-11-03. Business hranice a
 | --- | --- | --- |
 | Web a server | TypeScript, Next.js App Router na Node.js | Jeden repozitář a kontejner pro mobilní UI, serverové renderování a HTTP endpointy; obchodní logika zůstane mimo komponenty a handlery. |
 | UI | React, responzivní komponenty, přístupné formuláře; orientační vizuální styl z Lovable | Mobilní použití; mapa a opravy prototypu jsou v `docs/design.md`. |
-| Databáze | PostgreSQL, verzované SQL migrace a typovaný přístup k DB | Transakce a unikátní omezení pro finanční konzistenci. ORM/knihovnu vybrat při prvním milníku podle aktuální kompatibility, bez změny doménového modelu. |
+| Databáze | PostgreSQL, Drizzle ORM nad `postgres.js` a verzované SQL migrace | Transakce a unikátní omezení pro finanční konzistenci. Migrace se spustí před startem aplikace; doménové schéma se rozvíjí po malých verzovaných změnách. |
 | Přihlášení | Serverové session v bezpečném cookie, ověřená knihovna pro hesla a session | Pozvánky a role patří do vlastní domény; žádné klientské rozhodování o oprávnění. Konkrétní knihovna se zvolí při implementaci. |
 | E-mail | Resend přes izolovaný adaptér; stav doručení v DB | Požadovaná integrace. Odeslání po potvrzení DB změny; selhání nesmí vrátit ani zdvojit předpis a lze je ručně opakovat. |
 | Banka | Rozhraní `BankFeedProvider` a demo simulátor | Simulátor vrací normalizované pohyby s neměnným označením `simulated`. Skutečné Fio je mimo MVP. |
 | Provoz | Jeden Docker image aplikace a PostgreSQL v Docker Compose; perzistentní DB volume | Zadavatel stáhne repozitář na vlastní server a spustí Compose. ECS, RDS, další cloudové služby ani další aplikační proces nejsou potřeba. |
 
 Next.js oficiálně podporuje běh v Dockeru jako Node.js server a doporučuje předřadit reverzní proxy. Demo poběží v jedné aplikační instanci; stránky s finančními údaji nejsou veřejně cachované. Na serveru se musí vyřešit HTTPS, perzistentní volume a zálohy DB. Zdroje: [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting), [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers).
+
+Technický základ M1 používá jediný migrační proces při startu aplikačního kontejneru. Compose čeká na zdravou databázi, migrace jsou idempotentně evidované v PostgreSQL a teprve po jejich dokončení se spustí Next.js. Health endpoint kontroluje spojení i přítomnost markeru verze schématu; databázový port není publikovaný na hostitele.
 
 ## Moduly a hranice
 

@@ -12,6 +12,9 @@ Aktualizováno: 2026-11-03.
 - Nezávislá revize aktualizovaných dokumentů našla bezpečnostní mezery v pozvánce a týmovém kódu a několik chybějících kritérií. Byly zapracovány do rozhodnutí, architektury, designu a plánu. Závěrečná read-only kontrola nenašla další zásadní rozpor; její poslední připomínka ke zbytečnému druhému ověření e-mailu byla také zapracována.
 - Kontrola repozitáře a agentní konfigurace uzavřela M0: všechny tři TOML soubory se načítají, cesty k rolím a jejich pole odpovídají aktuální dokumentaci Codexu, osm snímků prototypu je přítomných. Doplněno IČO při registraci, oprávnění správce pro celoklubové ruční dluhy (D-12), neměnnost účtu vystaveného dluhu (D-13) a chybějící správní obrazovky.
 - Následná nezávislá read-only architektonická revize našla čtyři konkrétní mezery: změnu účtu, obecné formulace o ručních platbách, scénář zrušení dluhu a mapu správních obrazovek. Všechny čtyři připomínky byly přijaty a zapracovány; žádná nebyla odmítnuta. Kontrola návazností po úpravě nenašla staré rozporné formulace.
+- Schválený návrh M0, prototypové podklady, agentní konfigurace a bezpečný `.gitignore` byly uloženy v prvním commitu `8508dce` před zahájením aplikační implementace.
+- M1 dodal Next.js App Router v TypeScriptu, typovaný PostgreSQL přístup přes Drizzle ORM/`postgres.js`, první verzovanou migraci, databázový health endpoint, produkční Dockerfile a Docker Compose s nepublikovanou DB a pojmenovaným volume.
+- Lokální tajemství jsou v ignorovaném `.env`; repozitář obsahuje jen `.env.example` se zástupnými hodnotami. Start je popsán v `README.md` a aplikační kontejner před spuštěním Next.js automaticky provede čekající migrace.
 
 ## Kontrola konzistence
 
@@ -24,14 +27,21 @@ Aktualizováno: 2026-11-03.
 | Soukromí, historie, export a zachování dluhů po odchodu | Serverová oprávnění na klub/tým/sportovce, audit, archivace místo mazání | M6–M7; historie, příchozí platby, týmy |
 | Nasazení školního dema | Aplikace a PostgreSQL v Docker Compose na vlastním serveru | M8; ruční průchod a dokumentované spuštění |
 
-## Stav implementace
+## Stav implementace a ověření M1
 
-- Aplikace, databázové migrace, Docker Compose ani nasazení ještě nevznikly. Tento úkol je pouze přípravou návrhu.
-- Žádné automatizované testy se podle výslovné instrukce zadavatele nebudou psát. Milníky mají ruční ověřovací scénáře.
-- Skutečné Fio a ostrý provoz s reálnými údaji nejsou součástí schváleného demo MVP.
-- Lokální větev `main` zatím nemá žádný commit a všechny projektové soubory jsou nesledované. Vzdálený repozitář `origin` zatím nemá větev; dokumentace tedy dosud není uložená v historii Git/GitHub. To nebrání návrhu M0, ale před sdílením a implementací je vhodné vytvořit první commit a publikovat jej.
+- `npm run lint` prošel bez nálezů a čistý `npm run build` vytvořil produkční build se statickou úvodní stránkou a dynamickým `/api/health`.
+- `npm audit --omit=dev` hlásí 0 zranitelností produkčních závislostí. Úplný audit hlásí 20 středních nálezů pouze ve vývojovém toolingu Drizzle Kit/ESLint (`esbuild`, `minimatch`); dostupná automatická oprava by provedla nekompatibilní downgrade. Jde o známý dluh vývojových závislostí, který je nutné znovu zkontrolovat při jejich aktualizaci.
+- `docker compose up --build -d` sestavil image a spustil zdravé kontejnery `app` a `db`; web byl dostupný na hostitelském portu 3000, PostgreSQL zůstal pouze na Compose síti.
+- Startovací log potvrdil dokončení migrace. V `drizzle.__drizzle_migrations` zůstal právě jeden záznam a `/api/health` vrátil `200` s `database: connected` a `schemaVersion: M1-0000`.
+- Před restartem byl do `app_metadata` vložen `manual_persistence_check=M1-before-restart`. Po `docker compose restart` se migrace bezpečně spustila znovu bez duplicity, health endpoint se obnovil a kontrolní záznam i počet jedné aplikované migrace zůstaly zachované.
+- Automatizované testy ani testovací soubory nevznikly. Skutečné Fio a ostrý provoz s reálnými údaji zůstávají mimo schválené demo MVP.
+- Nezávislá architektonická a kódová read-only revize nenašla blokující ani středně závažný problém. Jediný konkrétní nízký nález o ručním duplikování DB hesla v `DATABASE_URL` byl přijat: runtime nyní skládá připojení ze samostatných `PG*` proměnných předaných Compose. Zbytková rizika pohyblivých patch tagů image a migračního retry byla pro školní demo přijata; validace session tajemství patří do M2 a HTTPS, reverzní proxy a zálohy do M8.
+
+## Známá omezení
+
+- Compose konfigurace je připravená pro demo; před veřejným nasazením je stále nutné doplnit reverzní proxy, HTTPS a provozní zálohování podle M8.
+- ESLint 9 je připnutý kvůli aktuálním peer požadavkům `eslint-config-next`; npm jej již označuje jako nepodporovanou hlavní verzi. Přechod na ESLint 10 je vhodný až po kompatibilní aktualizaci lintovacích pluginů.
 
 ## Nejbližší krok
 
-1. Předat zadavateli shrnutí M0 a upozornit na dosud neuložený první commit.
-2. Na další implementační pokyn zahájit M1. Lead Agent bude implementaci řídit a subagenty použije jen k revizi.
+1. V dalším samostatném úkolu zahájit M2: účty, session, klubové a týmové role, členství a bezpečné pozvánky.
