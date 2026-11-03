@@ -1,0 +1,69 @@
+# Návrh technické architektury
+
+Stav: aktualizováno podle rozhodnutí zadavatele 2026-11-03. Business hranice a pracovní zjednodušení: `docs/requirements.md`, `docs/decisions.md`. Jde o modulární monolit pro školní demo.
+
+## Stack a nasazení
+
+| Vrstva | Návrh | Důvod / omezení |
+| --- | --- | --- |
+| Web a server | TypeScript, Next.js App Router na Node.js | Jeden repozitář a kontejner pro mobilní UI, serverové renderování a HTTP endpointy; obchodní logika zůstane mimo komponenty a handlery. |
+| UI | React, responzivní komponenty, přístupné formuláře; orientační vizuální styl z Lovable | Mobilní použití; mapa a opravy prototypu jsou v `docs/design.md`. |
+| Databáze | PostgreSQL, verzované SQL migrace a typovaný přístup k DB | Transakce a unikátní omezení pro finanční konzistenci. ORM/knihovnu vybrat při prvním milníku podle aktuální kompatibility, bez změny doménového modelu. |
+| Přihlášení | Serverové session v bezpečném cookie, ověřená knihovna pro hesla a session | Pozvánky a role patří do vlastní domény; žádné klientské rozhodování o oprávnění. Konkrétní knihovna se zvolí při implementaci. |
+| E-mail | Resend přes izolovaný adaptér; stav doručení v DB | Požadovaná integrace. Odeslání po potvrzení DB změny; selhání nesmí vrátit ani zdvojit předpis a lze je ručně opakovat. |
+| Banka | Rozhraní `BankFeedProvider` a demo simulátor | Simulátor vrací normalizované pohyby s neměnným označením `simulated`. Skutečné Fio je mimo MVP. |
+| Provoz | Jeden Docker image aplikace a PostgreSQL v Docker Compose; perzistentní DB volume | Zadavatel stáhne repozitář na vlastní server a spustí Compose. ECS, RDS, další cloudové služby ani další aplikační proces nejsou potřeba. |
+
+Next.js oficiálně podporuje běh v Dockeru jako Node.js server a doporučuje předřadit reverzní proxy. Demo poběží v jedné aplikační instanci; stránky s finančními údaji nejsou veřejně cachované. Na serveru se musí vyřešit HTTPS, perzistentní volume a zálohy DB. Zdroje: [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting), [Route Handlers](https://nextjs.org/docs/app/getting-started/route-handlers).
+
+## Moduly a hranice
+
+```text
+Mobilní prohlížeč
+  └─ Next.js UI → serverové handlery → aplikační služby
+                                  ├─ Identity & invitations
+                                  ├─ Clubs, teams & memberships
+                                  ├─ Assessments & receivables
+                                  ├─ Payments & reconciliation
+                                  ├─ Notifications & exports
+                                  └─ Bank feed port
+                                        └─ simulator adapter (MVP)
+                         ↓               ↓
+                    PostgreSQL       Resend API
+```
+
+UI volá serverové aplikační služby; HTTP route handlery obsluhují pozvánky, formuláře a demo simulátor. V demo MVP se simulační pohyb zpracuje při potvrzení „odeslání“ v simulátoru; není třeba plánovač, broker, worker ani samostatná mikroslužba. Po úspěšném DB zápisu se odešle e-mail; stav doručení se uloží a případné selhání se nabídne k ručnímu opakování. Budoucí skutečné Fio by vyžadovalo plánovanou synchronizaci mimo HTTP proces.
+
+Simulátor je oddělený modul a adaptér. Jeho „odeslání“ vytváří simulovaný pohyb se zdrojem `simulated`, který projde stejnou technickou logikou párování, ale nikdy se nezmění na skutečně bankovně ověřenou událost. Zdroj a důvěryhodnost jsou neměnné atributy pohybu, alokace a odvozeného stavu; UI, e-mail, potvrzení i export musí demo výsledek viditelně označit. Standardní QR Platba obsahuje bankovní platební údaje, nikoli URL simulátoru. Demo přechod je samostatné tlačítko vedle QR (D-02).
+
+## Doménový a datový model (koncept)
+
+- `users`, `sessions`, `clubs`, `club_admins`, `teams`, `team_coaches`, `athletes`, `guardians`, `memberships`, `invitations`, `join_requests`.
+- `bank_accounts` patří klubu; jeden je výchozí, tým může mít vlastní. Normalizované číslo účtu je v demu jedinečné napříč kluby a může sloužit více týmům jednoho klubu. Režim je v demo MVP ruční nebo simulovaný a po vystavení dluhu se nemění. Změna výchozího či týmového účtu platí jen pro nové dluhy; starý účet zůstává v historii podle D-13. U sdíleného účtu vidí syrové nespárované pohyby pouze správce klubu; trenér je vidí jen u výhradního týmového účtu (D-03).
+- `assessments` jsou hromadné definice předpisu; `receivables` jsou individuální, neměnně identifikované dluhy. Dluh ukládá částku v haléřích, splatnost, účet, unikátní VS, příjemce a případný týmový původ. Celoklubový předpis vytvoří nejvýše jeden dluh pro každého unikátního sportovce, i když je ve více týmech; týmový původ je v tomto případě prázdný a export označí tým „Celý klub“. Spravuje jej klubový správce a používá výchozí klubový účet podle D-03.
+- `bank_transactions` ukládají normalizované demo pohyby se zdrojovým ID a unikátní dvojicí účet + ID pohybu; typ `source_kind` je v MVP vždy `simulated`. `payment_events` rozlišují simulovaný pohyb, oprávněným aktérem potvrzené ruční hlášení a hotovost. `allocations` přiřazují částky k dluhům. Historie nesmí být přepsána ztrátovým „paid = true“ ani demo alokace vydávána za reálný bankovní převod.
+- `payment_claims` drží ruční hlášení a jeho odvolání/zamítnutí/potvrzení. `audit_events` zachycují aktéra, čas, tým/klub, operaci a bezpečně vybrané změny. `notification_deliveries` ukládají stav odeslání e-mailu a umožní ruční opakování.
+- Peněžní částky jsou integer v haléřích, čas UTC; uživatelské datumy a splatnost se zobrazují podle Europe/Prague. VS je text s kontrolou platného formátu a DB unikátností v rámci bankovního účtu, včetně historických dluhů. Již vystavený dluh si trvale ponechá původní účet, VS a QR údaje; účet se neodstraňuje, dokud je potřebný pro historii (D-13).
+
+Stav „po splatnosti“ se odvodí z data a neuhrazené částky, nikoli ze samostatného účetního zápisu. Stav „nahlášeno“ vzniká jen z aktivního ručního hlášení. Částečná úhrada, zaplacení a přeplatek se odvozují z plateb a alokací. Přeplatek v MVP nezakládá kredit; zbytek čeká na ruční řešení dle D-05.
+
+## Klíčové toky
+
+1. **Pozvání a členství:** správce/trenér vytvoří časově omezenou jednorázovou e-mailovou pozvánku nebo týmový kód. Platný odkaz po registraci či přihlášení rovnou aktivuje členství jen u účtu se shodnou e-mailovou adresou; samotný odkaz je důkaz držení pozvánky a další ověřovací krok není. Kód vytvoří žádost čekající na trenéra. Pozvánka/kód dovoluje vytvořit sportovce pod daným účtem, nepřebírá existujícího sportovce podle jména. Rodič nevidí týmová data před aktivací členství. Přesun člena ukončí původní a založí nové členství bez přenosu starých dluhů.
+2. **Vystavení předpisu:** autorizovaná služba ověří klub/tým, účet a adresáty, ukáže počet oslovených rodičů, v jedné DB transakci založí předpis, dluhy, VS a audit. Po potvrzení transakce odešle e-maily a zaznamená výsledek doručení. Opakovaný požadavek nesmí vystavit duplicitní předpis.
+3. **Ruční platba:** rodič může nahlášení vzít zpět před potvrzením. Trenér spravuje hlášení a hotovost svého týmu, správce klubu i celoklubové dluhy podle D-12. Oprávněný aktér může více hlášení potvrdit nebo zamítnout s důvodem. Potvrzení vytváří finanční událost a alokaci v transakci, s ochranou proti opakovanému kliknutí. Hotovost má oddělený typ a datum.
+4. **Simulovaná platba:** potvrzení v demo bankovním rozhraní vloží idempotentně pohyb a páruje podle účtu a VS jen při jednoznačném výsledku. Nejasný VS či částka jdou do fronty nespárovaných. Přístup k syrovým pohybům sdíleného účtu má pouze správce klubu. Přiřazení kontroluje účet, klub a oprávnění k dluhu; stejné peníze nelze přiřadit dvakrát. Simulátor nikdy netvrdí, že se provedl skutečný převod.
+5. **Informování:** e-mail s QR a potvrzení po párování se odešlou po DB zápisu; stav doručení se uloží. Neutrální upomínka se odešle jen oprávněně vybraným neuhrazeným příjemcům. CSV a potvrzení vznikají ze serverově autorizovaných dat a nesou označení simulace tam, kde je zdrojem demo pohyb.
+
+## Bezpečnost, soukromí a provoz
+
+- Autorizace je v každé aplikační službě i dotazu: klubový správce pro svůj klub, trenér pro své týmy, rodič pro vlastní sportovce. Při ruční kontrole projít i přímé URL s cizím ID, nejen skryté ovládací prvky.
+- Hesla se ukládají moderním adaptivním hashem; session cookie `HttpOnly`, `Secure`, `SameSite`; ochrana CSRF u mutací, limitování pokusů o přihlášení a pozvánek. Veřejné kódy nesmí samy vystavit osobní nebo finanční data.
+- DB heslo, Resend klíč a session secret jsou mimo git; žádný skutečný Fio token v MVP. Tajemství a osobní údaje se nelogují. Přístup k bankovním údajům se audituje.
+- PostgreSQL má perzistentní volume a není vystavený do internetu; veřejná aplikace běží přes HTTPS, s pravidelnou zálohou a ověřenou obnovou. Konfigurace a migrace jsou součástí návodu pro `docker compose up`. Demo pracuje se syntetickými daty.
+- Neznámý stav banky se nikdy nevydává za skutečně ověřenou platbu. Před případným ostrým provozem je nutné doplnit skutečný zdroj bankovních pohybů a znovu posoudit ochranu dat.
+- Ručně se kontrolují přímé přístupy na cizí klub/tým, soukromí dítěte, souběžné vystavení VS, opakované potvrzení demo pohybu, částečné a duplicitní platby a opravy finančních záznamů. Automatizované testy se podle rozhodnutí A-04 nepíší.
+
+## Náklady a škálování
+
+Největší vývojová složitost je správnost plateb a oprávnění, nikoli počet služeb. Jedna aplikace a jedna PostgreSQL databáze snižují režii. Oddělený bankovní adaptér umožní později skutečné Fio bez přepisu UI. Demo nepotřebuje horizontální škálování ani další infrastrukturu; při budoucím ostrém provozu se musí znovu posoudit synchronizace, zálohy a ochrana dat.

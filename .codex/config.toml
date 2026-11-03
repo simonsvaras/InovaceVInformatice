@@ -1,0 +1,9 @@
+# Projektová konfigurace Codexu; model hlavního agenta přebírá nastavení uživatele.
+# Subagenti jsou v aktuálním Codexu zapnuti ve výchozím nastavení.
+[agents.architecture-reviewer]
+description = "Nezávislá read-only revize architektury a vazby na zadání."
+config_file = "agents/architecture-reviewer.toml"
+
+[agents.code-reviewer]
+description = "Nezávislá read-only revize implementace a bezpečnosti."
+config_file = "agents/code-reviewer.toml"
