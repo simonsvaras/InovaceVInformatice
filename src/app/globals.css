@@ -223,11 +223,112 @@ h2 {
   margin-top: 0;
 }
 
+h3 {
+  margin: 0 0 0.5rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+}
+
+.subcard {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  padding: 1rem;
+}
+
+.compact-form {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.inline-form {
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  align-items: end;
+}
+
+.checkbox-label {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  font-weight: 400 !important;
+}
+
+.checkbox-label input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.share-code {
+  display: block;
+  overflow-wrap: anywhere;
+  border-radius: 0.5rem;
+  background: #f1f5fa;
+  padding: 0.85rem;
+}
+
+.link-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.list-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fieldset {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 1rem;
+}
+
+.fieldset legend {
+  padding: 0 0.4rem;
+  font-weight: 700;
+}
+
+.link-output-list {
+  display: grid;
+  gap: 0.8rem;
+  padding-left: 1.25rem;
+}
+
+.link-output-list li {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.link-output-list code {
+  overflow-wrap: anywhere;
+}
+
+.large-code {
+  margin-left: 0.35rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+}
+
+.spaced-section {
+  margin-top: 1.5rem;
+}
+
 @media (max-width: 35rem) {
   .button-row,
   .button-row > *,
   .button-row form,
   .button-row button {
     width: 100%;
+  }
+
+  .inline-form {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "team_join_codes_one_active_per_team_idx" ON "team_join_codes" USING btree ("team_id") WHERE "team_join_codes"."revoked_at" is null;

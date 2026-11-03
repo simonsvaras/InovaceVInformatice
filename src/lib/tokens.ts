@@ -21,3 +21,10 @@ export function hashOpaqueToken(token: string): string {
 export function hashRateLimitKey(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
+
+export function createHumanCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(8);
+  const characters = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]);
+  return `${characters.slice(0, 4).join("")}-${characters.slice(4).join("")}`;
+}

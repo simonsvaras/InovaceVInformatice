@@ -5,21 +5,21 @@ import { redirect } from "next/navigation";
 
 import { getDatabase } from "@/db/client";
 import {
+  auditEvents,
   passwordResetTokens,
-  rateLimitBuckets,
   sessions,
   users,
 } from "@/db/schema";
 import {
   createOpaqueToken,
   hashOpaqueToken,
-  hashRateLimitKey,
 } from "@/lib/tokens";
 import { InputError, normalizeEmail } from "@/lib/validation";
 import {
   absoluteAppUrl,
   sendTransactionalEmail,
 } from "@/modules/notifications/email";
+import { consumeRateLimit } from "@/modules/security/rate-limit";
 
 const SESSION_COOKIE = "club_session";
 const SESSION_DAYS = 30;
@@ -33,36 +33,6 @@ export type AuthenticatedUser = {
 
 function expiresInMinutes(minutes: number) {
   return new Date(Date.now() + minutes * 60_000);
-}
-
-async function consumeRateLimit(
-  scope: string,
-  identifier: string,
-  limit: number,
-  windowMinutes: number,
-) {
-  const database = getDatabase();
-  const key = hashRateLimitKey(`${scope}:${identifier}`);
-  const resetBefore = new Date(Date.now() - windowMinutes * 60_000);
-  const now = new Date();
-  const [bucket] = await database
-    .insert(rateLimitBuckets)
-    .values({ key, attempts: 1, windowStartedAt: now })
-    .onConflictDoUpdate({
-      target: rateLimitBuckets.key,
-      set: {
-        attempts: sql<number>`case when ${rateLimitBuckets.windowStartedAt} < ${resetBefore} then 1 else ${rateLimitBuckets.attempts} + 1 end`,
-        windowStartedAt: sql<Date>`case when ${rateLimitBuckets.windowStartedAt} < ${resetBefore} then ${now} else ${rateLimitBuckets.windowStartedAt} end`,
-      },
-    })
-    .returning({ attempts: rateLimitBuckets.attempts });
-
-  if (bucket.attempts > limit) {
-    throw new InputError(
-      "rate_limited",
-      "Příliš mnoho pokusů. Zkuste to prosím později.",
-    );
-  }
 }
 
 export async function registerUser(input: {
@@ -206,15 +176,6 @@ export async function requestPasswordReset(emailInput: string) {
 
   const rawToken = createOpaqueToken();
   await database.transaction(async (transaction) => {
-    await transaction
-      .update(passwordResetTokens)
-      .set({ consumedAt: new Date() })
-      .where(
-        and(
-          eq(passwordResetTokens.userId, user.id),
-          isNull(passwordResetTokens.consumedAt),
-        ),
-      );
     await transaction.insert(passwordResetTokens).values({
       userId: user.id,
       tokenHash: hashOpaqueToken(rawToken),
@@ -262,8 +223,19 @@ export async function resetPassword(rawToken: string, newPassword: string) {
     await transaction
       .update(passwordResetTokens)
       .set({ consumedAt: new Date() })
-      .where(eq(passwordResetTokens.id, token.id));
+      .where(
+        and(
+          eq(passwordResetTokens.userId, token.user_id),
+          isNull(passwordResetTokens.consumedAt),
+        ),
+      );
     await transaction.delete(sessions).where(eq(sessions.userId, token.user_id));
+    await transaction.insert(auditEvents).values({
+      actorUserId: token.user_id,
+      eventType: "account.password_reset",
+      targetType: "user",
+      targetId: token.user_id,
+    });
     return true;
   });
 

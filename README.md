@@ -11,6 +11,9 @@ Požadavky: Docker s Compose pluginem.
 1. Zkopírujte `.env.example` jako `.env`.
 2. V `.env` nahraďte všechny hodnoty `replace_...` vlastními lokálními
    tajemstvími.
+   `PUBLIC_APP_URL` musí odpovídat adrese, ze které uživatelé otevírají
+   pozvánky a reset hesla. Pro skutečné odeslání e-mailu doplňte
+   `RESEND_API_KEY` a ověřenou adresu `EMAIL_FROM`.
 3. Spusťte aplikaci a databázi jediným příkazem:
 
    ```sh
@@ -49,3 +52,17 @@ npm run db:generate
 
 Projekt záměrně neobsahuje automatizované testy ani testovací soubory. Ověření
 milníků probíhá ručně podle `docs/development-plan.md`.
+
+## Účty, pozvánky a e-mail
+
+- Session je neprůhledný náhodný token v `HttpOnly`, `SameSite=Lax` cookie;
+  server v databázi drží pouze HMAC hash. Platnost session je 30 dní.
+- Reset hesla je jednorázový a platí 30 minut. Úspěšná změna zneplatní všechny
+  stávající session účtu.
+- E-mailové pozvánky trenéra i člena jsou jednorázové, vázané na normalizovaný
+  e-mail a platí 48 hodin. Aktivní pozvánku lze zrušit.
+- Týmový kód platí 30 dní a pouze vytvoří žádost ke schválení. Vygenerování
+  nového kódu zruší předchozí kód.
+- Bez `RESEND_API_KEY` se stav nedoručení bezpečně uloží. Oprávněný správce či
+  trenér stále uvidí právě vytvořené členské odkazy pro demo sdílení; reset
+  hesla vyžaduje funkční e-mailovou konfiguraci.

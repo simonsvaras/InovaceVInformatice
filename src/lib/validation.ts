@@ -54,6 +54,94 @@ export function validatePassword(value: string): string {
   return value;
 }
 
+export function validateEntityName(
+  value: string,
+  label: string,
+  maximum = 160,
+): string {
+  const name = value.trim().replace(/\s+/g, " ");
+
+  if (name.length < 2 || name.length > maximum) {
+    throw new InputError(
+      "invalid_name",
+      `${label} musí mít 2 až ${maximum} znaků.`,
+    );
+  }
+
+  return name;
+}
+
+export function validateIco(value: string): string {
+  const ico = value.replace(/\s/g, "");
+
+  if (!/^\d{8}$/.test(ico)) {
+    throw new InputError("invalid_ico", "IČO musí obsahovat přesně 8 číslic.");
+  }
+
+  const weights = [8, 7, 6, 5, 4, 3, 2];
+  const sum = weights.reduce(
+    (total, weight, index) => total + Number(ico[index]) * weight,
+    0,
+  );
+  const expectedCheckDigit = (11 - (sum % 11)) % 10;
+
+  if (expectedCheckDigit !== Number(ico[7])) {
+    throw new InputError("invalid_ico", "Kontrolní číslice IČO není platná.");
+  }
+
+  return ico;
+}
+
+export function normalizeBankAccount(value: string): string {
+  const account = value.replace(/\s/g, "");
+
+  if (!/^(?:\d{1,6}-)?\d{2,10}\/\d{4}$/.test(account)) {
+    throw new InputError(
+      "invalid_bank_account",
+      "Účet zadejte ve formátu 123456789/0100 nebo 19-123456789/0100.",
+    );
+  }
+
+  return account;
+}
+
+export function validatePersonName(value: string, label: string): string {
+  const name = value.trim().replace(/\s+/g, " ");
+
+  if (name.length < 2 || name.length > 80) {
+    throw new InputError(
+      "invalid_person_name",
+      `${label} musí mít 2 až 80 znaků.`,
+    );
+  }
+
+  return name;
+}
+
+export function validateBirthYear(value: string): number {
+  const year = Number.parseInt(value, 10);
+  const currentYear = new Date().getFullYear();
+
+  if (!/^\d{4}$/.test(value) || year < currentYear - 100 || year > currentYear) {
+    throw new InputError(
+      "invalid_birth_year",
+      `Rok narození musí být mezi ${currentYear - 100} a ${currentYear}.`,
+    );
+  }
+
+  return year;
+}
+
+export function normalizeJoinCode(value: string): string {
+  const compact = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+  if (!/^[A-HJ-NP-Z2-9]{8}$/.test(compact)) {
+    throw new InputError("invalid_join_code", "Týmový kód není platný.");
+  }
+
+  return `${compact.slice(0, 4)}-${compact.slice(4)}`;
+}
+
 export function safeInternalPath(value: string | null, fallback = "/prehled") {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
     return fallback;

@@ -9,7 +9,7 @@ Stav: aktualizováno podle rozhodnutí zadavatele 2026-11-03. Business hranice a
 | Web a server | TypeScript, Next.js App Router na Node.js | Jeden repozitář a kontejner pro mobilní UI, serverové renderování a HTTP endpointy; obchodní logika zůstane mimo komponenty a handlery. |
 | UI | React, responzivní komponenty, přístupné formuláře; orientační vizuální styl z Lovable | Mobilní použití; mapa a opravy prototypu jsou v `docs/design.md`. |
 | Databáze | PostgreSQL, Drizzle ORM nad `postgres.js` a verzované SQL migrace | Transakce a unikátní omezení pro finanční konzistenci. Migrace se spustí před startem aplikace; doménové schéma se rozvíjí po malých verzovaných změnách. |
-| Přihlášení | Serverové session v bezpečném cookie, ověřená knihovna pro hesla a session | Pozvánky a role patří do vlastní domény; žádné klientské rozhodování o oprávnění. Konkrétní knihovna se zvolí při implementaci. |
+| Přihlášení | Vlastní neprůhledné serverové session v bezpečném cookie; hesla přes `bcryptjs` | V DB je pouze HMAC hash náhodného session tokenu. Pozvánky a role patří do vlastní domény; žádné klientské rozhodování o oprávnění. |
 | E-mail | Resend přes izolovaný adaptér; stav doručení v DB | Požadovaná integrace. Odeslání po potvrzení DB změny; selhání nesmí vrátit ani zdvojit předpis a lze je ručně opakovat. |
 | Banka | Rozhraní `BankFeedProvider` a demo simulátor | Simulátor vrací normalizované pohyby s neměnným označením `simulated`. Skutečné Fio je mimo MVP. |
 | Provoz | Jeden Docker image aplikace a PostgreSQL v Docker Compose; perzistentní DB volume | Zadavatel stáhne repozitář na vlastní server a spustí Compose. ECS, RDS, další cloudové služby ani další aplikační proces nejsou potřeba. |
@@ -61,6 +61,7 @@ Stav „po splatnosti“ se odvodí z data a neuhrazené částky, nikoli ze sam
 
 - Autorizace je v každé aplikační službě i dotazu: klubový správce pro svůj klub, trenér pro své týmy, rodič pro vlastní sportovce. Při ruční kontrole projít i přímé URL s cizím ID, nejen skryté ovládací prvky.
 - Hesla se ukládají moderním adaptivním hashem; session cookie `HttpOnly`, `Secure`, `SameSite`; ochrana CSRF u mutací, limitování pokusů o přihlášení a pozvánek. Veřejné kódy nesmí samy vystavit osobní nebo finanční data.
+- V M2 používá bcrypt cost 12, 30denní neprůhlednou session a HMAC hash tokenů se serverovým tajemstvím. Next.js Server Actions ověřují původ mutací; všechny akce navíc znovu načítají uživatele ze serverové session a aplikují klubový/týmový filtr. Reset platí 30 minut, e-mailová pozvánka 48 hodin a týmový kód 30 dní. Kód pouze zakládá čekající žádost.
 - DB heslo, Resend klíč a session secret jsou mimo git; žádný skutečný Fio token v MVP. Tajemství a osobní údaje se nelogují. Přístup k bankovním údajům se audituje.
 - PostgreSQL má perzistentní volume a není vystavený do internetu; veřejná aplikace běží přes HTTPS, s pravidelnou zálohou a ověřenou obnovou. Konfigurace a migrace jsou součástí návodu pro `docker compose up`. Demo pracuje se syntetickými daty.
 - Neznámý stav banky se nikdy nevydává za skutečně ověřenou platbu. Před případným ostrým provozem je nutné doplnit skutečný zdroj bankovních pohybů a znovu posoudit ochranu dat.

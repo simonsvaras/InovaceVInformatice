@@ -19,12 +19,16 @@ import {
   validatePassword,
 } from "@/lib/validation";
 
-function errorPath(path: string, error: unknown) {
+function errorPath(path: string, error: unknown, next?: string) {
   const message =
     error instanceof InputError
       ? error.message
       : "Akci se nepodařilo dokončit. Zkuste to znovu.";
-  return `${path}?error=${encodeURIComponent(message)}`;
+  const params = new URLSearchParams({ error: message });
+  if (next) {
+    params.set("next", next);
+  }
+  return `${path}?${params.toString()}`;
 }
 
 export async function registerAction(formData: FormData) {
@@ -38,7 +42,7 @@ export async function registerAction(formData: FormData) {
     });
     await createUserSession(user.id);
   } catch (error) {
-    redirect(errorPath("/registrace", error));
+    redirect(errorPath("/registrace", error, next));
   }
 
   redirect(next);
@@ -54,7 +58,7 @@ export async function loginAction(formData: FormData) {
     );
     await createUserSession(user.id);
   } catch (error) {
-    redirect(errorPath("/prihlaseni", error));
+    redirect(errorPath("/prihlaseni", error, next));
   }
 
   redirect(next);

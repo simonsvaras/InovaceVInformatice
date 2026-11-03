@@ -11,6 +11,7 @@ Stav k 2026-11-03. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 | A-03 | Schváleno zadavatelem | Nasazení: stáhnout repozitář na vlastní server a spustit přes Docker Compose. ECS, RDS a další spravované AWS služby nejsou součástí projektu. |
 | A-04 | Schváleno zadavatelem | Lead Agent vždy navrhuje, implementuje, sjednocuje a dokumentuje. Subagenti pouze nezávisle kontrolují; soubory neupravují. Nikdy nepsat automatizované testy. Ověření je ruční průchod scénářů a kontrola build/lint/migrací. |
 | A-05 | Pracovní pravidlo | Typovaný přístup k PostgreSQL zajišťuje Drizzle ORM nad `postgres.js`; Drizzle Kit generuje verzované SQL migrace. V Docker Compose čeká aplikace na zdravou DB, provede čekající migrace a až potom spustí Next.js. Health endpoint ověřuje spojení i marker verze schématu. PostgreSQL používá pojmenované volume a nemá publikovaný hostitelský port. |
+| A-06 | Pracovní pravidlo | M2 ukládá hesla přes bcrypt s cost 12. Session, resetovací tokeny, pozvánky a týmové kódy jsou kryptograficky náhodné; v DB se ukládá jen HMAC-SHA-256 se serverovým `SESSION_SECRET`. Session platí 30 dní a změna hesla je všechny zneplatní. Mutace používají Next.js Server Actions a každá aplikační služba znovu ověřuje serverovou session a klubový/týmový rozsah. Pokusy o přihlášení, reset a vytváření pozvánek jsou omezené DB rate-limitem. |
 
 ## Produktová pravidla MVP
 
@@ -29,6 +30,7 @@ Stav k 2026-11-03. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 | D-11 | Pracovní pravidlo | V MVP má klub jednoho správce, tým nejvýše jednoho aktivního trenéra. Správce může trenéra vyměnit s varováním, historické akce zůstávají přiřazené původnímu aktérovi. |
 | D-12 | Pracovní pravidlo | Ruční hlášení, hotovost a zrušení neuhrazeného dluhu u celoklubového předpisu vyřizuje pouze správce klubu. Celoklubový dluh nemá týmový původ a nelze jej automaticky přidělit jednomu trenérovi; týmové dluhy nadále spravuje trenér svého týmu nebo správce klubu. |
 | D-13 | Pracovní pravidlo | Změna výchozího klubového či týmového bankovního účtu platí jen pro nově vystavené dluhy. Již vystavený dluh si ponechá původní účet, VS a QR platební údaje; použitý účet se z historie nemaže. Režim účtu s vystavenými dluhy zůstává neměnný podle D-05. |
+| D-14 | Pracovní pravidlo | E-mailová pozvánka trenéra nebo člena platí 48 hodin, je jednorázová, zrušitelná a vyžaduje přesnou shodu normalizovaného e-mailu účtu. Reset hesla platí 30 minut. Sdílený týmový kód platí 30 dní; nový kód starý zruší a kód vždy vytvoří pouze žádost ke schválení. Sportovce lze při pozvánce či kódu nově vytvořit nebo vybrat jen z vlastního účtu; shoda jména nikdy nepřevádí cizí záznam. |
 
 ## Vědomé rozdíly proti prototypu a původnímu seznamu
 
