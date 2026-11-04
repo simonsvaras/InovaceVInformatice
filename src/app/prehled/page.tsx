@@ -8,7 +8,7 @@ import { getUserContexts } from "@/modules/clubs/service";
 import { getGuardianMemberships } from "@/modules/memberships/service";
 import { getGuardianReceivables } from "@/modules/assessments/service";
 import { formatCzk } from "@/modules/payments/qr";
-import { todayInPrague } from "@/lib/dates";
+import { debtStatusLabel } from "@/modules/payments/status";
 
 export default async function DashboardPage({
   searchParams,
@@ -22,8 +22,6 @@ export default async function DashboardPage({
     getGuardianReceivables(user.id),
     searchParams,
   ]);
-  const today = todayInPrague();
-
   return (
     <main className="dashboard-shell">
       <header className="topbar">
@@ -113,14 +111,13 @@ export default async function DashboardPage({
             <p>Seřazeno podle nejbližší splatnosti. Platíte přímo na účet klubu nebo týmu.</p>
             <div className="card-grid">
               {receivables.map((debt) => {
-                const overdue = debt.dueDate < today;
                 return (
                   <section className="subcard" key={debt.id}>
                     <strong>{debt.title}</strong>
                     <span>{debt.athleteFirstName} {debt.athleteLastName}</span>
                     <span>{debt.clubName} · {debt.teamName ?? "celý klub"}</span>
-                    <span>{formatCzk(debt.amountHalere)} · splatnost {debt.dueDate}</span>
-                    <span className={overdue ? "status-overdue" : "status-open"}>{overdue ? "Po splatnosti" : "K úhradě"}</span>
+                    <span>{formatCzk(debt.amountHalere)} · evidováno {formatCzk(debt.allocatedHalere)} · zbývá {formatCzk(debt.remainingHalere)}</span>
+                    <span className={debt.status === "overdue" ? "status-overdue" : "status-open"}>{debtStatusLabel(debt.status)}</span>
                     <Link className="button-link" href={`/dluhy/${debt.id}`}>Platební údaje a QR</Link>
                   </section>
                 );

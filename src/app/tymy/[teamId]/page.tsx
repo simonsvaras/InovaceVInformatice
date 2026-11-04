@@ -37,6 +37,7 @@ export default async function TeamPage({
           <p>Týmový účet je volitelný. Není-li nastaven, předpis použije výchozí účet klubu.</p>
           <div className="button-row">
             <Link className="button-link" href={`/predpisy/novy?teamId=${team.id}`}>Nový týmový předpis</Link>
+            <Link className="button-link button-secondary" href={`/finance?teamId=${team.id}`}>Platby a hlášení</Link>
           </div>
           <form action={setTeamBankAccountAction} className="form-stack inline-form">
             <input name="teamId" type="hidden" value={team.id} />

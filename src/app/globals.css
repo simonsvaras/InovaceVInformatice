@@ -412,6 +412,79 @@ h3 {
   color: #174f8f;
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.25rem;
+}
+
+.summary-card span {
+  color: var(--muted);
+}
+
+.summary-card strong {
+  font-size: 1.45rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.section-heading h2,
+.section-heading p {
+  margin-top: 0;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.finance-matrix {
+  width: 100%;
+  min-width: 46rem;
+  border-collapse: collapse;
+}
+
+.finance-matrix th,
+.finance-matrix td {
+  min-width: 14rem;
+  border: 1px solid var(--border);
+  padding: 0.85rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.finance-matrix thead th,
+.finance-matrix tbody th {
+  background: #f6f8fb;
+}
+
+.matrix-cell {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.matrix-cell > span,
+.matrix-cell details p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.matrix-cell details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 @media (max-width: 35rem) {
   .button-row,
   .button-row > *,
@@ -426,5 +499,13 @@ h3 {
 
   .payment-detail {
     grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading {
+    display: grid;
   }
 }

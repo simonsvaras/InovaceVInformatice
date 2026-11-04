@@ -150,9 +150,6 @@ export const bankAccounts = pgTable(
       .references(() => clubs.id, { onDelete: "restrict" }),
     accountNumber: varchar("account_number", { length: 32 }).notNull(),
     isDefault: boolean("is_default").notNull().default(false),
-    verificationMode: varchar("verification_mode", { length: 20 })
-      .notNull()
-      .default("manual"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -482,5 +479,156 @@ export const receivables = pgTable(
       "receivables_vs_digits",
       sql`${table.variableSymbol} ~ '^[0-9]{1,10}$'`,
     ),
+  ],
+);
+
+export const paymentClaims = pgTable(
+  "payment_claims",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    receivableId: uuid("receivable_id")
+      .notNull()
+      .references(() => receivables.id, { onDelete: "restrict" }),
+    guardianUserId: uuid("guardian_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    amountHalere: integer("amount_halere").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    rejectionReason: varchar("rejection_reason", { length: 300 }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("payment_claims_one_pending_receivable_idx")
+      .on(table.receivableId)
+      .where(sql`${table.status} = 'pending'`),
+    index("payment_claims_guardian_status_idx").on(
+      table.guardianUserId,
+      table.status,
+    ),
+    index("payment_claims_receivable_idx").on(table.receivableId),
+    check("payment_claims_amount_positive", sql`${table.amountHalere} > 0`),
+    check(
+      "payment_claims_status_valid",
+      sql`${table.status} in ('pending', 'withdrawn', 'approved', 'rejected')`,
+    ),
+  ],
+);
+
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clubId: uuid("club_id")
+      .notNull()
+      .references(() => clubs.id, { onDelete: "restrict" }),
+    teamId: uuid("team_id").references(() => teams.id, {
+      onDelete: "restrict",
+    }),
+    kind: varchar("kind", { length: 30 }).notNull(),
+    amountHalere: integer("amount_halere").notNull(),
+    occurredOn: date("occurred_on", { mode: "string" }).notNull(),
+    recordedByUserId: uuid("recorded_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    sourceClaimId: uuid("source_claim_id").references(() => paymentClaims.id, {
+      onDelete: "restrict",
+    }),
+    idempotencyKey: uuid("idempotency_key").unique(),
+    reversesEventId: uuid("reverses_event_id").unique(),
+    correctionReason: varchar("correction_reason", { length: 300 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("payment_events_source_claim_idx").on(table.sourceClaimId),
+    index("payment_events_club_created_idx").on(table.clubId, table.createdAt),
+    index("payment_events_team_created_idx").on(table.teamId, table.createdAt),
+    check("payment_events_amount_positive", sql`${table.amountHalere} > 0`),
+    check(
+      "payment_events_kind_valid",
+      sql`${table.kind} in ('manual_claim', 'cash', 'correction')`,
+    ),
+  ],
+);
+
+export const paymentAllocations = pgTable(
+  "payment_allocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    paymentEventId: uuid("payment_event_id")
+      .notNull()
+      .references(() => paymentEvents.id, { onDelete: "restrict" }),
+    receivableId: uuid("receivable_id")
+      .notNull()
+      .references(() => receivables.id, { onDelete: "restrict" }),
+    amountHalere: integer("amount_halere").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("payment_allocations_event_receivable_idx").on(
+      table.paymentEventId,
+      table.receivableId,
+    ),
+    index("payment_allocations_receivable_idx").on(table.receivableId),
+    check("payment_allocations_amount_nonzero", sql`${table.amountHalere} <> 0`),
+  ],
+);
+
+export const reminderBatches = pgTable(
+  "reminder_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clubId: uuid("club_id")
+      .notNull()
+      .references(() => clubs.id, { onDelete: "restrict" }),
+    teamId: uuid("team_id").references(() => teams.id, {
+      onDelete: "restrict",
+    }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    idempotencyKey: uuid("idempotency_key").notNull().unique(),
+    requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("reminder_batches_scope_idx").on(table.clubId, table.teamId)],
+);
+
+export const reminderRecipients = pgTable(
+  "reminder_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => reminderBatches.id, { onDelete: "restrict" }),
+    receivableId: uuid("receivable_id")
+      .notNull()
+      .references(() => receivables.id, { onDelete: "restrict" }),
+    guardianUserId: uuid("guardian_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("reminder_recipients_batch_debt_guardian_idx").on(
+      table.batchId,
+      table.receivableId,
+      table.guardianUserId,
+    ),
+    index("reminder_recipients_receivable_idx").on(table.receivableId),
   ],
 );

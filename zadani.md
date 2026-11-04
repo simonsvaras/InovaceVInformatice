@@ -3,9 +3,9 @@
 Stavíme webovou aplikaci, používanou hlavně z mobilu, přes kterou amatérské sportovní kluby vybírají
 členské příspěvky a další platby, třeba za turnaj nebo soustředění. Správce klubu se sám zaregistruje,
 založí týmy a přidá do nich trenéry. Trenér pozve hráče a rodiče, vystaví platbu pro svůj tým a na jedné
-obrazovce vidí, kdo zaplatil a kdo ne. Rodič dostane e-mail s QR kódem, zaplatí převodem přímo na
-účet klubu a aplikace platbu ověří: automaticky přes Fio API (v MVP nejspíš simulované FIO API), nebo ručně, kdy rodič klikne „Zaplatil
-jsem“ a trenér to potvrdí. Peníze přes aplikaci nikdy neprotékají, takže nepotřebujeme platební bránu.
+obrazovce vidí, kdo zaplatil a kdo ne. Rodič dostane e-mail s QR kódem a zaplatí převodem přímo na
+účet klubu. Přijetí platby lze v aplikaci zaevidovat ručně oprávněnou osobou nebo později zjistit bankovní synchronizací (v MVP simulátorem).
+Rodičovo „Zaplatil jsem“ je pouze hlášení čekající na vyřízení, nikoli potvrzení přijetí peněz. Peníze přes aplikaci nikdy neprotékají, takže nepotřebujeme platební bránu.
 Trenér dobrovolník tak přestane párovat výpis z banky s Excelem a psát trapné upomínky a rodič má
 jasný stav „zaplaceno“. Vzhled aplikace je hotový jako klikací prototyp v Lovable. Úkolem vývoje je
 postavit podle něj skutečnou aplikaci a napojit ji na backend.
@@ -18,7 +18,7 @@ Tři role. Oprávnění se počítá vždy na úrovni týmu, správce klubu má 
 Role	Jak se do aplikace dostane	Co smí
 Správce klubu	sám se zaregistruje a založí klub (e-mail, heslo, název klubu, IČO, číslo účtu)	vše v klubu: zakládat a archivovat týmy, zvát trenéry, přesouvat členy mezi týmy, vidět platby všech týmů, celoklubové předpisy, export za klub
 Trenér (správce týmu)	vždy ho pozve správce klubu e-mailem a přiřadí k týmu	jen své týmy: zvát a schvalovat členy, vyřadit člena, zakládat jakékoli platby ve svém týmu (příspěvek, turnaj, soustředění), potvrzovat platby, zapsat hotovost, napojit Fio, export za tým
-Člen / rodič	jen přes pozvánku nebo kód týmu, při registraci volí „Koho přihlašuji: sebe / dítě“	vidět své týmy, jména spoluhráčů a trenéra, co má zaplatit a co zaplatil, zaplatit přes QR, v ručním režimu kliknout „Zaplatil jsem“, odhlásit dítě z týmu
+Člen / rodič	jen přes pozvánku nebo kód týmu, při registraci volí „Koho přihlašuji: sebe / dítě“	vidět své týmy, jména spoluhráčů a trenéra, co má zaplatit a co zaplatil, zaplatit přes QR, u nezaplaceného dluhu kliknout „Zaplatil jsem“, odhlásit dítě z týmu
 Důležité: účet není člen. Člen je sportovec, často dítě bez vlastního přihlášení. Rodič má jeden účet a spravuje přes něj všechny své děti, i ve více týmech. Dospělý člen spravuje sám sebe.
 
 Práva na platby se nedělí podle druhu platby: trenér zakládá jakékoli platby ve svém týmu, správce klubu ve všech týmech a navíc jednu platbu pro celý klub naráz.
@@ -26,10 +26,10 @@ Práva na platby se nedělí podle druhu platby: trenér zakládá jakékoli pla
 V MVP je na tým jeden trenér (pokladní). 
 
 ### 3. Byznysová pravidla
-Peníze nikdy přes aplikaci. Platí se převodem na účet týmu nebo klubu. Aplikace eviduje předpisy a ověřuje platby.
-Dva režimy ověření, podle bankovního účtu. Fio: aplikace stahuje pohyby z banky a páruje sama, rodič nic nehlásí. Ruční: rodič klikne „Zaplatil jsem“, trenér potvrdí. Když Fio spojení selže, účet se nepřepne sám, trenér dostane upozornění.
+Peníze nikdy přes aplikaci. Platí se převodem na účet týmu nebo klubu. Aplikace eviduje předpisy a způsoby evidence jejich úhrady.
+Bankovní účet nemá vzájemně výlučný „ruční“ ani „automatický“ režim. Oprávněná osoba může úhradu zaevidovat ručně; rodič může u nezaplaceného dluhu vždy poslat hlášení „Zaplatil jsem“, které samo přijetí peněz nepotvrzuje. Bankovní synchronizace nebo demo simulátor může později zjistit pohyb na stejném účtu. Tatáž skutečná úhrada se nesmí započítat podruhé; nejasná shoda se předloží oprávněné osobě k ručnímu rozhodnutí. Výpadek integrace nevypíná ruční evidenci.
 Předpis a dluh. Předpis (např. „Pololetí jaro 2027“) vytvoří pro každého vybraného člena samostatný dluh s vlastním variabilním symbolem, unikátním v rámci bankovního účtu.
-Stavy dluhu: čeká na platbu, po splatnosti, nahlášeno (jen ruční režim), částečně zaplaceno, zaplaceno, přeplaceno, odpuštěno / zrušeno. Upomínka není stav.
+Stavy dluhu: čeká na platbu, po splatnosti, nahlášeno, částečně zaplaceno, zaplaceno, přeplaceno, odpuštěno / zrušeno. Upomínka není stav.
 Hotovost: trenér zapíše „Zaplaceno hotově“ s datem, v exportu je odlišená.
 Odchod nebo vyřazení z týmu dluh nemaže. Nezaplacené předpisy zůstávají, trenér je může zrušit. (Prototyp je stornuje automaticky, to se mění.)
 Smazat tým = archivovat. Platby musí zůstat kvůli účetnictví.
@@ -53,8 +53,8 @@ C1	Se zaregistrovat z pozvánky	To zvládl na mobilu za minutu	Odkaz z e-mailu �
 C2	Přidat další dítě do jiného týmu pod stejným účtem	Měl vše na jednom místě	Přepínač dětí/týmů, souhrn „K zaplacení“ za všechny děti.	M
 C3	Vidět, co mám zaplatit a do kdy	Nic nezmeškal	Seznam otevřených předpisů seřazený podle splatnosti, po splatnosti červeně.	M
 C4	Zaplatit naskenováním QR kódu	Nemusel opisovat účet a VS	QR platba s částkou, VS a zprávou; tlačítko „Kopírovat údaje“ jako záloha.	M
-C5	V ručním režimu oznámit „Zaplatil jsem“	Trenér věděl, že peníze jdou	Tlačítko jen v ručním režimu, stav „Čeká na potvrzení“, jde vzít zpět do potvrzení.	M
-C6	Ve Fio režimu vědět, že platbu nemusím hlásit	Se nestresoval, že se nic neděje	Info „Kontrolujeme automaticky, propis může trvat“; e-mail po spárování.	M
+C5	Oznámit „Zaplatil jsem“	Trenér věděl, že rodič tvrdí, že platbu odeslal	Tlačítko u každého nezaplaceného dluhu; hlášení výslovně není potvrzení přijetí peněz, čeká na vyřízení a jde vzít zpět do vyřízení.	M
+C6	Při zapnuté bankovní synchronizaci vědět, že se pohyby kontrolují automaticky	Se nestresoval, že se nic neděje	Info „Kontrolujeme automaticky, propis může trvat“; ruční hlášení zůstává dostupné a e-mail přijde po spárování.	M
 C7	Vidět historii zaplacených plateb	Měl důkaz	Datum, částka, způsob, kdo potvrdil; potvrzení ke stažení.	M
 C8	Vidět tým, spoluhráče a kontakt na trenéra	Věděl, na koho se obrátit	Jen jména spoluhráčů, žádné platby ostatních.	M
 C9	Dítě z týmu odhlásit	Nedostával další předpisy	Potvrzovací dialog upozorní na nezaplacené předpisy, které zůstávají, a na zůstatek kreditu.	M
@@ -97,4 +97,4 @@ K7	Vidět audit log	Dohledal, kdo co změnil	Filtr podle týmu, uživatele, typu
 Může se jedna o monolit aplikaci BE + FE v jednom stacku. Aplikaci budu nasazovat na AWS, bylo by dobré kdyby vše bylo v dockeru s postgreSQL databází.
 Emaily se budou posílat přes resend 
 
-Účet ve fiobacne se bude nejspší simulovat - nápad: součástí systému by mohla být simulační služba. Vygenerovaný QR code by uživatele mohl odkázat na naší simulované FIO bank rozhraní, kde by se mu ukázal předvyplněný formulář s variabilním simbolem a část s možností "Potvrdit odeslání". Tota akce by evidovala platbu. Pro to si myslím že není nutné dělat přímo novou servisu, ale bylo by dobré to nějak logicky oddělit od hlavní služby aby to šlo jednoduše vyjmout, nahradit nebo smazat.  
+Bankovní pohyby se budou pro školní demo nejspíš simulovat v logicky odděleném modulu, který půjde jednoduše vyjmout nebo nahradit. Standardní CZK QR obsahuje údaje pro skutečný převod přímo na klubový či týmový účet a nikdy neodkazuje na simulátor. Vedle něj může být samostatná jasně označená akce „Simulovat platbu“; ta vytvoří pouze demo pohyb, nikoli bankovně ověřený převod.

@@ -1,0 +1,2 @@
+DROP INDEX "reminder_recipients_batch_receivable_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "reminder_recipients_batch_debt_guardian_idx" ON "reminder_recipients" USING btree ("batch_id","receivable_id","guardian_user_id");

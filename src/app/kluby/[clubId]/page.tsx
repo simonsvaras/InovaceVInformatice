@@ -34,7 +34,10 @@ export default async function ClubPage({
         <article className="panel">
           <h2>Celoklubový předpis</h2>
           <p>Aktivní sportovec dostane jediný dluh, i když je členem více týmů.</p>
-          <Link className="button-link" href={`/predpisy/novy?clubId=${club.id}`}>Nový celoklubový předpis</Link>
+          <div className="button-row">
+            <Link className="button-link" href={`/predpisy/novy?clubId=${club.id}`}>Nový celoklubový předpis</Link>
+            <Link className="button-link button-secondary" href={`/finance?clubId=${club.id}`}>Celoklubové platby</Link>
+          </div>
         </article>
         {query.inviteLink ? (
           <article className="panel">

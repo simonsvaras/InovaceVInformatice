@@ -53,7 +53,6 @@ export async function createClubWithFirstTeam(
         clubId: club.id,
         accountNumber: input.accountNumber,
         isDefault: true,
-        verificationMode: "manual",
       });
       const [team] = await transaction
         .insert(teams)

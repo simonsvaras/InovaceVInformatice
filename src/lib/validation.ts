@@ -165,6 +165,28 @@ export function validatePaymentMessage(value: string): string {
   return message;
 }
 
+export function validateReason(value: string, label = "Důvod"): string {
+  const reason = value.trim().replace(/\s+/g, " ");
+  if (reason.length < 2 || reason.length > 300) {
+    throw new InputError(
+      "invalid_reason",
+      `${label} musí mít 2 až 300 znaků.`,
+    );
+  }
+  return reason;
+}
+
+export function validatePaymentDate(value: string, today: string): string {
+  const date = validateDueDate(value);
+  if (date > today) {
+    throw new InputError(
+      "future_payment_date",
+      "Datum platby nesmí být v budoucnosti.",
+    );
+  }
+  return date;
+}
+
 export function validateUuid(value: string, label = "Identifikátor"): string {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
     throw new InputError("invalid_id", `${label} není platný.`);

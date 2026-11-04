@@ -13,6 +13,8 @@ import {
   clubs,
   memberships,
   notificationDeliveries,
+  paymentAllocations,
+  paymentClaims,
   receivables,
   teams,
   users,
@@ -24,6 +26,7 @@ import {
   failRecordedDelivery,
   sendRecordedTransactionalEmail,
 } from "@/modules/notifications/email";
+import { deriveDebtState } from "@/modules/payments/status";
 
 type AssessmentInput = {
   actorUserId: string;
@@ -469,7 +472,6 @@ export async function setTeamBankAccount(input: {
           clubId: team.club_id,
           accountNumber: input.accountNumber,
           isDefault: false,
-          verificationMode: "manual",
         })
         .returning({ id: bankAccounts.id });
       accountId = created.id;
@@ -490,7 +492,7 @@ export async function setTeamBankAccount(input: {
 }
 
 export async function getGuardianReceivables(userId: string) {
-  return getDatabase()
+  const rows = await getDatabase()
     .select({
       id: receivables.id,
       athleteId: athletes.id,
@@ -501,6 +503,8 @@ export async function getGuardianReceivables(userId: string) {
       dueDate: assessments.dueDate,
       clubName: clubs.name,
       teamName: teams.name,
+      allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
+      pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
     })
     .from(receivables)
     .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
@@ -510,6 +514,15 @@ export async function getGuardianReceivables(userId: string) {
     .leftJoin(teams, eq(teams.id, receivables.originTeamId))
     .where(eq(athleteGuardians.userId, userId))
     .orderBy(asc(assessments.dueDate), desc(receivables.createdAt));
+  return rows.map((row) => ({
+    ...row,
+    ...deriveDebtState({
+      amountHalere: row.amountHalere,
+      allocatedHalere: row.allocatedHalere,
+      dueDate: row.dueDate,
+      hasPendingClaim: Boolean(row.pendingClaimId),
+    }),
+  }));
 }
 
 export async function getGuardianReceivable(userId: string, receivableId: string) {
@@ -528,6 +541,9 @@ export async function getGuardianReceivable(userId: string, receivableId: string
       teamName: teams.name,
       clubId: assessments.clubId,
       teamId: assessments.teamId,
+      allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
+      pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
+      pendingClaimAmountHalere: sql<number | null>`(select ${paymentClaims.amountHalere} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
     })
     .from(receivables)
     .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
@@ -552,7 +568,15 @@ export async function getGuardianReceivable(userId: string, receivableId: string
     targetType: "receivable",
     targetId: row.id,
   });
-  return row;
+  return {
+    ...row,
+    ...deriveDebtState({
+      amountHalere: row.amountHalere,
+      allocatedHalere: row.allocatedHalere,
+      dueDate: row.dueDate,
+      hasPendingClaim: Boolean(row.pendingClaimId),
+    }),
+  };
 }
 
 export async function getAssessmentManagerView(userId: string, assessmentId: string) {
