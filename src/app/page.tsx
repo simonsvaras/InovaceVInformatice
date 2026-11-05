@@ -7,35 +7,113 @@ export default async function Home() {
   const user = await getCurrentUser();
 
   return (
-    <main>
-      <section className="card" aria-labelledby="page-title">
-        <p className="eyebrow">Školní demo</p>
-        <h1 id="page-title">Klubové platby</h1>
-        <p>
-          Technický základ aplikace je spuštěný. Aplikace pouze eviduje předpisy
-          a platby; peníze přes ni nikdy neprocházejí.
-        </p>
+    <main className="home-shell">
+      <header className="home-header">
+        <Link className="home-brand" href="/" aria-label="Klubio – domovská stránka">
+          <span className="home-brand-mark" aria-hidden="true">
+            K
+          </span>
+          <span>Klubio</span>
+          <span className="home-demo-label">školní demo</span>
+        </Link>
+
         {user ? (
-          <div className="button-row">
-            <Link className="button-link" href="/prehled">
-              Přejít na přehled
-            </Link>
+          <div className="home-account">
+            <span>{user.displayName}</span>
             <form action={logoutAction}>
-              <button className="button-secondary" type="submit">
-                Odhlásit {user.displayName}
+              <button className="home-header-action" type="submit">
+                Odhlásit se
               </button>
             </form>
           </div>
         ) : (
-          <div className="button-row">
-            <Link className="button-link" href="/registrace">
-              Vytvořit účet
-            </Link>
-            <Link className="button-link button-secondary" href="/prihlaseni">
-              Přihlásit se
-            </Link>
-          </div>
+          <Link className="home-header-action" href="/prihlaseni">
+            Přihlásit se
+          </Link>
         )}
+      </header>
+
+      <section className="home-hero" aria-labelledby="page-title">
+        <div className="home-copy">
+          <h1 id="page-title">
+            Mějte jasno, co je předepsáno a co už je evidováno.
+          </h1>
+          <p className="home-lead">
+            Klubio dává správcům, trenérům a rodičům jeden přehled klubových
+            příspěvků a úhrad. Bez dohledávání v tabulkách a zprávách.
+          </p>
+
+          {user ? (
+            <div className="home-actions">
+              <Link className="home-action home-action-primary" href="/prehled">
+                Otevřít přehled
+              </Link>
+            </div>
+          ) : (
+            <div className="home-actions">
+              <Link className="home-action home-action-primary" href="/registrace">
+                Vytvořit účet
+              </Link>
+              <Link className="home-action home-action-secondary" href="/prihlaseni">
+                Přihlásit se
+              </Link>
+            </div>
+          )}
+
+          <p className="home-disclaimer">
+            Klubio peníze neposílá ani nepřijímá. Pouze eviduje jejich stav.
+          </p>
+        </div>
+
+        <div className="home-ledger" aria-hidden="true">
+          <div className="home-ledger-heading">
+            <div>
+              <span>Přehled klubu</span>
+              <strong>Listopad</strong>
+            </div>
+            <span className="home-ledger-badge">Aktuální</span>
+          </div>
+
+          <div className="home-ledger-paper">
+            <div className="home-ledger-summary">
+              <span>Evidováno tento měsíc</span>
+              <strong>27 350 Kč</strong>
+            </div>
+
+            <div className="home-ledger-row">
+              <div>
+                <strong>Členské příspěvky</strong>
+                <span>Mladší žáci</span>
+              </div>
+              <div className="home-ledger-value">
+                <strong>12 400 Kč</strong>
+                <span className="home-ledger-done">Evidováno</span>
+              </div>
+            </div>
+
+            <div className="home-ledger-row">
+              <div>
+                <strong>Soustředění</strong>
+                <span>Starší žáci</span>
+              </div>
+              <div className="home-ledger-value">
+                <strong>8 750 Kč</strong>
+                <span>Čeká na 3</span>
+              </div>
+            </div>
+
+            <div className="home-ledger-row">
+              <div>
+                <strong>Klubové dresy</strong>
+                <span>Celý klub</span>
+              </div>
+              <div className="home-ledger-value">
+                <strong>6 200 Kč</strong>
+                <span className="home-ledger-done">Evidováno</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   );

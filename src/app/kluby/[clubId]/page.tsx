@@ -21,7 +21,7 @@ export default async function ClubPage({
   return (
     <main className="dashboard-shell">
       <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubové platby</Link>
+        <Link className="brand-link" href="/prehled">Klubio</Link>
         <form action={logoutAction}><button className="button-secondary" type="submit">Odhlásit</button></form>
       </header>
       <section className="content-stack">

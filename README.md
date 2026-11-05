@@ -1,4 +1,4 @@
-# Klubové platby — školní demo
+# Klubio — školní demo
 
 Technický základ modulárního monolitu v Next.js a PostgreSQL. Aplikace pouze
 eviduje předpisy a platby; peníze přes ni neprocházejí a bankovní pohyby v MVP

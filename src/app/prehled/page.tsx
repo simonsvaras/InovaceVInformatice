@@ -26,7 +26,7 @@ export default async function DashboardPage({
     <main className="dashboard-shell">
       <header className="topbar">
         <Link className="brand-link" href="/prehled">
-          Klubové platby
+          Klubio
         </Link>
         <form action={logoutAction}>
           <button className="button-secondary" type="submit">

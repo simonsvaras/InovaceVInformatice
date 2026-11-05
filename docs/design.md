@@ -36,6 +36,7 @@ Adresy z `Popis.md` bereme jako orientační. Konečné URL mohou mít jiný tva
 
 | Stránka | Hlavní obsah a pořadí na mobilu | Akce a stavy |
 | --- | --- | --- |
+| Domovská stránka | Minimalistický dvousloupcový vstup: stručné vysvětlení produktu a akce vlevo, jediný ilustrační motiv klubové evidence vpravo. Na telefonu nejprve sdělení a akce, potom přehled. | Nepřihlášený uživatel přejde k registraci nebo přihlášení; přihlášený přímo do přehledu nebo se odhlásí. Vždy viditelně uvést, že aplikace peníze neposílá ani nepřijímá a pouze eviduje jejich stav. |
 | Registrace klubu | Krátký průvodce: účet správce → název klubu, IČO a bankovní účet → první tým → volitelné pozvání trenéra → souhrn. | Validace formulářů a možnost pokračovat v nedokončeném kroku. Nepředpokládat druhý bankovní účet. |
 | Vstup člena/rodiče | Odkaz z e-mailu či zadání týmového kódu → registrace nebo přihlášení → volba „sebe / dítě“ → základní údaje sportovce. Samostatný reset hesla. | Platná jednorázová e-mailová pozvánka aktivuje členství účtu se shodnou adresou bez dalšího kroku. Kód vytvoří žádost a čeká na schválení; nikdy nepřevezme existujícího sportovce podle jména. Neplatná/propadlá pozvánka vysvětlí další krok. |
 | Vytvoření předpisu | Název, částka v Kč, splatnost, cílový účet, výběr členů, souhrn adresátů a náhled e-mailu/QR. | Trenér pro svůj tým, správce také pro celý klub. Potvrzení před odesláním. |
@@ -51,6 +52,7 @@ Adresy z `Popis.md` bereme jako orientační. Konečné URL mohou mít jiný tva
 
 ## Rozložení doplněných stránek na široké obrazovce
 
+- **Domovská stránka:** vlevo výrazný typografický nadpis s nejvýše dvěma akcemi, vpravo jedna kompaktní ukázka klubové evidence. Bez statistik, marketingových sekcí a dalších dekorativních karet; identitu nese modrá plocha přehledu, zbytek stránky zůstává klidný.
 - **Průvodce registrací:** uprostřed úzký formulář, nad ním čtyři kroky a pod ním tlačítka Zpět/Pokračovat. Na telefonu kroky zůstanou textově označené a formulář vyplní dostupnou šířku.
 - **Nastavení účtu:** nahoře identita a platební údaje účtu; níže samostatná technická konfigurace synchronizace a vedle ní vysvětlující panel, že ruční evidence zůstává vždy dostupná. Budoucí průvodce Fio je jasně označený jako nedostupná budoucí funkce, aby nevzbuzoval dojem aktivního propojení.
 - **K potvrzení a Nespárované:** nahoře počet čekajících, filtr týmu a způsobu; pod tím tabulka. Hromadná akce se zpřístupní po výběru položek. Na mobilu každý záznam tvoří karta s částkou, datem, osobou, důvodem a akcemi.

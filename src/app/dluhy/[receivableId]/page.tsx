@@ -45,7 +45,7 @@ export default async function ReceivablePage({
   return (
     <main className="dashboard-shell">
       <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubové platby</Link>
+        <Link className="brand-link" href="/prehled">Klubio</Link>
         <Link href="/prehled">Zpět na přehled</Link>
       </header>
       <section className="content-stack">

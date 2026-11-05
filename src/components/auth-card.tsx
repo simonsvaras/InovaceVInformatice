@@ -13,7 +13,7 @@ export function AuthCard({
     <main className="auth-shell">
       <section className="panel auth-card">
         <Link className="brand-link" href="/">
-          Klubové platby
+          Klubio
         </Link>
         <p className="eyebrow">Školní demo</p>
         <h1>{title}</h1>

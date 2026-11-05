@@ -34,7 +34,7 @@ export default async function DemoBankPage({
   return (
     <main className="dashboard-shell">
       <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubové platby</Link>
+        <Link className="brand-link" href="/prehled">Klubio</Link>
         <Link href={`/dluhy/${receivableId}`}>Zpět na skutečné platební údaje</Link>
       </header>
       <section className="content-stack narrow-content">

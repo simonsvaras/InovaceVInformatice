@@ -36,7 +36,7 @@ export default async function InvitationPage({
   return (
     <main className="auth-shell">
       <section className="panel auth-card">
-        <Link className="brand-link" href="/">Klubové platby</Link>
+        <Link className="brand-link" href="/">Klubio</Link>
         <p className="eyebrow">Jednorázová pozvánka</p>
         {invalid ? (
           <>

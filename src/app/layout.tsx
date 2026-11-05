@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Klubové platby — školní demo",
-  description: "Evidence klubových předpisů a plateb pro školní demo.",
+  title: "Klubio — školní demo",
+  description:
+    "Jednoduchá evidence klubových předpisů a úhrad pro správce, trenéry a rodiče.",
 };
 
 export default function RootLayout({

@@ -188,7 +188,7 @@ export async function requestPasswordReset(emailInput: string) {
     userId: user.id,
     recipient: user.email,
     kind: "password_reset",
-    subject: "Obnovení hesla — Klubové platby",
+    subject: "Obnovení hesla — Klubio",
     text: `Odkaz pro nastavení nového hesla platí 30 minut: ${link}\n\nPokud jste o změnu nežádali, zprávu ignorujte.`,
   });
 }

@@ -24,7 +24,7 @@ export default async function AssessmentPage({
   return (
     <main className="dashboard-shell">
       <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubové platby</Link>
+        <Link className="brand-link" href="/prehled">Klubio</Link>
         <Link href={back}>Zpět</Link>
       </header>
       <section className="content-stack">

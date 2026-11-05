@@ -30,7 +30,7 @@ export default async function NewAssessmentPage({
   return (
     <main className="dashboard-shell">
       <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubové platby</Link>
+        <Link className="brand-link" href="/prehled">Klubio</Link>
         <Link href={isTeam ? `/tymy/${context.id}` : `/kluby/${context.id}`}>Zpět</Link>
       </header>
       <section className="content-stack">
