@@ -31,6 +31,8 @@ type DbTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 type LockedScope = { clubId: string; teamId: string | null };
 
+class MovementLockChanged extends Error {}
+
 function isUniqueViolation(error: unknown) {
   return Boolean(
     typeof error === "object" &&
@@ -497,7 +499,7 @@ export async function reversePaymentEvent(input: {
   paymentEventId: string;
   reason: string;
   idempotencyKey: string;
-}) {
+}, lockRetry = 0) {
   const existing = await existingIdempotentEvent({
     key: input.idempotencyKey,
     actorUserId: input.actorUserId,
@@ -510,6 +512,19 @@ export async function reversePaymentEvent(input: {
   try {
     const eventId = await getDatabase().transaction(async (transaction) => {
       const scope = await lockManagerScope(transaction, input.actorUserId, input.scope);
+      const movementRows = await transaction.execute<{ bank_transaction_id: string | null }>(sql`
+        select coalesce(
+                 pe.bank_transaction_id,
+                 (select bel.bank_transaction_id from bank_transaction_evidence_links bel
+                   where bel.payment_event_id=pe.id and bel.invalidated_at is null limit 1)
+               ) as bank_transaction_id
+          from payment_events pe where pe.id=${input.paymentEventId}
+      `);
+      if (movementRows[0]?.bank_transaction_id) {
+        await transaction.execute(sql`
+          select id from bank_transactions where id=${movementRows[0].bank_transaction_id} for update
+        `);
+      }
       const rows = await transaction.execute<{
         event_id: string;
         kind: string;
@@ -520,11 +535,16 @@ export async function reversePaymentEvent(input: {
         assessment_team_id: string | null;
         origin_team_id: string | null;
         already_reversed: boolean;
+        bank_transaction_id: string | null;
+        linked_bank_transaction_id: string | null;
       }>(sql`
         select pe.id as event_id, pe.kind, pe.amount_halere,
                pa.amount_halere as allocation_halere, pa.receivable_id,
                a.club_id, a.team_id as assessment_team_id, r.origin_team_id,
-               exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id) as already_reversed
+               exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id) as already_reversed,
+               pe.bank_transaction_id,
+               (select bel.bank_transaction_id from bank_transaction_evidence_links bel
+                 where bel.payment_event_id=pe.id and bel.invalidated_at is null limit 1) as linked_bank_transaction_id
         from payment_events pe
         join payment_allocations pa on pa.payment_event_id=pe.id
         join receivables r on r.id=pa.receivable_id
@@ -534,6 +554,11 @@ export async function reversePaymentEvent(input: {
       `);
       const original = rows[0];
       if (!original) throw new InputError("invalid_event", "Platební záznam nebyl nalezen.");
+      const lockedMovementId = movementRows[0]?.bank_transaction_id ?? null;
+      const discoveredMovementId = original.bank_transaction_id ?? original.linked_bank_transaction_id;
+      if (discoveredMovementId && discoveredMovementId !== lockedMovementId) {
+        throw new MovementLockChanged();
+      }
       assertDebtInScope(original, scope);
       if (original.kind === "correction" || original.already_reversed) {
         throw new InputError("already_reversed", "Tento záznam už byl opraven.");
@@ -555,6 +580,7 @@ export async function reversePaymentEvent(input: {
           idempotencyKey: input.idempotencyKey,
           reversesEventId: original.event_id,
           correctionReason: input.reason,
+          bankTransactionId: original.bank_transaction_id,
         })
         .returning({ id: paymentEvents.id });
       await transaction.insert(paymentAllocations).values({
@@ -562,6 +588,35 @@ export async function reversePaymentEvent(input: {
         receivableId: original.receivable_id,
         amountHalere: -original.allocation_halere,
       });
+      if (original.linked_bank_transaction_id) {
+        await transaction.execute(sql`
+          update bank_transaction_evidence_links
+             set invalidated_at=now(), invalidated_by_user_id=${input.actorUserId}
+           where payment_event_id=${original.event_id} and invalidated_at is null
+        `);
+        await transaction.execute(sql`
+          update bank_transactions
+             set status='unmatched', reason_code='linked_event_corrected',
+                 resolution_reason=${input.reason}, resolved_by_user_id=${input.actorUserId}, resolved_at=now()
+           where id=${original.linked_bank_transaction_id}
+        `);
+      } else if (original.bank_transaction_id) {
+        const movementRowsAfter = await transaction.execute<{ amount_halere: number; allocated_halere: number }>(sql`
+          select bt.amount_halere,
+                 coalesce((select sum(pa.amount_halere) from payment_events pe
+                           join payment_allocations pa on pa.payment_event_id=pe.id
+                          where pe.bank_transaction_id=bt.id), 0)::int as allocated_halere
+            from bank_transactions bt where bt.id=${original.bank_transaction_id}
+        `);
+        const movement = movementRowsAfter[0];
+        await transaction.execute(sql`
+          update bank_transactions
+             set status=${movement.allocated_halere === 0 ? "unmatched" : "partially_allocated"},
+                 reason_code='allocation_corrected', resolution_reason=${input.reason},
+                 resolved_by_user_id=${input.actorUserId}, resolved_at=now()
+           where id=${original.bank_transaction_id}
+        `);
+      }
       await transaction.insert(auditEvents).values({
         actorUserId: input.actorUserId,
         clubId: original.club_id,
@@ -574,12 +629,17 @@ export async function reversePaymentEvent(input: {
           amountHalere: original.allocation_halere,
           allocatedBeforeHalere,
           reason: input.reason,
+          bankTransactionId: original.bank_transaction_id ?? original.linked_bank_transaction_id ?? "",
         },
       });
       return correction.id;
     });
     return { eventId, created: true };
   } catch (error) {
+    if (error instanceof MovementLockChanged) {
+      if (lockRetry < 1) return reversePaymentEvent(input, lockRetry + 1);
+      throw new InputError("concurrent_change", "Finanční vazba se souběžně změnila. Obnovte stránku a akci zopakujte.");
+    }
     if (isUniqueViolation(error)) {
       const eventId = await existingIdempotentEvent({
         key: input.idempotencyKey,

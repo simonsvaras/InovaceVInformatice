@@ -185,6 +185,36 @@ export const teams = pgTable(
   ],
 );
 
+export const bankIntegrations = pgTable(
+  "bank_integrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    exclusiveTeamId: uuid("exclusive_team_id").references(() => teams.id, {
+      onDelete: "restrict",
+    }),
+    provider: varchar("provider", { length: 20 }).notNull().default("demo"),
+    enabled: boolean("enabled").notNull().default(true),
+    configuredByUserId: uuid("configured_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    lastProcessedAt: timestamp("last_processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("bank_integrations_account_idx").on(table.bankAccountId),
+    index("bank_integrations_exclusive_team_idx").on(table.exclusiveTeamId),
+    check("bank_integrations_provider_demo", sql`${table.provider} = 'demo'`),
+  ],
+);
+
 export const teamCoaches = pgTable(
   "team_coaches",
   {
@@ -521,6 +551,58 @@ export const paymentClaims = pgTable(
   ],
 );
 
+export const bankTransactions = pgTable(
+  "bank_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    integrationId: uuid("integration_id")
+      .notNull()
+      .references(() => bankIntegrations.id, { onDelete: "restrict" }),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    source: varchar("source", { length: 20 }).notNull().default("simulated"),
+    sourceTransactionId: varchar("source_transaction_id", { length: 80 }).notNull(),
+    amountHalere: integer("amount_halere").notNull(),
+    variableSymbol: varchar("variable_symbol", { length: 10 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: varchar("status", { length: 30 }).notNull().default("unmatched"),
+    reasonCode: varchar("reason_code", { length: 40 }).notNull(),
+    resolutionReason: varchar("resolution_reason", { length: 300 }),
+    resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("bank_transactions_account_source_idx").on(
+      table.bankAccountId,
+      table.sourceTransactionId,
+    ),
+    index("bank_transactions_integration_received_idx").on(
+      table.integrationId,
+      table.receivedAt,
+    ),
+    index("bank_transactions_status_idx").on(table.status, table.receivedAt),
+    check("bank_transactions_source_simulated", sql`${table.source} = 'simulated'`),
+    check("bank_transactions_amount_positive", sql`${table.amountHalere} > 0`),
+    check(
+      "bank_transactions_vs_digits",
+      sql`${table.variableSymbol} is null or ${table.variableSymbol} ~ '^[0-9]{1,10}$'`,
+    ),
+    check(
+      "bank_transactions_status_valid",
+      sql`${table.status} in ('unmatched', 'partially_allocated', 'allocated', 'linked', 'ignored')`,
+    ),
+  ],
+);
+
 export const paymentEvents = pgTable(
   "payment_events",
   {
@@ -540,6 +622,10 @@ export const paymentEvents = pgTable(
     sourceClaimId: uuid("source_claim_id").references(() => paymentClaims.id, {
       onDelete: "restrict",
     }),
+    bankTransactionId: uuid("bank_transaction_id").references(
+      () => bankTransactions.id,
+      { onDelete: "restrict" },
+    ),
     idempotencyKey: uuid("idempotency_key").unique(),
     reversesEventId: uuid("reverses_event_id").unique(),
     correctionReason: varchar("correction_reason", { length: 300 }),
@@ -554,7 +640,7 @@ export const paymentEvents = pgTable(
     check("payment_events_amount_positive", sql`${table.amountHalere} > 0`),
     check(
       "payment_events_kind_valid",
-      sql`${table.kind} in ('manual_claim', 'cash', 'correction')`,
+      sql`${table.kind} in ('manual_claim', 'cash', 'correction', 'simulated')`,
     ),
   ],
 );
@@ -581,6 +667,38 @@ export const paymentAllocations = pgTable(
     ),
     index("payment_allocations_receivable_idx").on(table.receivableId),
     check("payment_allocations_amount_nonzero", sql`${table.amountHalere} <> 0`),
+  ],
+);
+
+export const bankTransactionEvidenceLinks = pgTable(
+  "bank_transaction_evidence_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bankTransactionId: uuid("bank_transaction_id")
+      .notNull()
+      .references(() => bankTransactions.id, { onDelete: "restrict" }),
+    paymentEventId: uuid("payment_event_id")
+      .notNull()
+      .references(() => paymentEvents.id, { onDelete: "restrict" }),
+    linkedByUserId: uuid("linked_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    reason: varchar("reason", { length: 300 }).notNull(),
+    invalidatedAt: timestamp("invalidated_at", { withTimezone: true }),
+    invalidatedByUserId: uuid("invalidated_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("bank_transaction_evidence_transaction_idx")
+      .on(table.bankTransactionId)
+      .where(sql`${table.invalidatedAt} is null`),
+    uniqueIndex("bank_transaction_evidence_event_idx")
+      .on(table.paymentEventId)
+      .where(sql`${table.invalidatedAt} is null`),
   ],
 );
 

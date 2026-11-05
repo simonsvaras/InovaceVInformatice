@@ -25,7 +25,14 @@ function message(error: unknown) {
     : "Akci se nepodařilo dokončit. Zkuste to znovu.";
 }
 
-export async function createClubAction(formData: FormData) {
+type CreateClubState = {
+  error?: string;
+};
+
+export async function createClubAction(
+  _previousState: CreateClubState,
+  formData: FormData,
+): Promise<CreateClubState> {
   const user = await requireUser();
   let clubId: string;
 
@@ -38,7 +45,7 @@ export async function createClubAction(formData: FormData) {
     });
     clubId = result.clubId;
   } catch (error) {
-    redirect(`/kluby/novy?error=${encodeURIComponent(message(error))}`);
+    return { error: message(error) };
   }
 
   redirect(`/kluby/${clubId}?success=${encodeURIComponent("Klub a první tým byly založeny.")}`);

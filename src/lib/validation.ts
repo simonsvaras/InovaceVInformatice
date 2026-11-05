@@ -93,38 +93,7 @@ export function validateIco(value: string): string {
 }
 
 export function normalizeBankAccount(value: string): string {
-  const account = value.replace(/\s/g, "");
-
-  if (!/^(?:\d{1,6}-)?\d{2,10}\/\d{4}$/.test(account)) {
-    throw new InputError(
-      "invalid_bank_account",
-      "Účet zadejte ve formátu 123456789/0100 nebo 19-123456789/0100.",
-    );
-  }
-
-  const [, prefix = "", number] = account.match(
-    /^(?:(\d{1,6})-)?(\d{2,10})\/\d{4}$/,
-  )!;
-  const prefixWeights = [10, 5, 8, 4, 2, 1];
-  const numberWeights = [6, 3, 7, 9, 10, 5, 8, 4, 2, 1];
-  const checksum = (digits: string, weights: number[]) =>
-    digits
-      .padStart(weights.length, "0")
-      .split("")
-      .reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0) %
-    11;
-
-  if (
-    (prefix && checksum(prefix, prefixWeights) !== 0) ||
-    checksum(number, numberWeights) !== 0
-  ) {
-    throw new InputError(
-      "invalid_bank_account",
-      "Číslo účtu nemá platnou českou kontrolní číslici.",
-    );
-  }
-
-  return account;
+  return value.replace(/\s/g, "");
 }
 
 export function parseCzkAmount(value: string): number {

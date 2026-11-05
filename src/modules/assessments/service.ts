@@ -456,12 +456,13 @@ export async function setTeamBankAccount(input: {
     if (!team?.allowed) {
       throw new InputError("access_denied", "K nastavení účtu týmu nemáte oprávnění.");
     }
-    const [existing] = await transaction
-      .select({ id: bankAccounts.id, clubId: bankAccounts.clubId })
-      .from(bankAccounts)
-      .where(eq(bankAccounts.accountNumber, input.accountNumber))
-      .limit(1);
-    if (existing && existing.clubId !== team.club_id) {
+    const existingRows = await transaction.execute<{ id: string; club_id: string }>(sql`
+      select id, club_id from bank_accounts
+       where account_number=${input.accountNumber}
+       for update
+    `);
+    const existing = existingRows[0];
+    if (existing && existing.club_id !== team.club_id) {
       throw new InputError("account_in_use", "Tento účet už používá jiný klub.");
     }
     let accountId = existing?.id;
@@ -475,6 +476,19 @@ export async function setTeamBankAccount(input: {
         })
         .returning({ id: bankAccounts.id });
       accountId = created.id;
+    }
+    const integrationOwners = await transaction.execute<{ exclusive_team_id: string | null }>(sql`
+      select exclusive_team_id from bank_integrations
+       where bank_account_id=${accountId} for update
+    `);
+    if (
+      integrationOwners[0]?.exclusive_team_id &&
+      integrationOwners[0].exclusive_team_id !== input.teamId
+    ) {
+      throw new InputError(
+        "exclusive_account_in_use",
+        "Účet je trvale označen jako výhradní pro jiný tým a nelze jej znovu přiřadit.",
+      );
     }
     await transaction
       .update(teams)
@@ -544,6 +558,13 @@ export async function getGuardianReceivable(userId: string, receivableId: string
       allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
       pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
       pendingClaimAmountHalere: sql<number | null>`(select ${paymentClaims.amountHalere} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
+      demoIntegrationEnabled: sql<boolean>`exists(select 1 from bank_integrations bi where bi.bank_account_id=${receivables.bankAccountId} and bi.enabled=true)`,
+      hasSimulatedPayment: sql<boolean>`exists(
+        select 1 from payment_events pe
+        join payment_allocations pa on pa.payment_event_id=pe.id
+        where pa.receivable_id=${receivables.id} and pe.kind='simulated'
+          and not exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id)
+      )`,
     })
     .from(receivables)
     .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))

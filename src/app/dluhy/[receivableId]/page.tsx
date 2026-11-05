@@ -77,8 +77,23 @@ export default async function ReceivablePage({
                 <p>Naskenujte bankovní aplikací. Platba zbývající částky směřuje přímo na uvedený účet.</p>
               </>
             ) : <p>Dluh je podle evidovaných platebních událostí uhrazen.</p>}
+            {debt.demoIntegrationEnabled && debt.remainingHalere > 0 ? (
+              <div className="demo-simulator-entry">
+                <p><strong>Školní demo automatické kontroly</strong></p>
+                <p>Jde o oddělenou simulaci. Nevytváří skutečný převod, nemění QR a není spojením s Fio.</p>
+                <Link className="button-link button-secondary" href={`/demo-banka/${debt.id}`}>Simulovat platbu (DEMO)</Link>
+              </div>
+            ) : debt.remainingHalere > 0 ? (
+              <p>Ruční hlášení „Zaplatil jsem“ zůstává dostupné nezávisle na technické konfiguraci demo kontroly.</p>
+            ) : null}
           </div>
         </article>
+        {debt.hasSimulatedPayment ? (
+          <article className="panel">
+            <h2>Demo automatická kontrola</h2>
+            <p>Část evidované úhrady pochází ze simulovaného pohybu (<code>simulated</code>). Nejde o potvrzení skutečného ani bankovně ověřeného převodu a aplikace není spojena s Fio.</p>
+          </article>
+        ) : null}
         {debt.pendingClaimId ? (
           <article className="panel">
             <h2>Hlášení o odeslané platbě</h2>
