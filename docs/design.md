@@ -61,3 +61,28 @@ Adresy z `Popis.md` bereme jako orientační. Konečné URL mohou mít jiný tva
 ## Mobilní uspořádání a kontrola návrhu
 
 Na šířce telefonu má být nejdůležitější údaj a akce vidět bez vodorovného posouvání: u rodiče částka/splatnost/QR, u trenéra počet čekajících a rychlý přechod do potvrzování, u správce stav týmů. Dlouhé seznamy mají filtry nad obsahem, zřetelný prázdný stav a jasnou zpětnou vazbu po akci. Přístupnost ověřit klávesnicí, čtečkou a dostatečným kontrastem textových stavů. Vizuální věrnost desktopovým snímkům se ověřuje až po opravě rozporů uvedených výše.
+
+## Přihlášený přehled „Moje kluby“
+
+- `/prehled` seskupuje všechny relevantní týmy podle klubu. Jeden tým se zobrazuje právě jednou, i když k němu má účet více vztahů.
+- Dlaždice týmu ukazuje název, počet aktivních členů, aktivního trenéra a všechny vztahy přihlášeného účtu: vlastník klubu, trenér, člen nebo rodič člena.
+- Vlastník klubu vidí všechny aktivní týmy klubu a přechod do správy klubu. Trenér může otevřít tým a nastavit jej jako aktivní. Člen nebo rodič přechází do bezpečného členského detailu bez manažerských akcí.
+- Přehled neposílá do klienta soupisku ani kontakty ostatních členů; počet členů a jméno trenéra vrací server jen pro týmy, k nimž má účet autorizovaný vztah.
+- Na telefonu se týmové dlaždice skládají do jednoho sloupce, bez vodorovného posouvání.
+
+## Členský detail týmu
+
+- `/tymy/[teamId]` serverově rozlišuje manažerský a členský pohled. Přímá URL bez aktivního členství nebo manažerské role data nezobrazí.
+- Člen/rodič vidí název klubu a týmu, kontakt na aktivního trenéra, počet členů a pouze jména spoluhráčů. Kontakty, roky narození a platby ostatních členů zůstávají skryté.
+- „Platby k vyřízení“ obsahují pouze týmové dluhy sportovců spravovaných přihlášeným účtem. Akce vede na stávající autorizovaný detail platebních údajů a QR.
+- Historie plateb zobrazuje pouze alokace vlastních sportovců v daném týmu, včetně jasně označeného původu evidence a případných opravných protizápisů.
+- Správce a trenér nadále dostávají stávající manažerskou správu týmu. Pokud má stejný účet také vlastní členství nebo spravuje člena, může z přehledu otevřít oddělený členský pohled; finanční dotazy se i v něm filtrují jen na jeho sportovce.
+
+# Oprava obrazovek vstupu člena
+
+- `/pozvanka/[token]` a `/vstup` začínají volbou „Vstupuji za sebe“. Je-li osobní profil vytvořený, stránka ukáže jeho jméno; jinak vysvětlí vytvoření z názvu účtu.
+- „Přihlašuji dítě“ odkryje výběr spravovaných dětí. Formulář celého jména a nepovinného roku narození se zobrazí pouze po volbě „Přidat další dítě“.
+- Nezařazený historický profil lze při osobním vstupu výslovně zvolit jako „To jsem já“; v dětské větvi jej lze výslovně zařadit jako dítě. Rozhraní upozorňuje, že nedochází k automatickému slučování podle jména.
+- Výsledek pozvánky říká, že členství je aktivní. Výsledek kódu říká, že žádost čeká na schválení.
+- Rodičovský přehled označuje osobní profil, dítě a starší nezařazený profil. Manažerská soupiska u dítěte používá popisek „Účet rodiče“, u dospělého „Vlastní účet“; rok narození se nezobrazuje, pokud chybí.
+

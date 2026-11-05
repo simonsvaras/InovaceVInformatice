@@ -98,3 +98,12 @@ Může se jedna o monolit aplikaci BE + FE v jednom stacku. Aplikaci budu nasazo
 Emaily se budou posílat přes resend 
 
 Bankovní pohyby se budou pro školní demo nejspíš simulovat v logicky odděleném modulu, který půjde jednoduše vyjmout nebo nahradit. Standardní CZK QR obsahuje údaje pro skutečný převod přímo na klubový či týmový účet a nikdy neodkazuje na simulátor. Vedle něj může být samostatná jasně označená akce „Simulovat platbu“; ta vytvoří pouze demo pohyb, nikoli bankovně ověřený převod.
+# Upřesnění vstupu člena do týmu
+
+- Členem týmu je vždy sportovec; uživatelský účet pouze spravuje přístup, kontakt a komunikaci včetně platebních e-mailů.
+- Přihlášený uživatel vstupuje výchozí volbou „Vstupuji za sebe“. Jeden účet smí mít nejvýše jeden trvalý osobní profil sportovce, který se znovu používá ve všech týmech.
+- Alternativou je „Přihlašuji dítě“. Rodič vybírá již spravované dítě nebo založí technický profil dalšího dítěte; dítěti tím nevzniká uživatelský účet.
+- Sportovec má uložené celé jméno bez automatického dělení a nepovinný rok narození. Staré profily se podle jména neslučují. Vlastník je může jednorázově a výslovně označit „to jsem já“ nebo jako dítě.
+- E-mailová pozvánka vyžaduje shodný e-mail a po úspěšném zápisu aktivuje členství. Týmový kód vytváří pouze žádost ke schválení.
+- Trenér a správce vidí na soupisce jméno sportovce a oprávněný kontakt spravujícího účtu; u dítěte je kontakt označen „účet rodiče“. Běžný spoluhráč smí vidět pouze jméno sportovce.
+

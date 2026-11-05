@@ -74,3 +74,11 @@ Stav „po splatnosti“ se odvodí z data a neuhrazené částky, nikoli ze sam
 ## Náklady a škálování
 
 Největší vývojová složitost je správnost plateb a oprávnění, nikoli počet služeb. Jedna aplikace a jedna PostgreSQL databáze snižují režii. Oddělený bankovní adaptér umožní později skutečné Fio bez přepisu UI. Demo nepotřebuje horizontální škálování ani další infrastrukturu; při budoucím ostrém provozu se musí znovu posoudit synchronizace, zálohy a ochrana dat.
+# Oprava modelu identity sportovce při vstupu
+
+`users` reprezentují přihlášení a komunikační adresu, `athletes` člena a `memberships` účast sportovce v týmu. `athletes.full_name` je kanonické zobrazované jméno, `birth_year` je nullable a historické sloupce jména se po nedestruktivním převodu již nepoužívají pro nové zápisy. `athlete_guardians.relationship` rozlišuje `self` a `child`; `NULL` je pouze přechodný stav historických vazeb čekajících na výslovné přiřazení.
+
+Obě vstupní cesty volají společný resolver profilu uvnitř stejné databázové transakce jako členství nebo žádost. Resolver zamkne účet, znovu načte jeho osobní profil a serverově ověří vlastnictví zvoleného dítěte. Unikátní částečný index `(user_id) WHERE relationship = 'self'` brání dvěma osobním profilům. `athletes.creation_key` je unikátní pouze pro nově vytvářený profil dítěte a bezpečně opakuje dvojklik stejného formuláře. Aktivní členství a čekající žádosti nadále chrání existující částečné unikátní indexy.
+
+Pozvánka se zamyká a spotřebuje až po úspěšném vložení členství. U kódu vzniká jen čekající žádost. Přístup k soupisce s kontaktem zůstává omezen na trenéra či správce; případný členský výpis nesmí připojit `users` ani zveřejnit kontakt. Finanční tabulky dál odkazují na stabilní `athlete_id` a e-mail se získává ze spravujícího účtu, proto migrace jména nemění dluhy ani jejich adresáta.
+

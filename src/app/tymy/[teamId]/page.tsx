@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { setTeamBankAccountAction } from "@/app/actions/assessments";
 import {
   reviewJoinRequestAction,
   revokeInvitationAction,
@@ -7,22 +8,199 @@ import {
 import { JoinCodeForm } from "@/components/join-code-form";
 import { MemberInviteForm } from "@/components/member-invite-form";
 import { Message } from "@/components/message";
+import { getGuardianTeamFinance } from "@/modules/assessments/service";
 import { requireUser } from "@/modules/auth/service";
-import { getTeamMembershipDashboard } from "@/modules/memberships/service";
-import { setTeamBankAccountAction } from "@/app/actions/assessments";
+import { requireTeamPageAccess } from "@/modules/authorization/service";
+import {
+  getMemberTeamDashboard,
+  getTeamMembershipDashboard,
+} from "@/modules/memberships/service";
+import { formatCzk } from "@/modules/payments/qr";
+import { debtStatusLabel } from "@/modules/payments/status";
 
-export default async function TeamPage({
-  params,
-  searchParams,
+type Query = { success?: string; error?: string; view?: string };
+type ManagerTeam = Awaited<ReturnType<typeof getTeamMembershipDashboard>>;
+type MemberTeam = Awaited<ReturnType<typeof getMemberTeamDashboard>>;
+type MemberFinance = Awaited<ReturnType<typeof getGuardianTeamFinance>>;
+
+function formatDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("cs-CZ", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Prague",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toLocaleUpperCase("cs"))
+    .join("");
+}
+
+function paymentKindLabel(kind: string) {
+  switch (kind) {
+    case "manual_claim":
+      return "Ručně potvrzená úhrada";
+    case "cash":
+      return "Hotovost";
+    case "simulated":
+      return "Demo pohyb";
+    case "correction":
+      return "Oprava evidence";
+    default:
+      return "Evidovaná úhrada";
+  }
+}
+
+function MemberTeamView({
+  team,
+  finance,
+  query,
 }: {
-  params: Promise<{ teamId: string }>;
-  searchParams: Promise<{ success?: string; error?: string }>;
+  team: MemberTeam;
+  finance: MemberFinance;
+  query: Query;
 }) {
-  const user = await requireUser();
-  const { teamId } = await params;
-  const query = await searchParams;
-  const team = await getTeamMembershipDashboard(user.id, teamId);
+  const openDebts = finance.debts.filter((debt) => debt.remainingHalere > 0);
+  const ownAthletes = new Set(team.managedMembers.map((member) => member.athleteId));
 
+  return (
+    <main className="dashboard-shell dashboard-home member-team-page">
+      <header className="dashboard-topbar">
+        <Link className="dashboard-brand" href="/prehled" aria-label="Klubio – přehled">
+          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
+          <span>Klubio</span>
+        </Link>
+        <Link className="club-topbar-link" href="/prehled">Zpět na přehled</Link>
+      </header>
+
+      <section className="member-team-content">
+        <Message error={query.error} success={query.success} />
+
+        <header className="member-team-hero">
+          <div className="member-team-hero-copy">
+            <p>{team.clubName}</p>
+            <h1>{team.name}</h1>
+            <div className="member-team-coach">
+              <span>Trenér</span>
+              <strong>{team.coachName ?? "Zatím nepřiřazen"}</strong>
+              {team.coachEmail ? <a href={`mailto:${team.coachEmail}`}>{team.coachEmail}</a> : null}
+            </div>
+          </div>
+          <dl className="member-team-summary">
+            <div>
+              <dt>Členové týmu</dt>
+              <dd>{team.roster.length}</dd>
+            </div>
+            <div>
+              <dt>Vaše profily</dt>
+              <dd>{team.managedMembers.length}</dd>
+            </div>
+            <div>
+              <dt>K úhradě</dt>
+              <dd>{formatCzk(openDebts.reduce((sum, debt) => sum + debt.remainingHalere, 0))}</dd>
+            </div>
+          </dl>
+        </header>
+
+        <div className="member-team-grid">
+          <section className="member-team-payments" aria-labelledby="team-payments-title">
+            <header className="member-team-section-heading">
+              <div>
+                <h2 id="team-payments-title">Platby k vyřízení</h2>
+                <p>Předpisy se platí přímo na účet klubu nebo týmu.</p>
+              </div>
+              <span>{openDebts.length}</span>
+            </header>
+
+            {openDebts.length ? (
+              <div className="member-team-payment-list">
+                {openDebts.map((debt) => (
+                  <article className="member-team-payment" key={debt.id}>
+                    <div>
+                      <span>{debt.athleteName}</span>
+                      <h3>{debt.title}</h3>
+                      <p>Splatnost {formatDate(debt.dueDate)}</p>
+                    </div>
+                    <div className="member-team-payment-amount">
+                      <span className={debt.status === "overdue" ? "status-overdue" : "status-open"}>
+                        {debtStatusLabel(debt.status)}
+                      </span>
+                      <strong>{formatCzk(debt.remainingHalere)}</strong>
+                      {debt.allocatedHalere > 0 ? <small>Z původních {formatCzk(debt.amountHalere)}</small> : null}
+                    </div>
+                    <Link href={`/dluhy/${debt.id}`}>Platební údaje</Link>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="member-team-empty">
+                <strong>V tomto týmu nemáte žádnou platbu k vyřízení.</strong>
+                <span>Nové předpisy se objeví na tomto místě.</span>
+              </div>
+            )}
+          </section>
+
+          <aside className="member-team-roster" aria-labelledby="team-roster-title">
+            <header className="member-team-section-heading">
+              <div>
+                <h2 id="team-roster-title">Členové týmu</h2>
+                <p>Kontaktní údaje ostatních členů zůstávají skryté.</p>
+              </div>
+            </header>
+            <ul>
+              {team.roster.map((member) => (
+                <li key={member.athleteId}>
+                  <span aria-hidden="true">{initials(member.fullName)}</span>
+                  <strong>{member.fullName}</strong>
+                  {ownAthletes.has(member.athleteId) ? <small>Váš profil</small> : null}
+                </li>
+              ))}
+            </ul>
+          </aside>
+        </div>
+
+        <section className="member-team-history" aria-labelledby="team-history-title">
+          <header className="member-team-section-heading">
+            <div>
+              <h2 id="team-history-title">Historie plateb</h2>
+              <p>Evidence plateb a případných oprav pro vaše profily v tomto týmu.</p>
+            </div>
+          </header>
+
+          {finance.history.length ? (
+            <div className="member-team-history-list">
+              {finance.history.map((event) => (
+                <div className="member-team-history-row" key={`${event.eventId}-${event.athleteName}-${event.assessmentTitle}`}>
+                  <span>{formatDate(event.occurredOn)}</span>
+                  <div>
+                    <strong>{event.assessmentTitle}</strong>
+                    <small>{event.athleteName} · {paymentKindLabel(event.kind)}</small>
+                  </div>
+                  <strong className={event.amountHalere < 0 ? "is-correction" : ""}>
+                    {formatCzk(event.amountHalere)}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="member-team-empty">
+              <strong>Historie je zatím prázdná.</strong>
+              <span>Po zaevidování úhrady se objeví zde.</span>
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}
+
+function ManagerTeamView({ team, query }: { team: ManagerTeam; query: Query }) {
   return (
     <main className="dashboard-shell">
       <header className="topbar">
@@ -41,10 +219,7 @@ export default async function TeamPage({
           </div>
           <form action={setTeamBankAccountAction} className="form-stack inline-form">
             <input name="teamId" type="hidden" value={team.id} />
-            <label>
-              Český účet týmu
-              <input name="accountNumber" placeholder="19-2000145399/0800" required />
-            </label>
+            <label>Český účet týmu<input name="accountNumber" placeholder="19-2000145399/0800" required /></label>
             <button className="button-secondary" type="submit">Uložit týmový účet</button>
           </form>
         </article>
@@ -54,8 +229,8 @@ export default async function TeamPage({
             <div className="list-stack">
               {team.pendingRequests.map((request) => (
                 <section className="subcard" key={request.id}>
-                  <strong>{request.firstName} {request.lastName} ({request.birthYear})</strong>
-                  <span>Účet: {request.guardianName} · {request.guardianEmail}</span>
+                  <strong>{request.fullName}{request.birthYear ? ` (${request.birthYear})` : ""}</strong>
+                  <span>{request.relationship === "child" ? "Účet rodiče" : request.relationship === "self" ? "Vlastní účet" : "Spravující účet"}: {request.guardianName} · {request.guardianEmail}</span>
                   <form action={reviewJoinRequestAction} className="button-row">
                     <input name="teamId" type="hidden" value={team.id} />
                     <input name="requestId" type="hidden" value={request.id} />
@@ -73,8 +248,8 @@ export default async function TeamPage({
             <div className="list-stack">
               {team.roster.map((member) => (
                 <section className="subcard" key={member.membershipId}>
-                  <strong>{member.firstName} {member.lastName} ({member.birthYear})</strong>
-                  <span>Kontakt účtu: {member.guardianName} · {member.guardianEmail}</span>
+                  <strong>{member.fullName}{member.birthYear ? ` (${member.birthYear})` : ""}</strong>
+                  <span>{member.relationship === "child" ? "Účet rodiče" : member.relationship === "self" ? "Vlastní účet" : "Spravující účet"}: {member.guardianName} · {member.guardianEmail}</span>
                 </section>
               ))}
             </div>
@@ -106,4 +281,28 @@ export default async function TeamPage({
       </section>
     </main>
   );
+}
+
+export default async function TeamPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ teamId: string }>;
+  searchParams: Promise<Query>;
+}) {
+  const user = await requireUser();
+  const { teamId } = await params;
+  const query = await searchParams;
+  const access = await requireTeamPageAccess(user.id, teamId);
+
+  if (access.hasMembership && (!access.canManage || query.view === "member")) {
+    const [team, finance] = await Promise.all([
+      getMemberTeamDashboard(user.id, teamId),
+      getGuardianTeamFinance(user.id, teamId),
+    ]);
+    return <MemberTeamView finance={finance} query={query} team={team} />;
+  }
+
+  const team = await getTeamMembershipDashboard(user.id, teamId);
+  return <ManagerTeamView query={query} team={team} />;
 }

@@ -43,17 +43,6 @@ export function validateDisplayName(value: string): string {
   return displayName;
 }
 
-export function validatePassword(value: string): string {
-  if (value.length < 12 || value.length > 128) {
-    throw new InputError(
-      "invalid_password",
-      "Heslo musí mít 12 až 128 znaků.",
-    );
-  }
-
-  return value;
-}
-
 export function validateEntityName(
   value: string,
   label: string,

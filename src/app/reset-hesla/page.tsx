@@ -19,11 +19,11 @@ export default async function ResetPasswordPage({
           <input name="token" type="hidden" value={params.token} />
           <label>
             Nové heslo
-            <input autoComplete="new-password" minLength={12} name="password" required type="password" />
+            <input autoComplete="new-password" name="password" required type="password" />
           </label>
           <label>
             Nové heslo znovu
-            <input autoComplete="new-password" minLength={12} name="passwordConfirmation" required type="password" />
+            <input autoComplete="new-password" name="passwordConfirmation" required type="password" />
           </label>
           <button type="submit">Změnit heslo</button>
         </form>

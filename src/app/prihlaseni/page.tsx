@@ -30,7 +30,7 @@ export default async function LoginPage({
         </label>
         <label>
           Heslo
-          <input autoComplete="current-password" maxLength={128} name="password" required type="password" />
+          <input autoComplete="current-password" name="password" required type="password" />
         </label>
         <button type="submit">Přihlásit se</button>
       </form>

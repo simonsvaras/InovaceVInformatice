@@ -22,7 +22,7 @@ export default async function RegistrationPage({
   return (
     <AuthCard
       title="Vytvořit účet"
-      intro="Účet patří rodiči, dospělému sportovci, trenérovi nebo správci klubu. Sportovce přidáte až po přihlášení."
+      intro="Účet patří rodiči, dospělému sportovci, trenérovi nebo správci klubu. Při vstupu si zvolíte sebe nebo dítě."
     >
       <Message error={params.error} />
       <form action={registerAction} className="form-stack">
@@ -39,13 +39,10 @@ export default async function RegistrationPage({
           Heslo
           <input
             autoComplete="new-password"
-            maxLength={128}
-            minLength={12}
             name="password"
             required
             type="password"
           />
-          <small>Nejméně 12 znaků.</small>
         </label>
         <button type="submit">Vytvořit účet</button>
       </form>

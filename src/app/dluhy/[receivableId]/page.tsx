@@ -53,7 +53,7 @@ export default async function ReceivablePage({
         <div><p className="eyebrow">Detail dluhu</p><h1>{debt.title}</h1></div>
         <article className="panel payment-detail">
           <div className="payment-summary">
-            <p><strong>{debt.athleteFirstName} {debt.athleteLastName}</strong></p>
+            <p><strong>{debt.athleteName}</strong></p>
             <p>{debt.clubName} · {debt.teamName ?? "celý klub"}</p>
             <dl>
               <div><dt>Částka</dt><dd>{amount}</dd></div>

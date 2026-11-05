@@ -3,6 +3,7 @@ import Link from "next/link";
 import { acceptCoachInvitationAction } from "@/app/actions/clubs";
 import { acceptMemberInvitationAction } from "@/app/actions/memberships";
 import { Message } from "@/components/message";
+import { AthleteEntryFields } from "@/components/athlete-entry-fields";
 import { getCurrentUser } from "@/modules/auth/service";
 import { getInvitationPreview } from "@/modules/clubs/service";
 import { getOwnAthletes } from "@/modules/memberships/service";
@@ -79,24 +80,11 @@ export default async function InvitationPage({
             ) : (
               <form action={acceptMemberInvitationAction} className="form-stack">
                 <input name="token" type="hidden" value={token} />
-                <label>
-                  Sportovec
-                  <select defaultValue="new" name="athleteChoice">
-                    <option value="new">Přidat nového sportovce</option>
-                    {ownAthletes.map((athlete) => (
-                      <option key={athlete.id} value={athlete.id}>
-                        {athlete.firstName} {athlete.lastName} ({athlete.birthYear})
-                      </option>
-                    ))}
-                  </select>
-                  <small>Vybrat lze jen sportovce, které už spravuje váš účet.</small>
-                </label>
-                <fieldset className="fieldset">
-                  <legend>Údaje nového sportovce</legend>
-                  <label>Jméno<input maxLength={80} name="firstName" /></label>
-                  <label>Příjmení<input maxLength={80} name="lastName" /></label>
-                  <label>Rok narození<input inputMode="numeric" maxLength={4} name="birthYear" /></label>
-                </fieldset>
+                <AthleteEntryFields
+                  creationKey={crypto.randomUUID()}
+                  displayName={user.displayName}
+                  profiles={ownAthletes}
+                />
                 <button type="submit">Přijmout pozvánku a aktivovat členství</button>
               </form>
             )}

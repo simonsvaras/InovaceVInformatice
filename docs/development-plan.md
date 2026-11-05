@@ -21,3 +21,9 @@ Skutečné Fio včetně read-only tokenu, průvodce se screenshoty, testu spojen
 ## Lead Agent a revize
 
 Lead Agent vždy vlastní návrh, implementaci, ruční ověření a dokumentaci. `architecture-reviewer` a `code-reviewer` provádějí pouze nezávislé čtecí kontroly konkrétního návrhu nebo změny; soubory nemění. Lead Agent zapracuje důvodné nálezy a aktualizuje `docs/current-state.md`. Nikdy nevznikají souběžné úpravy stejného souboru ani automatizované testy.
+# Oprava po M5: vstup člena a trvalá identita sportovce
+
+Rozsah opravy: verzovaná nedestruktivní migrace celého jména, nepovinného roku narození a vazby `self`/`child`; společný serverový resolver pro pozvánku a kód; výchozí osobní vstup, správa více dětí, jednorázové zařazení starších profilů a úprava soupisek, rodičovských a finančních výpisů. Existující profily, členství, dluhy a auditní historie musí zůstat na původních ID. Tato oprava nemění rozsah M6 ani finanční pravidla M3–M5.
+
+Ověření bylo na výslovný pokyn zadavatele odloženo: nebyly spuštěny lint, typová kontrola, build, migrace, aplikace ani revizní agenti. Před nasazením je nutné dokončit ruční scénáře a technické kontroly uvedené v zadání opravy.
+

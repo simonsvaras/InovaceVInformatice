@@ -59,7 +59,7 @@ export default async function NewAssessmentPage({
               {context.athletes.map((athlete) => (
                 <label className="checkbox-label" key={athlete.id}>
                   <input name="athleteId" type="checkbox" value={athlete.id} />
-                  {athlete.firstName} {athlete.lastName} ({athlete.birthYear})
+                  {athlete.fullName}{athlete.birthYear ? ` (${athlete.birthYear})` : ""}
                 </label>
               ))}
             </fieldset>

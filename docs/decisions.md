@@ -45,3 +45,14 @@ Stav k 2026-11-05. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 - T7 v původním zadání počítá s průvodcem a skutečným Fio tokenem. Ve schváleném demo MVP se ukáže pouze technická konfigurace demo synchronizace a připravený informační návrh obrazovky Fio; nejde o režim účtu a skutečné napojení je budoucí rozvoj.
 - T8 se u sdíleného účtu vykonává správcem klubu kvůli izolaci dat týmů. Trenér ji může vykonat u výhradního účtu svého týmu.
 - C9 zmiňuje kredit, ale C12/C13 jej řadí až po MVP. Bez kreditní funkce se při odchodu zobrazuje upozornění na trvající dluhy, nikoli vymyšlený zůstatek kreditu.
+# D-17 — Trvalý osobní profil a výslovný profil dítěte
+
+Stav: schváleno zadavatelem dne 2026-11-05.
+
+- Výchozí vstup je `self`; databázový částečný unikátní index dovolí jednomu účtu nejvýše jednu takovou vazbu.
+- Vazba `child` znamená technický profil dítěte spravovaný účtem rodiče, nikoli účet dítěte.
+- Nové profily ukládají `full_name` beze změny pořadí a bez dělení podle mezery; `birth_year` je nepovinný. Původní `first_name` a `last_name` zůstávají dočasně pouze kvůli nedestruktivní migraci starých dat.
+- Staré vazby zůstanou po migraci nezařazené (`relationship IS NULL`). Uživatel je může při vstupu výslovně označit jako `self` nebo `child`; systém nesmí identitu odvozovat ze shody jména.
+- Pozvánka i kód používají jedinou transakční resolver funkci. Řádek uživatele serializuje souběžné vytvoření profilu, částečný unikátní index chrání `self`, stabilní klíč formuláře chrání vytvoření dítěte a existující unikátní indexy chrání aktivní členství a čekající žádost.
+- Spravující účet zůstává adresátem finanční komunikace. Typ vazby nemění existující dluhy, platby ani auditní historii.
+

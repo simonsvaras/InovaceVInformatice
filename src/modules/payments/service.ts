@@ -678,7 +678,7 @@ export async function getManagerFinanceDashboard(
     team_name: string | null;
   }>(sql`
     select r.id, a.id as assessment_id, a.title as assessment_title, a.due_date::text,
-           ath.id as athlete_id, ath.first_name || ' ' || ath.last_name as athlete_name,
+           ath.id as athlete_id, ath.full_name as athlete_name,
            r.amount_halere,
            coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere,
            exists(select 1 from payment_claims pc where pc.receivable_id=r.id and pc.status='pending') as has_pending_claim,
@@ -708,7 +708,7 @@ export async function getManagerFinanceDashboard(
     team_name: string | null;
   }>(sql`
     select pc.id, pc.receivable_id,
-           ath.first_name || ' ' || ath.last_name as athlete_name,
+           ath.full_name as athlete_name,
            a.title as assessment_title, pc.amount_halere, pc.created_at,
            u.email as guardian_email, t.name as team_name
     from payment_claims pc
@@ -831,7 +831,7 @@ async function loadRetryableReminderRecipients(batchId: string) {
     select nd.id as "deliveryId", rr.id as "reminderRecipientId",
            u.id as "guardianUserId", u.email as "guardianEmail",
            r.id as "receivableId",
-           ath.first_name || ' ' || ath.last_name as "athleteName",
+           ath.full_name as "athleteName",
            a.title as "assessmentTitle", c.name as "clubName", t.name as "teamName",
            greatest(r.amount_halere - coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0), 0)::int as "remainingHalere",
            a.due_date::text as "dueDate"
@@ -908,7 +908,7 @@ export async function sendBulkReminders(input: {
         due_date: string;
       }>(sql`
         select r.id as receivable_id, u.id as guardian_user_id, u.email as guardian_email,
-               ath.first_name || ' ' || ath.last_name as athlete_name,
+               ath.full_name as athlete_name,
                a.title as assessment_title, c.name as club_name, t.name as team_name,
                (r.amount_halere - coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0))::int as remaining_halere,
                a.due_date::text

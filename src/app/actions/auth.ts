@@ -16,8 +16,17 @@ import {
   normalizeEmail,
   safeInternalPath,
   validateDisplayName,
-  validatePassword,
 } from "@/lib/validation";
+
+function passwordValue(formData: FormData, field: string) {
+  const value = formData.get(field);
+
+  if (typeof value !== "string" || value.length === 0) {
+    throw new InputError("invalid_password", "Heslo musí být vyplněné.");
+  }
+
+  return value;
+}
 
 function errorPath(path: string, error: unknown, next?: string) {
   const message =
@@ -38,7 +47,7 @@ export async function registerAction(formData: FormData) {
     const user = await registerUser({
       email: normalizeEmail(formText(formData, "email")),
       displayName: validateDisplayName(formText(formData, "displayName")),
-      password: validatePassword(formText(formData, "password")),
+      password: passwordValue(formData, "password"),
     });
     await createUserSession(user.id);
   } catch (error) {
@@ -54,7 +63,7 @@ export async function loginAction(formData: FormData) {
   try {
     const user = await authenticateUser(
       formText(formData, "email"),
-      formText(formData, "password"),
+      passwordValue(formData, "password"),
     );
     await createUserSession(user.id);
   } catch (error) {
@@ -85,8 +94,8 @@ export async function resetPasswordAction(formData: FormData) {
   const token = formText(formData, "token");
 
   try {
-    const password = validatePassword(formText(formData, "password"));
-    const confirmation = formText(formData, "passwordConfirmation");
+    const password = passwordValue(formData, "password");
+    const confirmation = passwordValue(formData, "passwordConfirmation");
 
     if (password !== confirmation) {
       throw new InputError("password_mismatch", "Zadaná hesla se neshodují.");

@@ -62,7 +62,7 @@ async function retryableDeliveries(bankTransactionId: string) {
   return getDatabase().execute<Delivery>(sql`
     select nd.id as "deliveryId", pa.id as "allocationId",
            u.id as "guardianUserId", u.email as "guardianEmail",
-           ath.first_name || ' ' || ath.last_name as "athleteName",
+           ath.full_name as "athleteName",
            a.title as "assessmentTitle", c.name as "clubName", t.name as "teamName",
            pa.amount_halere as "amountHalere", bt.source_transaction_id as "sourceTransactionId"
       from payment_events pe
@@ -262,7 +262,7 @@ export async function getDemoSimulator(userId: string, receivableId: string) {
     select r.id as receivable_id, r.bank_account_id, ba.account_number,
            r.variable_symbol, r.amount_halere,
            coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere,
-           a.title, ath.first_name || ' ' || ath.last_name as athlete_name,
+           a.title, ath.full_name as athlete_name,
            bi.enabled
       from receivables r
       join assessments a on a.id=r.assessment_id
@@ -305,7 +305,7 @@ async function allocateAutomatically(
   }>(sql`
     select r.id, a.club_id, a.team_id as assessment_team_id, r.origin_team_id,
            r.amount_halere, u.id as guardian_user_id, u.email as guardian_email,
-           ath.first_name || ' ' || ath.last_name as athlete_name,
+           ath.full_name as athlete_name,
            a.title as assessment_title, c.name as club_name, t.name as team_name
       from receivables r
       join assessments a on a.id=r.assessment_id
@@ -691,7 +691,7 @@ export async function allocateSimulatedTransaction(input: {
     }>(sql`
       select r.id, a.club_id, a.team_id as assessment_team_id, r.origin_team_id, r.bank_account_id,
              u.id as guardian_user_id, u.email as guardian_email,
-             ath.first_name || ' ' || ath.last_name as athlete_name,
+             ath.full_name as athlete_name,
              a.title as assessment_title, c.name as club_name, t.name as team_name
         from receivables r
         join assessments a on a.id=r.assessment_id
@@ -866,7 +866,7 @@ export async function getBankReconciliationDashboard(userId: string, requestedSc
     amount_halere: number;
     allocated_halere: number;
   }>(sql`
-    select r.id, r.bank_account_id, ath.first_name || ' ' || ath.last_name as athlete_name,
+    select r.id, r.bank_account_id, ath.full_name as athlete_name,
            a.title as assessment_title, r.amount_halere,
            coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere
       from receivables r join assessments a on a.id=r.assessment_id join athletes ath on ath.id=r.athlete_id
@@ -880,7 +880,7 @@ export async function getBankReconciliationDashboard(userId: string, requestedSc
     amount_halere: number;
     created_at: Date;
   }>(sql`
-    select pe.id, r.bank_account_id, ath.first_name || ' ' || ath.last_name as athlete_name,
+    select pe.id, r.bank_account_id, ath.full_name as athlete_name,
            pe.amount_halere, pe.created_at
       from payment_events pe
       join payment_allocations pa on pa.payment_event_id=pe.id

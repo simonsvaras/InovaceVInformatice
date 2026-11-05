@@ -145,6 +145,110 @@ export async function getUserContexts(userId: string) {
   };
 }
 
+type UserTeamOverviewRow = {
+  team_id: string;
+  team_name: string;
+  club_id: string;
+  club_name: string;
+  member_count: number;
+  coach_name: string | null;
+  is_club_admin: boolean;
+  is_coach: boolean;
+  is_self_member: boolean;
+  is_guardian: boolean;
+};
+
+export async function getUserTeamOverview(userId: string) {
+  const rows = await getDatabase().execute<UserTeamOverviewRow>(sql`
+    select t.id as team_id,
+           t.name as team_name,
+           c.id as club_id,
+           c.name as club_name,
+           (
+             select count(distinct m.athlete_id)::int
+             from memberships m
+             where m.team_id = t.id and m.ended_at is null
+           ) as member_count,
+           (
+             select u.display_name
+             from team_coaches tc
+             join users u on u.id = tc.user_id
+             where tc.team_id = t.id and tc.ended_at is null
+             order by tc.started_at desc
+             limit 1
+           ) as coach_name,
+           exists (
+             select 1
+             from club_admins ca
+             where ca.club_id = c.id and ca.user_id = ${userId}
+           ) as is_club_admin,
+           exists (
+             select 1
+             from team_coaches tc
+             where tc.team_id = t.id
+               and tc.user_id = ${userId}
+               and tc.ended_at is null
+           ) as is_coach,
+           exists (
+             select 1
+             from memberships m
+             join athlete_guardians ag on ag.athlete_id = m.athlete_id
+             where m.team_id = t.id
+               and m.ended_at is null
+               and ag.user_id = ${userId}
+               and ag.relationship = 'self'
+           ) as is_self_member,
+           exists (
+             select 1
+             from memberships m
+             join athlete_guardians ag on ag.athlete_id = m.athlete_id
+             where m.team_id = t.id
+               and m.ended_at is null
+               and ag.user_id = ${userId}
+               and ag.relationship is distinct from 'self'
+           ) as is_guardian
+    from teams t
+    join clubs c on c.id = t.club_id
+    where t.archived_at is null
+      and (
+        exists (
+          select 1
+          from club_admins ca
+          where ca.club_id = c.id and ca.user_id = ${userId}
+        )
+        or exists (
+          select 1
+          from team_coaches tc
+          where tc.team_id = t.id
+            and tc.user_id = ${userId}
+            and tc.ended_at is null
+        )
+        or exists (
+          select 1
+          from memberships m
+          join athlete_guardians ag on ag.athlete_id = m.athlete_id
+          where m.team_id = t.id
+            and m.ended_at is null
+            and ag.user_id = ${userId}
+        )
+      )
+    order by c.name, t.name
+  `);
+
+  return rows.map((row) => ({
+    teamId: row.team_id,
+    teamName: row.team_name,
+    clubId: row.club_id,
+    clubName: row.club_name,
+    memberCount: row.member_count,
+    coachName: row.coach_name,
+    isClubAdmin: row.is_club_admin,
+    isCoach: row.is_coach,
+    isSelfMember: row.is_self_member,
+    isGuardian: row.is_guardian,
+  }));
+}
+
 export async function getClubAdminDashboard(userId: string, clubId: string) {
   const club = await requireClubAdminAccess(userId, clubId);
   const database = getDatabase();

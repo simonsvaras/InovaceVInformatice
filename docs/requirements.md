@@ -56,3 +56,12 @@ Auditní události pro citlivé změny patří do základu MVP; odložené je pr
 ## Pracovní zjednodušení a design
 
 Konkrétní pravidla pro účty, přeplatky, členství a opravy jsou v `docs/decisions.md`. Jde o jednoduché pracovní volby pro školní projekt, nikoli o obecná pravidla finanční aplikace. `docs/design.md` mapuje dodané snímky, navrhuje chybějící stránky a popisuje rozpory prototypu s business zadáním.
+# Upřesnění požadavků: identita sportovce při vstupu
+
+- `users`, `athletes` a `memberships` zůstávají oddělené. Vazba účtu na sportovce rozlišuje `self` a `child`; starší nezařazené vazby se nesmějí automaticky rozhodnout podle jména.
+- Databáze vynucuje nejvýše jeden profil `self` na uživatele. První vstup za sebe použije jméno účtu, další vstupy používají stejné `athlete_id`.
+- Nové dítě má celé jméno a nepovinný rok narození. Výběr existujícího profilu je povolen pouze vlastníkovi vazby; dítě nedostává účet.
+- Pozvánka a kód používají stejnou serverovou volbu profilu. Pozvánka se spotřebuje až po úspěšném členství a dál kontroluje e-mail; kód dál vytváří čekající žádost.
+- Opakované odeslání nesmí vytvořit druhý osobní profil, stejné nové dítě z jednoho formuláře ani duplicitní aktivní členství či čekající žádost.
+- Dluhy, QR a platební komunikace zůstávají na sportovci a jeho spravujícím účtu; změna reprezentace jména nemění existující ID ani finanční historii.
+

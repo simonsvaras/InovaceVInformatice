@@ -54,6 +54,16 @@ function paymentEventLabel(kind: string) {
   return "Potvrzené hlášení";
 }
 
+function formatDueDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("cs-CZ", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Europe/Prague",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
 export default async function FinancePage({
   searchParams,
 }: {
@@ -100,42 +110,229 @@ export default async function FinancePage({
     : `clubId=${encodeURIComponent(scope.clubId!)}`;
   const back = "teamId" in scope ? `/tymy/${scope.teamId!}` : `/kluby/${scope.clubId!}`;
   const today = todayInPrague();
+  const assessmentMap = new Map<
+    string,
+    {
+      id: string;
+      title: string;
+      dueDate: string;
+      teamNames: Set<string>;
+      amounts: Set<number>;
+      expectedHalere: number;
+      collectedHalere: number;
+      settledCount: number;
+      recipientCount: number;
+    }
+  >();
+
+  for (const debt of dashboard.debts) {
+    const current = assessmentMap.get(debt.assessment_id) ?? {
+      id: debt.assessment_id,
+      title: debt.assessment_title,
+      dueDate: debt.due_date,
+      teamNames: new Set<string>(),
+      amounts: new Set<number>(),
+      expectedHalere: 0,
+      collectedHalere: 0,
+      settledCount: 0,
+      recipientCount: 0,
+    };
+    if (debt.team_name) current.teamNames.add(debt.team_name);
+    current.amounts.add(debt.amount_halere);
+    current.expectedHalere += debt.amount_halere;
+    current.collectedHalere += debt.allocated_halere;
+    current.recipientCount += 1;
+    if (debt.remainingHalere <= 0) current.settledCount += 1;
+    assessmentMap.set(debt.assessment_id, current);
+  }
+
+  const assessmentRows = Array.from(assessmentMap.values()).sort((left, right) =>
+    left.dueDate.localeCompare(right.dueDate),
+  );
 
   return (
-    <main className="dashboard-shell">
-      <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubio</Link>
-        <Link href={back}>Zpět</Link>
+    <main className="dashboard-shell dashboard-home finance-admin-page">
+      <header className="dashboard-topbar">
+        <Link
+          className="dashboard-brand"
+          href="/prehled"
+          aria-label="Klubio – přehled"
+        >
+          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
+          <span>Klubio</span>
+        </Link>
+        <Link className="club-topbar-link" href={back}>Zpět</Link>
       </header>
-      <section className="content-stack">
-        <div>
-          <p className="eyebrow">Finance</p>
-          <h1>Kdo zaplatil</h1>
-          <p>{dashboard.name} · upomínka není stav dluhu</p>
-        </div>
+      <section className="content-stack finance-admin-content">
+        <header className="finance-admin-hero">
+          <div>
+            <p className="finance-admin-role">Správa financí</p>
+            <h1>Klubové finance</h1>
+            <p>
+              {dashboard.name}. Přehled předpisů a úhrad evidovaných v aplikaci.
+            </p>
+          </div>
+          <Link
+            className="club-primary-action"
+            href={`/predpisy/novy?${scopeQuery}`}
+          >
+            Nový předpis
+          </Link>
+        </header>
         <Message error={query.error} success={query.success} />
-        <section className="summary-grid">
-          <article className="panel summary-card"><span>Předepsáno</span><strong>{formatCzk(dashboard.totals.expectedHalere)}</strong></article>
-          <article className="panel summary-card"><span>Vybráno</span><strong>{formatCzk(dashboard.totals.collectedHalere)}</strong></article>
-          <article className="panel summary-card"><span>Zbývá</span><strong>{formatCzk(dashboard.totals.remainingHalere)}</strong></article>
+
+        <section className="finance-overview" aria-label="Souhrn financí">
+          <div>
+            <span>Předepsáno</span>
+            <strong>{formatCzk(dashboard.totals.expectedHalere)}</strong>
+          </div>
+          <div>
+            <span>Evidováno</span>
+            <strong>{formatCzk(dashboard.totals.collectedHalere)}</strong>
+          </div>
+          <div>
+            <span>Zbývá</span>
+            <strong>{formatCzk(dashboard.totals.remainingHalere)}</strong>
+          </div>
         </section>
-        <article className="panel">
-          <h2>Technická konfigurace demo banky</h2>
-          <p>Konfigurace pouze přijímá simulované pohyby. Není režimem účtu a nevypíná rodičovské hlášení ani ruční evidenci. Skutečné Fio API ani token se nepoužívají.</p>
-          <div className="list-stack">
+
+        <section className="finance-assessments" aria-labelledby="assessments-title">
+          <header className="finance-assessments-header">
+            <div>
+              <h2 id="assessments-title">Předpisy</h2>
+              <p>Otevřete předpis pro detail jednotlivých členů a plateb.</p>
+            </div>
+            <span>{assessmentRows.length}</span>
+          </header>
+
+          {assessmentRows.length ? (
+            <div className="finance-assessment-list">
+              <div className="finance-assessment-columns" aria-hidden="true">
+                <span>Předpis</span>
+                <span>Splatnost</span>
+                <span>Na člena</span>
+                <span>Evidováno</span>
+                <span />
+              </div>
+              {assessmentRows.map((assessment) => {
+                const progress = assessment.expectedHalere > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        (assessment.collectedHalere / assessment.expectedHalere) * 100,
+                      ),
+                    )
+                  : 0;
+                const teamLabel = assessment.teamNames.size === 0
+                  ? "Celý klub"
+                  : assessment.teamNames.size === 1
+                    ? Array.from(assessment.teamNames)[0]
+                    : "Více týmů";
+                const perMember = assessment.amounts.size === 1
+                  ? formatCzk(Array.from(assessment.amounts)[0])
+                  : "Různé částky";
+
+                return (
+                  <Link
+                    className="finance-assessment-row"
+                    href={`/predpisy/${assessment.id}`}
+                    key={assessment.id}
+                  >
+                    <div className="finance-assessment-title">
+                      <span>{teamLabel}</span>
+                      <strong>{assessment.title}</strong>
+                    </div>
+                    <div className="finance-assessment-date">
+                      <span>Splatnost</span>
+                      <strong>{formatDueDate(assessment.dueDate)}</strong>
+                    </div>
+                    <div className="finance-assessment-amount">
+                      <span>Na člena</span>
+                      <strong>{perMember}</strong>
+                    </div>
+                    <div className="finance-assessment-progress">
+                      <div>
+                        <strong>
+                          {formatCzk(assessment.collectedHalere)} / {formatCzk(assessment.expectedHalere)}
+                        </strong>
+                        <span>
+                          {assessment.settledCount}/{assessment.recipientCount}
+                        </span>
+                      </div>
+                      <span className="finance-progress-track">
+                        <span style={{ width: `${progress}%` }} />
+                      </span>
+                    </div>
+                    <span className="finance-assessment-open" aria-hidden="true">›</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="finance-empty-state">
+              <strong>Zatím tu nejsou žádné předpisy.</strong>
+              <span>Vytvořte první předpis pro klub nebo tým.</span>
+            </div>
+          )}
+        </section>
+
+        <div className="finance-advanced-heading">
+          <h2>Rozšířená správa</h2>
+          <p>Hlášení, ruční evidence, demo banka a upomínky.</p>
+        </div>
+
+        <article className="panel finance-sync-settings">
+          <header className="finance-sync-header">
+            <div>
+              <h2>Nastavení automatické synchronizace účtu</h2>
+              <p>
+                Zapněte pravidelné načítání nových pohybů a zrychlete jejich
+                párování s platbami členů. Ruční evidence i hlášení rodičů
+                zůstávají vždy dostupné.
+              </p>
+            </div>
+            <span>Demo zdroj</span>
+          </header>
+          <p className="finance-sync-notice">
+            V této verzi se načítají pouze simulované pohyby. Skutečné bankovní
+            API ani přístupový token nejsou připojené.
+          </p>
+          <div className="finance-sync-accounts">
             {bankDashboard.accounts.map((account) => (
-              <div className="subcard" key={account.id}>
-                <p><strong>{account.account_number}</strong>{account.is_default ? " · výchozí/sdílený účet" : account.exclusive_team_id ? " · výhradní týmový účet" : " · sdílený účet"}</p>
-                <p>{account.integration_id ? "Demo synchronizace aktivní" : "Demo synchronizace není aktivní"}</p>
-                <p>Poslední nově přijatý demo pohyb: {account.last_processed_at ? formatDateTimeInPrague(account.last_processed_at) : "zatím žádný"}</p>
+              <div className="finance-sync-account" key={account.id}>
+                <div className="finance-sync-account-copy">
+                  <div className="finance-sync-account-title">
+                    <strong>{account.account_number}</strong>
+                    <span className={account.integration_id ? "is-active" : ""}>
+                      {account.integration_id ? "Synchronizace aktivní" : "Synchronizace vypnutá"}
+                    </span>
+                  </div>
+                  <p>
+                    {account.is_default
+                      ? "Výchozí sdílený účet klubu"
+                      : account.exclusive_team_id
+                        ? "Výhradní týmový účet"
+                        : "Sdílený klubový účet"}
+                  </p>
+                  <p className="finance-sync-last-run">
+                    Poslední načtený pohyb: {account.last_processed_at
+                      ? formatDateTimeInPrague(account.last_processed_at)
+                      : "zatím žádný"}
+                  </p>
+                </div>
                 {!account.integration_id && account.canConfigure ? (
-                  <form action={activateDemoIntegrationAction}>
+                  <form action={activateDemoIntegrationAction} className="finance-sync-action">
                     <ScopeFields scope={scope} />
                     <input name="bankAccountId" type="hidden" value={account.id} />
-                    <button className="button-secondary" type="submit">Aktivovat demo synchronizaci</button>
+                    <button type="submit">Zapnout automatickou synchronizaci</button>
                   </form>
                 ) : null}
-                {!account.canReadRaw && account.integration_id ? <p>Syrové pohyby sdíleného účtu může zobrazit pouze správce klubu.</p> : null}
+                {!account.canReadRaw && account.integration_id ? (
+                  <p className="finance-sync-access-note">
+                    Detail pohybů sdíleného účtu může zobrazit pouze správce klubu.
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>

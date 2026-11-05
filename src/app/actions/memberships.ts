@@ -16,8 +16,9 @@ import {
   formText,
   InputError,
   normalizeJoinCode,
+  validateEntityName,
   validateBirthYear,
-  validatePersonName,
+  validateUuid,
 } from "@/lib/validation";
 
 type InviteMembersState = {
@@ -38,17 +39,43 @@ function message(error: unknown) {
 }
 
 function athleteFromForm(formData: FormData) {
-  const choice = formText(formData, "athleteChoice");
+  const kind = formText(formData, "entryKind");
+  const creationKey = validateUuid(
+    formText(formData, "profileCreationKey"),
+    "Klíč formuláře",
+  );
 
-  if (choice !== "new") {
-    return { athleteId: choice };
+  if (kind === "self") {
+    const claimAthleteId = formText(formData, "selfAthleteId");
+    return {
+      kind,
+      creationKey,
+      claimAthleteId: claimAthleteId
+        ? validateUuid(claimAthleteId, "Profil sportovce")
+        : undefined,
+    } as const;
   }
 
+  if (kind !== "child") {
+    throw new InputError("invalid_entry_kind", "Vyberte, kdo vstupuje do týmu.");
+  }
+
+  const choice = formText(formData, "childAthleteId");
+  if (choice !== "new") {
+    return {
+      kind,
+      creationKey,
+      athleteId: validateUuid(choice, "Profil dítěte"),
+    } as const;
+  }
+
+  const rawBirthYear = formText(formData, "birthYear");
   return {
-    firstName: validatePersonName(formText(formData, "firstName"), "Jméno"),
-    lastName: validatePersonName(formText(formData, "lastName"), "Příjmení"),
-    birthYear: validateBirthYear(formText(formData, "birthYear")),
-  };
+    kind,
+    creationKey,
+    fullName: validateEntityName(formText(formData, "fullName"), "Celé jméno", 160),
+    birthYear: rawBirthYear ? validateBirthYear(rawBirthYear) : undefined,
+  } as const;
 }
 
 export async function inviteMembersAction(
@@ -105,7 +132,7 @@ export async function acceptMemberInvitationAction(formData: FormData) {
     );
   }
 
-  redirect(`/prehled?success=${encodeURIComponent("Sportovec byl přidán do týmu.")}`);
+  redirect(`/prehled?success=${encodeURIComponent("Členství bylo z pozvánky rovnou aktivováno.")}`);
 }
 
 export async function requestJoinByCodeAction(formData: FormData) {

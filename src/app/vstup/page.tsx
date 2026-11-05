@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { requestJoinByCodeAction } from "@/app/actions/memberships";
 import { Message } from "@/components/message";
+import { AthleteEntryFields } from "@/components/athlete-entry-fields";
 import { requireUser } from "@/modules/auth/service";
 import { getOwnAthletes } from "@/modules/memberships/service";
 
@@ -29,22 +30,11 @@ export default async function JoinByCodePage({
             Týmový kód
             <input autoCapitalize="characters" maxLength={9} name="joinCode" placeholder="ABCD-EFGH" required />
           </label>
-          <label>
-            Sportovec
-            <select defaultValue="new" name="athleteChoice">
-              <option value="new">Přidat nového sportovce</option>
-              {ownAthletes.map((athlete) => (
-                <option key={athlete.id} value={athlete.id}>{athlete.firstName} {athlete.lastName} ({athlete.birthYear})</option>
-              ))}
-            </select>
-            <small>Existujícího sportovce lze vybrat jen z vašeho vlastního účtu.</small>
-          </label>
-          <fieldset className="fieldset">
-            <legend>Údaje nového sportovce</legend>
-            <label>Jméno<input maxLength={80} name="firstName" /></label>
-            <label>Příjmení<input maxLength={80} name="lastName" /></label>
-            <label>Rok narození<input inputMode="numeric" maxLength={4} name="birthYear" /></label>
-          </fieldset>
+          <AthleteEntryFields
+            creationKey={crypto.randomUUID()}
+            displayName={user.displayName}
+            profiles={ownAthletes}
+          />
           <button type="submit">Odeslat žádost</button>
         </form>
       </section>

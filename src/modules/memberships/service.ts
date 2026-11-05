@@ -1,6 +1,10 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+import type { PostgresJsTransaction } from "drizzle-orm/postgres-js";
+import { notFound } from "next/navigation";
 
 import { getDatabase } from "@/db/client";
+import * as schema from "@/db/schema";
 import {
   athleteGuardians,
   athletes,
@@ -23,6 +27,7 @@ import { InputError, normalizeEmail } from "@/lib/validation";
 import {
   requireClubAdminAccess,
   requireTeamManagementAccess,
+  requireTeamPageAccess,
 } from "@/modules/authorization/service";
 import {
   absoluteAppUrl,
@@ -33,12 +38,24 @@ import { consumeRateLimit } from "@/modules/security/rate-limit";
 const MEMBER_INVITATION_HOURS = 48;
 const JOIN_CODE_DAYS = 30;
 
-type AthleteInput = {
-  athleteId?: string;
-  firstName?: string;
-  lastName?: string;
-  birthYear?: number;
-};
+type AthleteInput =
+  | {
+      kind: "self";
+      claimAthleteId?: string;
+      creationKey: string;
+    }
+  | {
+      kind: "child";
+      athleteId?: string;
+      fullName?: string;
+      birthYear?: number;
+      creationKey: string;
+    };
+
+type MembershipTransaction = PostgresJsTransaction<
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
 
 type LockedTeamAccess = {
   club_id: string;
@@ -221,23 +238,23 @@ export async function getOwnAthletes(userId: string) {
   return getDatabase()
     .select({
       id: athletes.id,
-      firstName: athletes.firstName,
-      lastName: athletes.lastName,
+      fullName: athletes.fullName,
       birthYear: athletes.birthYear,
+      relationship: athleteGuardians.relationship,
     })
     .from(athleteGuardians)
     .innerJoin(athletes, eq(athletes.id, athleteGuardians.athleteId))
     .where(eq(athleteGuardians.userId, userId))
-    .orderBy(athletes.lastName, athletes.firstName);
+    .orderBy(athletes.fullName);
 }
 
 export async function getGuardianMemberships(userId: string) {
   return getDatabase()
     .select({
       athleteId: athletes.id,
-      firstName: athletes.firstName,
-      lastName: athletes.lastName,
+      fullName: athletes.fullName,
       birthYear: athletes.birthYear,
+      relationship: athleteGuardians.relationship,
       teamId: teams.id,
       teamName: teams.name,
       clubName: clubs.name,
@@ -261,7 +278,244 @@ export async function getGuardianMemberships(userId: string) {
     )
     .leftJoin(users, eq(users.id, teamCoaches.userId))
     .where(eq(athleteGuardians.userId, userId))
-    .orderBy(athletes.lastName, athletes.firstName, teams.name);
+    .orderBy(athletes.fullName, teams.name);
+}
+
+export async function getMemberTeamDashboard(userId: string, teamId: string) {
+  const access = await requireTeamPageAccess(userId, teamId);
+  if (!access.hasMembership) {
+    notFound();
+  }
+
+  const database = getDatabase();
+  const [teamRows, roster, managedMembers] = await Promise.all([
+    database
+      .select({
+        id: teams.id,
+        name: teams.name,
+        clubId: clubs.id,
+        clubName: clubs.name,
+        coachName: users.displayName,
+        coachEmail: users.email,
+      })
+      .from(teams)
+      .innerJoin(clubs, eq(clubs.id, teams.clubId))
+      .leftJoin(
+        teamCoaches,
+        and(eq(teamCoaches.teamId, teams.id), isNull(teamCoaches.endedAt)),
+      )
+      .leftJoin(users, eq(users.id, teamCoaches.userId))
+      .where(eq(teams.id, teamId))
+      .limit(1),
+    database
+      .selectDistinct({
+        athleteId: athletes.id,
+        fullName: athletes.fullName,
+      })
+      .from(memberships)
+      .innerJoin(athletes, eq(athletes.id, memberships.athleteId))
+      .where(
+        and(eq(memberships.teamId, teamId), isNull(memberships.endedAt)),
+      )
+      .orderBy(athletes.fullName),
+    database
+      .select({
+        athleteId: athletes.id,
+        fullName: athletes.fullName,
+        relationship: athleteGuardians.relationship,
+      })
+      .from(memberships)
+      .innerJoin(athletes, eq(athletes.id, memberships.athleteId))
+      .innerJoin(
+        athleteGuardians,
+        and(
+          eq(athleteGuardians.athleteId, athletes.id),
+          eq(athleteGuardians.userId, userId),
+        ),
+      )
+      .where(
+        and(eq(memberships.teamId, teamId), isNull(memberships.endedAt)),
+      )
+      .orderBy(athletes.fullName),
+  ]);
+
+  const [team] = teamRows;
+  if (!team) notFound();
+
+  return { ...team, roster, managedMembers };
+}
+
+async function resolveOwnedAthlete(
+  transaction: MembershipTransaction,
+  input: {
+    userId: string;
+    clubId: string;
+    teamId: string;
+    athlete: AthleteInput;
+  },
+) {
+  const userRows = await transaction.execute<{ display_name: string }>(sql`
+    select display_name
+    from users
+    where id = ${input.userId}
+    for update
+  `);
+  const user = userRows[0];
+  if (!user) {
+    throw new InputError("account_not_found", "Přihlášený účet už neexistuje.");
+  }
+
+  if (input.athlete.kind === "self") {
+    const selfRows = await transaction.execute<{ athlete_id: string }>(sql`
+      select athlete_id
+      from athlete_guardians
+      where user_id = ${input.userId} and relationship = 'self'
+      for update
+    `);
+    if (selfRows[0]) {
+      return selfRows[0].athlete_id;
+    }
+
+    if (input.athlete.claimAthleteId) {
+      const legacyRows = await transaction.execute<{ athlete_id: string }>(sql`
+        select athlete_id
+        from athlete_guardians
+        where athlete_id = ${input.athlete.claimAthleteId}
+          and user_id = ${input.userId}
+          and relationship is null
+        for update
+      `);
+      const legacy = legacyRows[0];
+      if (!legacy) {
+        throw new InputError(
+          "legacy_profile_not_owned",
+          "Jako svůj lze označit pouze dosud nezařazený profil spravovaný vaším účtem.",
+        );
+      }
+      await transaction
+        .update(athleteGuardians)
+        .set({ relationship: "self" })
+        .where(
+          and(
+            eq(athleteGuardians.athleteId, legacy.athlete_id),
+            eq(athleteGuardians.userId, input.userId),
+            isNull(athleteGuardians.relationship),
+          ),
+        );
+      await transaction.insert(auditEvents).values({
+        actorUserId: input.userId,
+        clubId: input.clubId,
+        teamId: input.teamId,
+        eventType: "athlete.legacy_claimed_as_self",
+        targetType: "athlete",
+        targetId: legacy.athlete_id,
+      });
+      return legacy.athlete_id;
+    }
+
+    const [created] = await transaction
+      .insert(athletes)
+      .values({
+        fullName: user.display_name,
+        birthYear: null,
+      })
+      .returning({ id: athletes.id });
+    await transaction.insert(athleteGuardians).values({
+      athleteId: created.id,
+      userId: input.userId,
+      relationship: "self",
+    });
+    await transaction.insert(auditEvents).values({
+      actorUserId: input.userId,
+      clubId: input.clubId,
+      teamId: input.teamId,
+      eventType: "athlete.self_created",
+      targetType: "athlete",
+      targetId: created.id,
+    });
+    return created.id;
+  }
+
+  if (input.athlete.athleteId) {
+    const ownedRows = await transaction.execute<{
+      athlete_id: string;
+      relationship: string | null;
+    }>(sql`
+      select athlete_id, relationship
+      from athlete_guardians
+      where athlete_id = ${input.athlete.athleteId}
+        and user_id = ${input.userId}
+      for update
+    `);
+    const owned = ownedRows[0];
+    if (!owned || owned.relationship === "self") {
+      throw new InputError(
+        "athlete_not_owned",
+        "Jako dítě lze vybrat pouze vlastní profil dítěte spravovaný vaším účtem.",
+      );
+    }
+    if (owned.relationship === null) {
+      await transaction
+        .update(athleteGuardians)
+        .set({ relationship: "child" })
+        .where(
+          and(
+            eq(athleteGuardians.athleteId, owned.athlete_id),
+            eq(athleteGuardians.userId, input.userId),
+            isNull(athleteGuardians.relationship),
+          ),
+        );
+      await transaction.insert(auditEvents).values({
+        actorUserId: input.userId,
+        clubId: input.clubId,
+        teamId: input.teamId,
+        eventType: "athlete.legacy_classified_as_child",
+        targetType: "athlete",
+        targetId: owned.athlete_id,
+      });
+    }
+    return owned.athlete_id;
+  }
+
+  if (!input.athlete.fullName) {
+    throw new InputError("athlete_incomplete", "Doplňte celé jméno dítěte.");
+  }
+
+  const existingRows = await transaction.execute<{ athlete_id: string }>(sql`
+    select ag.athlete_id
+    from athletes a
+    join athlete_guardians ag on ag.athlete_id = a.id
+    where a.creation_key = ${input.athlete.creationKey}
+      and ag.user_id = ${input.userId}
+      and ag.relationship = 'child'
+    for update of ag
+  `);
+  if (existingRows[0]) {
+    return existingRows[0].athlete_id;
+  }
+
+  const [created] = await transaction
+    .insert(athletes)
+    .values({
+      fullName: input.athlete.fullName,
+      birthYear: input.athlete.birthYear ?? null,
+      creationKey: input.athlete.creationKey,
+    })
+    .returning({ id: athletes.id });
+  await transaction.insert(athleteGuardians).values({
+    athleteId: created.id,
+    userId: input.userId,
+    relationship: "child",
+  });
+  await transaction.insert(auditEvents).values({
+    actorUserId: input.userId,
+    clubId: input.clubId,
+    teamId: input.teamId,
+    eventType: "athlete.child_created",
+    targetType: "athlete",
+    targetId: created.id,
+  });
+  return created.id;
 }
 
 export async function acceptMemberInvitation(input: {
@@ -310,46 +564,12 @@ export async function acceptMemberInvitation(input: {
       );
     }
 
-    let athleteId = input.athlete.athleteId;
-
-    if (athleteId) {
-      const [owned] = await transaction
-        .select({ id: athleteGuardians.id })
-        .from(athleteGuardians)
-        .where(
-          and(
-            eq(athleteGuardians.athleteId, athleteId),
-            eq(athleteGuardians.userId, input.user.id),
-          ),
-        )
-        .limit(1);
-      if (!owned) {
-        throw new InputError(
-          "athlete_not_owned",
-          "Lze vybrat pouze sportovce spravovaného vaším účtem.",
-        );
-      }
-    } else {
-      if (
-        !input.athlete.firstName ||
-        !input.athlete.lastName ||
-        !input.athlete.birthYear
-      ) {
-        throw new InputError("athlete_incomplete", "Doplňte údaje sportovce.");
-      }
-      const [created] = await transaction
-        .insert(athletes)
-        .values({
-          firstName: input.athlete.firstName,
-          lastName: input.athlete.lastName,
-          birthYear: input.athlete.birthYear,
-        })
-        .returning({ id: athletes.id });
-      athleteId = created.id;
-      await transaction
-        .insert(athleteGuardians)
-        .values({ athleteId, userId: input.user.id });
-    }
+    const athleteId = await resolveOwnedAthlete(transaction, {
+      userId: input.user.id,
+      clubId: invitation.club_id,
+      teamId: invitation.team_id,
+      athlete: input.athlete,
+    });
 
     const [existing] = await transaction
       .select({ id: memberships.id })
@@ -416,46 +636,12 @@ export async function requestJoinByCode(input: {
       throw new InputError("invalid_join_code", "Týmový kód je neplatný nebo vypršel.");
     }
 
-    let athleteId = input.athlete.athleteId;
-
-    if (athleteId) {
-      const [owned] = await transaction
-        .select({ id: athleteGuardians.id })
-        .from(athleteGuardians)
-        .where(
-          and(
-            eq(athleteGuardians.athleteId, athleteId),
-            eq(athleteGuardians.userId, input.userId),
-          ),
-        )
-        .limit(1);
-      if (!owned) {
-        throw new InputError(
-          "athlete_not_owned",
-          "Kód nikdy nepřiřadí existujícího sportovce cizímu účtu.",
-        );
-      }
-    } else {
-      if (
-        !input.athlete.firstName ||
-        !input.athlete.lastName ||
-        !input.athlete.birthYear
-      ) {
-        throw new InputError("athlete_incomplete", "Doplňte údaje sportovce.");
-      }
-      const [created] = await transaction
-        .insert(athletes)
-        .values({
-          firstName: input.athlete.firstName,
-          lastName: input.athlete.lastName,
-          birthYear: input.athlete.birthYear,
-        })
-        .returning({ id: athletes.id });
-      athleteId = created.id;
-      await transaction
-        .insert(athleteGuardians)
-        .values({ athleteId, userId: input.userId });
-    }
+    const athleteId = await resolveOwnedAthlete(transaction, {
+      userId: input.userId,
+      clubId: code.club_id,
+      teamId: code.team_id,
+      athlete: input.athlete,
+    });
 
     const [member] = await transaction
       .select({ id: memberships.id })
@@ -517,9 +703,9 @@ export async function getTeamMembershipDashboard(userId: string, teamId: string)
       .select({
         membershipId: memberships.id,
         athleteId: athletes.id,
-        firstName: athletes.firstName,
-        lastName: athletes.lastName,
+        fullName: athletes.fullName,
         birthYear: athletes.birthYear,
+        relationship: athleteGuardians.relationship,
         guardianName: users.displayName,
         guardianEmail: users.email,
       })
@@ -533,19 +719,26 @@ export async function getTeamMembershipDashboard(userId: string, teamId: string)
       .where(
         and(eq(memberships.teamId, teamId), isNull(memberships.endedAt)),
       )
-      .orderBy(athletes.lastName, athletes.firstName),
+      .orderBy(athletes.fullName),
     database
       .select({
         id: joinRequests.id,
-        firstName: athletes.firstName,
-        lastName: athletes.lastName,
+        fullName: athletes.fullName,
         birthYear: athletes.birthYear,
+        relationship: athleteGuardians.relationship,
         guardianName: users.displayName,
         guardianEmail: users.email,
         createdAt: joinRequests.createdAt,
       })
       .from(joinRequests)
       .innerJoin(athletes, eq(athletes.id, joinRequests.athleteId))
+      .innerJoin(
+        athleteGuardians,
+        and(
+          eq(athleteGuardians.athleteId, athletes.id),
+          eq(athleteGuardians.userId, joinRequests.guardianUserId),
+        ),
+      )
       .innerJoin(users, eq(users.id, joinRequests.guardianUserId))
       .where(
         and(eq(joinRequests.teamId, teamId), eq(joinRequests.status, "pending")),

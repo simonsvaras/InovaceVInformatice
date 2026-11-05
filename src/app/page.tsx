@@ -36,7 +36,7 @@ export default async function Home() {
       <section className="home-hero" aria-labelledby="page-title">
         <div className="home-copy">
           <h1 id="page-title">
-            Mějte jasno, co je předepsáno a co už je evidováno.
+            Klubové příspěvky a platby přehledně na jednom místě.
           </h1>
           <p className="home-lead">
             Klubio dává správcům, trenérům a rodičům jeden přehled klubových

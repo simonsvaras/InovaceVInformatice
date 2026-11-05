@@ -15,12 +15,17 @@ import {
   notificationDeliveries,
   paymentAllocations,
   paymentClaims,
+  paymentEvents,
   receivables,
   teams,
   users,
 } from "@/db/schema";
 import { InputError } from "@/lib/validation";
-import { requireClubAdminAccess, requireTeamManagementAccess } from "@/modules/authorization/service";
+import {
+  requireClubAdminAccess,
+  requireTeamManagementAccess,
+  requireTeamPageAccess,
+} from "@/modules/authorization/service";
 import { buildReceivableEmail } from "@/modules/assessments/email";
 import {
   failRecordedDelivery,
@@ -212,8 +217,7 @@ export async function createAssessment(input: AssessmentInput) {
       const selectedIds = [...new Set(input.athleteIds)];
       let recipientRows: Array<{
         athleteId: string;
-        firstName: string;
-        lastName: string;
+        fullName: string;
         guardianUserId: string;
         guardianEmail: string;
       }>;
@@ -229,8 +233,7 @@ export async function createAssessment(input: AssessmentInput) {
         recipientRows = await transaction
           .selectDistinct({
             athleteId: athletes.id,
-            firstName: athletes.firstName,
-            lastName: athletes.lastName,
+            fullName: athletes.fullName,
             guardianUserId: users.id,
             guardianEmail: users.email,
           })
@@ -239,7 +242,7 @@ export async function createAssessment(input: AssessmentInput) {
           .innerJoin(athleteGuardians, eq(athleteGuardians.athleteId, athletes.id))
           .innerJoin(users, eq(users.id, athleteGuardians.userId))
           .where(and(...conditions))
-          .orderBy(asc(athletes.lastName), asc(athletes.firstName));
+          .orderBy(asc(athletes.fullName));
         if (selectedIds.length && recipientRows.length !== selectedIds.length) {
           throw new InputError("invalid_recipients", "Výběr obsahuje sportovce mimo tento tým.");
         }
@@ -247,8 +250,7 @@ export async function createAssessment(input: AssessmentInput) {
         recipientRows = await transaction
           .selectDistinct({
             athleteId: athletes.id,
-            firstName: athletes.firstName,
-            lastName: athletes.lastName,
+            fullName: athletes.fullName,
             guardianUserId: users.id,
             guardianEmail: users.email,
           })
@@ -264,7 +266,7 @@ export async function createAssessment(input: AssessmentInput) {
               isNull(memberships.endedAt),
             ),
           )
-          .orderBy(asc(athletes.lastName), asc(athletes.firstName));
+          .orderBy(asc(athletes.fullName));
       }
 
       if (!recipientRows.length) {
@@ -326,7 +328,7 @@ export async function createAssessment(input: AssessmentInput) {
           receivableId: receivable.id,
           guardianUserId: recipient.guardianUserId,
           guardianEmail: recipient.guardianEmail,
-          athleteName: `${recipient.firstName} ${recipient.lastName}`,
+          athleteName: recipient.fullName,
           assessmentTitle: input.title,
           clubName: scope.clubName,
           teamName: scope.teamName,
@@ -395,14 +397,13 @@ export async function getTeamAssessmentForm(userId: string, teamId: string) {
     getDatabase()
       .selectDistinct({
         id: athletes.id,
-        firstName: athletes.firstName,
-        lastName: athletes.lastName,
+        fullName: athletes.fullName,
         birthYear: athletes.birthYear,
       })
       .from(memberships)
       .innerJoin(athletes, eq(athletes.id, memberships.athleteId))
       .where(and(eq(memberships.teamId, teamId), isNull(memberships.endedAt)))
-      .orderBy(athletes.lastName, athletes.firstName),
+      .orderBy(athletes.fullName),
   ]);
   return { ...team, accountNumber: account[0]?.accountNumber ?? "", athletes: roster };
 }
@@ -417,8 +418,7 @@ export async function getClubAssessmentForm(userId: string, clubId: string) {
   const roster = await getDatabase()
     .selectDistinct({
       id: athletes.id,
-      firstName: athletes.firstName,
-      lastName: athletes.lastName,
+      fullName: athletes.fullName,
       birthYear: athletes.birthYear,
     })
     .from(memberships)
@@ -431,7 +431,7 @@ export async function getClubAssessmentForm(userId: string, clubId: string) {
         isNull(memberships.endedAt),
       ),
     )
-    .orderBy(athletes.lastName, athletes.firstName);
+    .orderBy(athletes.fullName);
   return { ...club, accountNumber: account?.accountNumber ?? "", athletes: roster };
 }
 
@@ -510,8 +510,7 @@ export async function getGuardianReceivables(userId: string) {
     .select({
       id: receivables.id,
       athleteId: athletes.id,
-      athleteFirstName: athletes.firstName,
-      athleteLastName: athletes.lastName,
+      athleteName: athletes.fullName,
       title: assessments.title,
       amountHalere: receivables.amountHalere,
       dueDate: assessments.dueDate,
@@ -539,12 +538,87 @@ export async function getGuardianReceivables(userId: string) {
   }));
 }
 
+export async function getGuardianTeamFinance(userId: string, teamId: string) {
+  const access = await requireTeamPageAccess(userId, teamId);
+  if (!access.hasMembership) {
+    notFound();
+  }
+
+  const database = getDatabase();
+  const [debtRows, history] = await Promise.all([
+    database
+      .select({
+        id: receivables.id,
+        athleteId: athletes.id,
+        athleteName: athletes.fullName,
+        title: assessments.title,
+        amountHalere: receivables.amountHalere,
+        dueDate: assessments.dueDate,
+        allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
+        pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
+      })
+      .from(receivables)
+      .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
+      .innerJoin(athletes, eq(athletes.id, receivables.athleteId))
+      .innerJoin(
+        athleteGuardians,
+        and(
+          eq(athleteGuardians.athleteId, athletes.id),
+          eq(athleteGuardians.userId, userId),
+        ),
+      )
+      .where(eq(receivables.originTeamId, teamId))
+      .orderBy(asc(assessments.dueDate), desc(receivables.createdAt)),
+    database
+      .select({
+        eventId: paymentEvents.id,
+        athleteName: athletes.fullName,
+        assessmentTitle: assessments.title,
+        kind: paymentEvents.kind,
+        amountHalere: paymentAllocations.amountHalere,
+        occurredOn: paymentEvents.occurredOn,
+      })
+      .from(paymentAllocations)
+      .innerJoin(
+        paymentEvents,
+        eq(paymentEvents.id, paymentAllocations.paymentEventId),
+      )
+      .innerJoin(
+        receivables,
+        eq(receivables.id, paymentAllocations.receivableId),
+      )
+      .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
+      .innerJoin(athletes, eq(athletes.id, receivables.athleteId))
+      .innerJoin(
+        athleteGuardians,
+        and(
+          eq(athleteGuardians.athleteId, athletes.id),
+          eq(athleteGuardians.userId, userId),
+        ),
+      )
+      .where(eq(receivables.originTeamId, teamId))
+      .orderBy(desc(paymentEvents.occurredOn), desc(paymentEvents.createdAt)),
+  ]);
+
+  return {
+    debts: debtRows.map((row) => ({
+      ...row,
+      ...deriveDebtState({
+        amountHalere: row.amountHalere,
+        allocatedHalere: row.allocatedHalere,
+        dueDate: row.dueDate,
+        hasPendingClaim: Boolean(row.pendingClaimId),
+      }),
+    })),
+    history,
+  };
+}
+
 export async function getGuardianReceivable(userId: string, receivableId: string) {
   const [row] = await getDatabase()
     .select({
       id: receivables.id,
-      athleteFirstName: athletes.firstName,
-      athleteLastName: athletes.lastName,
+      athleteName: athletes.fullName,
       title: assessments.title,
       amountHalere: receivables.amountHalere,
       dueDate: assessments.dueDate,
@@ -638,7 +712,7 @@ export async function getAssessmentManagerView(userId: string, assessmentId: str
   const debts = await getDatabase()
     .select({
       id: receivables.id,
-      athleteName: sql<string>`${athletes.firstName} || ' ' || ${athletes.lastName}`,
+      athleteName: athletes.fullName,
       variableSymbol: receivables.variableSymbol,
       guardianEmail: users.email,
       deliveryStatus: notificationDeliveries.status,
@@ -656,7 +730,7 @@ export async function getAssessmentManagerView(userId: string, assessmentId: str
       ),
     )
     .where(eq(receivables.assessmentId, assessmentId))
-    .orderBy(athletes.lastName, athletes.firstName);
+    .orderBy(athletes.fullName);
   return { ...assessment, debts };
 }
 
@@ -675,7 +749,7 @@ export async function retryReceivableDelivery(input: {
       receivableId: receivables.id,
       guardianUserId: users.id,
       guardianEmail: users.email,
-      athleteName: sql<string>`${athletes.firstName} || ' ' || ${athletes.lastName}`,
+      athleteName: athletes.fullName,
       assessmentTitle: assessments.title,
       clubName: clubs.name,
       teamName: teams.name,

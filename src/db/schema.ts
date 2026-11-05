@@ -315,15 +315,25 @@ export const userPreferences = pgTable("user_preferences", {
     .notNull(),
 });
 
-export const athletes = pgTable("athletes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  firstName: varchar("first_name", { length: 80 }).notNull(),
-  lastName: varchar("last_name", { length: 80 }).notNull(),
-  birthYear: integer("birth_year").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const athletes = pgTable(
+  "athletes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fullName: varchar("full_name", { length: 160 }).notNull(),
+    firstName: varchar("first_name", { length: 80 }),
+    lastName: varchar("last_name", { length: 80 }),
+    birthYear: integer("birth_year"),
+    creationKey: uuid("creation_key"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("athletes_creation_key_idx")
+      .on(table.creationKey)
+      .where(sql`${table.creationKey} is not null`),
+  ],
+);
 
 export const athleteGuardians = pgTable(
   "athlete_guardians",
@@ -335,6 +345,7 @@ export const athleteGuardians = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    relationship: varchar("relationship", { length: 10 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -346,6 +357,13 @@ export const athleteGuardians = pgTable(
       table.userId,
     ),
     index("athlete_guardians_user_id_idx").on(table.userId),
+    uniqueIndex("athlete_guardians_one_self_per_user_idx")
+      .on(table.userId)
+      .where(sql`${table.relationship} = 'self'`),
+    check(
+      "athlete_guardians_relationship_valid",
+      sql`${table.relationship} is null or ${table.relationship} in ('self', 'child')`,
+    ),
   ],
 );
 
