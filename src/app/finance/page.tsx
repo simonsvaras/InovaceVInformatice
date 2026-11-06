@@ -71,6 +71,12 @@ function formatDueDate(value: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
+function isoTimestamp(value: Date | string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -350,9 +356,9 @@ export default async function FinancePage({
                   canReadRaw: account.canReadRaw,
                   fioIntegrationId: account.fio_integration_id,
                   fioStatus: account.fio_status,
-                  lastAttemptAt: account.fio_last_attempt_at?.toISOString() ?? null,
-                  lastSuccessAt: account.fio_last_success_at?.toISOString() ?? null,
-                  lastNewMovementAt: account.fio_last_new_movement_at?.toISOString() ?? null,
+                  lastAttemptAt: isoTimestamp(account.fio_last_attempt_at),
+                  lastSuccessAt: isoTimestamp(account.fio_last_success_at),
+                  lastNewMovementAt: isoTimestamp(account.fio_last_new_movement_at),
                   lastErrorCode: account.fio_last_error_code,
                   lastErrorMessage: account.fio_last_error_message,
                 }}
