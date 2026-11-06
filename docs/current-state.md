@@ -233,5 +233,8 @@ Aktualizováno: 2026-11-06.
 
 - Reálná odpověď Fio ukázala, že `column0` vrací účetní datum jako text (`YYYY-MM-DD...`), zatímco první parser očekával pouze číselný timestamp. Parser nyní přijímá textové Fio datum i timestamp a u pohybu bez vlastní měny použije měnu účtu z hlavičky výpisu.
 - Chyby čekacího intervalu a odpovědi Fio se nově rozpoznávají i tehdy, když je produkční runtime obalí přes hranici databázové transakce. UI tak místo obecné věty zobrazí konkrétní bezpečné sdělení, například nutnost vyčkat 30 sekund.
-- Oprava prošla lintem a typovou kontrolou. Úspěšná aktivace stejným skutečným tokenem vyžaduje nový pokus uživatele po nasazení opraveného image; token se při neúspěšné aktivaci záměrně neukládal.
+- Další opakované pokusy odhalily, že raw SQL vrací `timestamptz` lease jako text. Kontrola volající `.getTime()` proto po prvním pokusu spadla ještě před sítí. Čekací interval se nyní vyhodnocuje přímo v PostgreSQL a ostatní časové hodnoty procházejí tolerantním převodem.
+- Poskytnutý skutečný token byl ověřen přímo proti Fio: API vrátilo HTTP 200, správný účet `2903642978/2010`, banku 2010, CZK a jeden pohyb. Opravená aplikační služba následně integraci aktivovala a uložila jeden pohyb sedmidenního počátečního importu do fronty s důvodem `initial_import_review`.
+- Ruční požadavek synchronizace byl zařazen a worker jej během několika sekund změnil z `pending` přes `processing` na `completed`. Integrace zůstala `active`, aktualizoval se poslední pokus i úspěch a nevznikla druhá kopie stejného Fio pohybu.
+- Oprava prošla lintem, typovou kontrolou a produkčním Docker buildem; aplikace, databáze i worker jsou zdravé.
 

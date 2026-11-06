@@ -78,6 +78,12 @@ function addDays(value: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function timestampMs(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const milliseconds = new Date(value).getTime();
+  return Number.isNaN(milliseconds) ? null : milliseconds;
+}
+
 function normalizeAccountId(value: string) {
   return value
     .replace(/\s/g, "")
@@ -218,16 +224,15 @@ async function reserveTokenCall(fingerprint: string) {
     await transaction.insert(fioTokenCallLeases).values({ tokenFingerprint: fingerprint })
       .onConflictDoNothing();
     const rows = await transaction.execute<{
-      next_allowed_at: Date | null;
-      lease_until: Date | null;
+      token_busy: boolean;
     }>(sql`
-      select next_allowed_at, lease_until from fio_token_call_leases
+      select (lease_until is not null and lease_until > now())
+          or (next_allowed_at is not null and next_allowed_at > now()) as token_busy
+        from fio_token_call_leases
        where token_fingerprint=${fingerprint} for update
     `);
     const row = rows[0];
-    const now = Date.now();
-    if ((row?.lease_until && row.lease_until.getTime() > now) ||
-        (row?.next_allowed_at && row.next_allowed_at.getTime() > now)) {
+    if (row?.token_busy) {
       throw new InputError("fio_cooldown", "Stejný Fio token lze použít nejvýše jednou za 30 sekund. Zkuste to za chvíli.");
     }
     await transaction.execute(sql`
@@ -418,7 +423,7 @@ export async function verifyAndActivateFio(input: {
         from fio_verification_attempts where id=${started.attemptId} for update
     `);
     const attempt = attempts[0];
-    if (!attempt || attempt.status !== "pending" || attempt.expires_at.getTime() < Date.now()) {
+    if (!attempt || attempt.status !== "pending" || (timestampMs(attempt.expires_at) ?? 0) < Date.now()) {
       throw new InputError("stale_verification", "Ověření vypršelo. Zopakujte aktivaci.");
     }
     const existingRows = await transaction.execute<{ id: string; updated_at: Date }>(sql`
@@ -427,7 +432,9 @@ export async function verifyAndActivateFio(input: {
     const existing = existingRows[0];
     if (
       (started.purpose === "activate" && existing) ||
-      (started.purpose === "replace" && (!existing || existing.updated_at.getTime() !== started.expectedUpdatedAt?.getTime()))
+      (started.purpose === "replace" && (
+        !existing || timestampMs(existing.updated_at) !== timestampMs(started.expectedUpdatedAt)
+      ))
     ) {
       throw new InputError("stale_verification", "Nastavení účtu mezitím změnil jiný požadavek. Ověření zopakujte.");
     }
