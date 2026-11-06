@@ -32,10 +32,6 @@ import {
   sendRecordedTransactionalEmail,
 } from "@/modules/notifications/email";
 import { deriveDebtState } from "@/modules/payments/status";
-import {
-  getOrIssuePublicPaymentLink,
-  issuePublicPaymentLinkInTransaction,
-} from "@/modules/public-payments/service";
 
 type AssessmentInput = {
   actorUserId: string;
@@ -63,7 +59,6 @@ type EmailRecipient = {
   variableSymbol: string;
   paymentMessage: string;
   dueDate: string;
-  publicPaymentUrl: string;
 };
 
 function fingerprint(input: AssessmentInput) {
@@ -328,10 +323,6 @@ export async function createAssessment(input: AssessmentInput) {
             status: "pending",
           })
           .returning({ id: notificationDeliveries.id });
-        const publicPaymentLink = await issuePublicPaymentLinkInTransaction(
-          transaction,
-          { receivableId: receivable.id, issuedByUserId: input.actorUserId },
-        );
         emailRecipients.push({
           deliveryId: delivery.id,
           receivableId: receivable.id,
@@ -346,7 +337,6 @@ export async function createAssessment(input: AssessmentInput) {
           variableSymbol,
           paymentMessage: input.paymentMessage,
           dueDate: input.dueDate,
-          publicPaymentUrl: publicPaymentLink.url,
         });
       }
 
@@ -487,13 +477,13 @@ export async function setTeamBankAccount(input: {
         .returning({ id: bankAccounts.id });
       accountId = created.id;
     }
-    const integrationOwners = await transaction.execute<{ exclusive_team_id: string | null }>(sql`
-      select exclusive_team_id from bank_integrations
-       where bank_account_id=${accountId} for update
+    const integrationOwners = await transaction.execute<{ feed_exclusive_team_id: string | null }>(sql`
+      select feed_exclusive_team_id from bank_accounts
+       where id=${accountId} for update
     `);
     if (
-      integrationOwners[0]?.exclusive_team_id &&
-      integrationOwners[0].exclusive_team_id !== input.teamId
+      integrationOwners[0]?.feed_exclusive_team_id &&
+      integrationOwners[0].feed_exclusive_team_id !== input.teamId
     ) {
       throw new InputError(
         "exclusive_account_in_use",
@@ -643,10 +633,17 @@ export async function getGuardianReceivable(userId: string, receivableId: string
       pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
       pendingClaimAmountHalere: sql<number | null>`(select ${paymentClaims.amountHalere} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
       demoIntegrationEnabled: sql<boolean>`exists(select 1 from bank_integrations bi where bi.bank_account_id=${receivables.bankAccountId} and bi.enabled=true)`,
+      fioIntegrationEnabled: sql<boolean>`exists(select 1 from fio_integrations fi where fi.bank_account_id=${receivables.bankAccountId} and fi.status='active')`,
       hasSimulatedPayment: sql<boolean>`exists(
         select 1 from payment_events pe
         join payment_allocations pa on pa.payment_event_id=pe.id
         where pa.receivable_id=${receivables.id} and pe.kind='simulated'
+          and not exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id)
+      )`,
+      hasFioPayment: sql<boolean>`exists(
+        select 1 from payment_events pe
+        join payment_allocations pa on pa.payment_event_id=pe.id
+        where pa.receivable_id=${receivables.id} and pe.kind='fio'
           and not exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id)
       )`,
     })
@@ -679,12 +676,8 @@ export async function getGuardianReceivable(userId: string, receivableId: string
     dueDate: row.dueDate,
     hasPendingClaim: Boolean(row.pendingClaimId),
   });
-  const publicPaymentLink = debtState.remainingHalere > 0
-    ? await getOrIssuePublicPaymentLink(row.id, userId)
-    : null;
   return {
     ...row,
-    publicPaymentUrl: publicPaymentLink?.url ?? null,
     ...debtState,
   };
 }
@@ -769,7 +762,15 @@ export async function retryReceivableDelivery(input: {
       clubName: clubs.name,
       teamName: teams.name,
       accountNumber: bankAccounts.accountNumber,
-      amountHalere: receivables.amountHalere,
+      amountHalere: sql<number>`greatest(
+        ${receivables.amountHalere} - coalesce(
+          (select sum(retry_allocation.amount_halere)
+             from payment_allocations retry_allocation
+            where retry_allocation.receivable_id=${receivables.id}),
+          0
+        ),
+        0
+      )::int`,
       variableSymbol: receivables.variableSymbol,
       paymentMessage: assessments.paymentMessage,
       dueDate: assessments.dueDate,
@@ -797,11 +798,12 @@ export async function retryReceivableDelivery(input: {
     )
     .limit(1);
   if (!recipient) notFound();
-  const publicPaymentLink = await getOrIssuePublicPaymentLink(
-    recipient.receivableId,
-    input.actorUserId,
-  );
-
+  if (recipient.amountHalere <= 0) {
+    throw new InputError(
+      "receivable_already_paid",
+      "Dluh už nemá kladný zůstatek; nový platební QR se neposílá.",
+    );
+  }
   await getDatabase().insert(auditEvents).values({
     actorUserId: input.actorUserId,
     clubId: assessment.clubId,
@@ -810,5 +812,5 @@ export async function retryReceivableDelivery(input: {
     targetType: "receivable",
     targetId: recipient.receivableId,
   });
-  await sendAssessmentEmails([{ ...recipient, publicPaymentUrl: publicPaymentLink.url }]);
+  await sendAssessmentEmails([recipient]);
 }

@@ -14,7 +14,6 @@ import {
   formatCzk,
   paymentQrDataUrl,
 } from "@/modules/payments/qr";
-import { rotatePublicPaymentLinkAction } from "@/app/actions/public-payments";
 import { debtStatusLabel } from "@/modules/payments/status";
 
 export default async function ReceivablePage({
@@ -28,8 +27,13 @@ export default async function ReceivablePage({
   const { receivableId } = await params;
   const query = await searchParams;
   const debt = await getGuardianReceivable(user.id, receivableId);
-  const qr = debt.remainingHalere > 0 && debt.publicPaymentUrl
-    ? await paymentQrDataUrl(debt.publicPaymentUrl)
+  const qr = debt.remainingHalere > 0
+    ? await paymentQrDataUrl({
+        accountNumber: debt.accountNumber,
+        amountHalere: debt.remainingHalere,
+        variableSymbol: debt.variableSymbol,
+        message: debt.paymentMessage,
+      })
     : null;
   const amount = formatCzk(debt.amountHalere);
 
@@ -76,17 +80,12 @@ export default async function ReceivablePage({
           <div className="qr-panel">
             {qr ? (
               <>
-                <Image alt="QR odkaz na veřejnou platební stránku" height={320} priority src={qr} unoptimized width={320} />
-                <p>Naskenujte běžným fotoaparátem. Otevře se veřejná platební stránka bez přihlášení.</p>
-                <a className="button-link" href={debt.publicPaymentUrl!}>Otevřít platbu</a>
-                <form action={rotatePublicPaymentLinkAction}>
-                  <input name="receivableId" type="hidden" value={debt.id} />
-                  <button className="button-secondary" type="submit">Zrušit odkaz a vydat nový</button>
-                </form>
+                <Image alt="Standardní česká QR Platba s účtem, částkou a variabilním symbolem" height={320} priority src={qr} unoptimized width={320} />
+                <p>Naskenujte QR v bankovní aplikaci. Obsahuje účet, aktuální zbývající částku, variabilní symbol a zprávu.</p>
               </>
             ) : <p>Dluh je podle evidovaných platebních událostí uhrazen.</p>}
             {debt.remainingHalere > 0 ? (
-              <p>Potvrzení na veřejné stránce vytvoří pouze simulovaný pohyb. Ruční hlášení „Zaplatil jsem“ zůstává dostupné.</p>
+              <p>Platbu potvrzujete ve své bance. Aplikace peníze nepřijímá ani nepřevádí. Ruční hlášení „Zaplatil jsem“ zůstává dostupné.</p>
             ) : null}
           </div>
         </article>
@@ -94,6 +93,17 @@ export default async function ReceivablePage({
           <article className="panel">
             <h2>Demo automatická kontrola</h2>
             <p>Část evidované úhrady pochází ze simulovaného pohybu (<code>simulated</code>). Nejde o potvrzení skutečného ani bankovně ověřeného převodu a aplikace není spojena s Fio.</p>
+          </article>
+        ) : null}
+        {debt.hasFioPayment ? (
+          <article className="panel">
+            <h2>Automatická kontrola banky</h2>
+            <p>Část evidované úhrady byla načtena z Fio API a spárována podle účtu, variabilního symbolu a částky.</p>
+          </article>
+        ) : debt.fioIntegrationEnabled && debt.remainingHalere > 0 ? (
+          <article className="panel">
+            <h2>Automatická kontrola banky</h2>
+            <p>Příchozí pohyby se kontrolují automaticky. Propis platby může chvíli trvat; „Zaplatil jsem“ můžete použít i nadále.</p>
           </article>
         ) : null}
         {debt.pendingClaimId ? (

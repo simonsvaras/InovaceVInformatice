@@ -1,8 +1,8 @@
 # Klubio — školní demo
 
-Technický základ modulárního monolitu v Next.js a PostgreSQL. Aplikace pouze
-eviduje předpisy a platby; peníze přes ni neprocházejí a bankovní pohyby v MVP
-budou výhradně simulované.
+Modulární aplikace v Next.js a PostgreSQL pro klubové předpisy a evidenci
+úhrad. Peníze přes aplikaci neprocházejí. Příchozí pohyby lze načítat z Fio API;
+historická demo evidence zůstává trvale označená jako `simulated`.
 
 ## Spuštění přes Docker Compose
 
@@ -14,17 +14,18 @@ Požadavky: Docker s Compose pluginem.
    `PUBLIC_APP_URL` musí odpovídat adrese, ze které uživatelé otevírají
    pozvánky a reset hesla. Pro skutečné odeslání e-mailu doplňte
    `RESEND_API_KEY` a ověřenou adresu `EMAIL_FROM`.
-   `PUBLIC_QR_BASE_URL` musí být veřejná absolutní HTTPS adresa bez
-   `localhost`; výchozí hodnota míří na školní ngrok adresu. Nastavte také
-   samostatné náhodné `PUBLIC_QR_TOKEN_SECRET` o délce nejméně 32 znaků.
-   Toto tajemství neměňte, dokud mají vydané platební odkazy zůstat platné.
+   `FIO_TOKEN_ENCRYPTION_KEY` musí být náhodný 32bajtový klíč zakódovaný v
+   Base64. Lze jej vytvořit například příkazem `openssl rand -base64 32`.
+   Změna klíče bez řízené rotace znemožní načíst dříve uložené Fio tokeny.
 3. Spusťte aplikaci a databázi jediným příkazem:
 
    ```sh
    docker compose up --build -d
    ```
 
-Při startu aplikační kontejner automaticky provede čekající SQL migrace. Web je
+Při startu aplikační kontejner automaticky provede čekající SQL migrace. Služba
+`fio-worker` samostatně zpracovává plánované i ručně vyžádané synchronizace.
+Web je
 standardně na `http://localhost:3000` a kontrola databáze na
 `http://localhost:3000/api/health`. PostgreSQL nemá publikovaný hostitelský port.
 
@@ -33,6 +34,7 @@ Stav kontejnerů a log migrace:
 ```sh
 docker compose ps
 docker compose logs app
+docker compose logs fio-worker
 ```
 
 Zastavení bez smazání databázového volume:
@@ -57,14 +59,29 @@ npm run db:generate
 Projekt záměrně neobsahuje automatizované testy ani testovací soubory. Ověření
 milníků probíhá ručně podle `docs/development-plan.md`.
 
-## Veřejná QR platba
+## QR Platba
 
-Jediný QR kód na detailu dluhu a v e-mailu obsahuje veřejný HTTPS odkaz na
-mobilní platební stránku. Návštěvník nepotřebuje účet ani session. Stránka
-zobrazuje pouze účet, aktuální zbývající částku, variabilní symbol a zprávu;
-potvrzení vytvoří simulovaný příchozí pohyb a nepředstavuje skutečný bankovní
-převod. Odkazy jsou omezené na jeden dluh, lze je zrušit a znovu vydat a jejich
-surové tokeny se v databázi neukládají.
+Jediný QR kód na detailu dluhu i v e-mailu obsahuje standardní český řetězec
+`SPD*1.0` s historicky přiřazeným účtem, aktuální zbývající částkou v CZK,
+variabilním symbolem a zprávou. QR se potvrzuje v bankovní aplikaci a nevede na
+simulátor. Aktivní odkazy dřívější veřejné simulace zneplatňuje dopředná
+migrace; historické pohyby a audit nemaže ani nepřejmenovává.
+
+## Fio synchronizace
+
+- V internetbankingu Fio vytvořte token pro konkrétní účet s oprávněním
+  „Sledování účtu“. Aplikace ověří čtení, banku 2010, CZK, číslo účtu a IBAN;
+  Fio ve výpisové odpovědi nepotvrzuje rozsah práv tokenu. Nový token může začít
+  fungovat až přibližně za pět minut.
+- Token se ukládá pomocí AES-256-GCM a po uložení se nevrací do prohlížeče ani
+  se nezapisuje do logu. URL volání Fio, která obsahuje token v cestě, se
+  neloguje.
+- Worker používá periodický endpoint s překryvem, databázový lease a minimálně
+  30sekundový odstup pro stejný token. Prvních sedm dní se importuje pouze do
+  fronty k posouzení; další jednoznačné kladné CZK příjmy lze automaticky
+  spárovat.
+- Vypnutí nebo výpadek synchronizace nevypíná ruční evidenci ani rodičovské
+  hlášení „Zaplatil jsem“.
 
 ## Účty, pozvánky a e-mail
 

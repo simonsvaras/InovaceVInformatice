@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "fio:worker": "tsx scripts/fio-sync-worker.ts"
   },
   "dependencies": {
     "bcryptjs": "3.0.3",
@@ -20,7 +21,8 @@
     "postgres": "4.0.0",
     "qrcode": "1.5.4",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "tsx": "4.23.15"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

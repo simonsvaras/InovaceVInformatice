@@ -1,6 +1,6 @@
 # Aktuální stav projektu
 
-Aktualizováno: 2026-11-05.
+Aktualizováno: 2026-11-06.
 
 ## Hotovo
 
@@ -198,4 +198,34 @@ Aktualizováno: 2026-11-05.
 - Rozložení používá adaptivní mřížku pro více týmů a na telefonu přechází do jednoho sloupce. Aktivní tým je označen textem i zeleným stavem, nikoli pouze barvou.
 - Read-only `code-reviewer` nenašel únik správy ani osobních údajů. Jeho dvě nízké připomínky byly přijaty: štítek aktivního týmu vyžaduje vedle uložené preference také aktuální trenérskou roli a počty týmů používají správné české tvary pro 0, 1, 2–4 a 5 a více.
 - Automatizované testy ani testovací soubory nevznikly. Build, lint, aplikace a ruční vizuální ověření nebyly v tomto kroku spuštěny.
+
+# Skutečná Fio synchronizace a návrat standardního SPD QR (2026-11-06)
+
+## Implementace
+
+- D-19 nahrazuje veřejný simulovaný QR tok a staré odložení Fio. Detail dluhu i platební e-mail používají jediný standardní řetězec `SPD*1.0` s historicky přiřazeným účtem dluhu, aktuální zbývající částkou, VS a zprávou. „Kopírovat údaje“ zůstává. Veřejná route, serverové akce a služba byly odstraněny; `PUBLIC_QR_*` už není runtime konfigurace.
+- Dopředná migrace `0023_lyrical_beyonder.sql` zneplatnila aktivní veřejné odkazy, ale zachovala tabulku, již vzniklý pohyb, alokaci a audit s původem `public_qr`/`simulated`. Již aplikované migrace `0021` a `0022` nebyly změněny. Marker `0024` a dopředná oprava guardu `0025` posouvají health verzi na `FIO-0025`.
+- Fio integrace je samostatná od historické demo integrace. Aktivace serverově ověřuje uživatele a rozsah, banku 2010, čitelnost periodického výpisu, shodu účtu/IBANu a CZK. Token je uložen AES-256-GCM se samostatným `FIO_TOKEN_ENCRYPTION_KEY`; HMAC otisk slouží jen pro společný 30sekundový limit. Token se nevrací klientovi, auditu ani e-mailu a odchozí URL s tokenem se neloguje.
+- Finance obsahují modál „Aktivovat automatickou synchronizaci“, bezpečný návod, stav a časy posledního pokusu/úspěchu/nového pohybu, ruční zařazení kontroly, výměnu tokenu a vypnutí s odstraněním šifrovaného tokenu. UI výslovně ponechává ruční evidenci a „Zaplatil jsem“ dostupné.
+- Samostatný `fio-worker` v Docker Compose zpracovává plánované i ručně vyžádané kontroly. Používá integrační lease, per-token lease, periodický endpoint s dvoudenním překryvem a idempotenci `(bank_account_id, source, source_transaction_id)`. Ruční požadavek ve stavu `processing` se po expiraci lease vrátí do `pending`, takže pád workeru trvale nezablokuje další kontrolu.
+- Sedmidenní počáteční import jde pouze do fronty. Nový kladný CZK příjem se automaticky alokuje jen při jedinečném účtu a VS, přesné zbývající částce a bez čekajícího hlášení či neopravované ruční úhrady. Záporné, cizoměnové a nejasné pohyby zůstávají k ručnímu rozhodnutí. Fio událost má `kind=fio`, původ `fio_sync` a žádného smyšleného uživatelského aktéra.
+- Příjem, případná alokace, audit, delivery a posun kurzoru jsou transakční; Resend se volá až po commitu. E-mail má vlastní text pro Fio. Opakované odeslání původního platebního e-mailu nyní vytváří QR z aktuálního kladného zůstatku a u uhrazeného či přeplaceného dluhu nový QR odmítne.
+- Migrace `0025_fio_source_guard.sql` zpřesňuje databázový invariant: platební událost navázaná na bankovní pohyb musí mít stejný druh jako zdroj `fio`/`simulated`, s výjimkou auditované korekce. Historické záznamy se nemění.
+
+## Skutečně provedené ověření
+
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` a `npm run db:generate` prošly; Drizzle po snapshotu `0023` nehlásí další strukturální změnu. Produkční `docker compose up --build -d` prošel po zapracování revize včetně Next.js buildu a typové kontroly.
+- Docker automaticky aplikoval migrace až po `0025`; PostgreSQL eviduje 26 migrací a `/api/health` vrací `200`, připojenou databázi a `schemaVersion: FIO-0025`. Aplikace, databáze a `fio-worker` běží; po společném restartu se health obnovil a worker zůstal spuštěný bez původní chyby „Top-level await is currently not supported with cjs output format“.
+- Databázová kontrola po migraci našla 6 historických veřejných vydání, 0 aktivních a 1 s vazbou na zachovaný pohyb. Historie stále obsahuje právě původní `simulated/public_qr` pohyb; žádný záznam nebyl přepsán na Fio.
+- Ruční sestavení vzorové platby vytvořilo `SPD*1.0*ACC:CZ8920100000000123456789*AM:1250.50*CC:CZK*MSG:PRISPEVEK PODZIM*X-VS:1000000001`. QR nebyl potvrzením skutečné platby a žádný převod nebyl odeslán.
+- Guard `0025` byl ověřen v PostgreSQL: pokus vložit `manual_claim` s bankovním pohybem skončil očekávanou chybou `payment event kind must match bank transaction source`; korekční událost nad stejným pohybem prošla a byla vrácena rollbackem.
+- `architecture-reviewer` doporučil jeden autoritativní feed fyzického účtu, globální limit podle otisku tokenu, dvoufázovou aktivaci bez DB zámku během sítě, review-only počáteční import, přímý worker, atomický kurzor a konzervativní záporné pohyby. Připomínky byly přijaty a zapracovány. `code-reviewer` našel obnovu zaseklého ručního požadavku, ochranu jeho stavu proti doběhnutí starého workeru, chybnou částku retry QR a neúplný DB guard; všechny nálezy byly zapracovány a závěrečná read-only kontrola obou oprav nenašla otevřený problém.
+- Nevznikly automatizované testy ani testovací soubory.
+
+## Známá omezení a další krok
+
+- V dostupném prostředí nebyl úspěšně uložen žádný skutečný Fio token ani reálný Fio pohyb. Proto nebyly pravdivě provedeny scénáře správného a cizího účtu, neplatného či čerstvého tokenu, reálného opakovaného Fio ID, souběhu síťových kontrol, výměny tokenu, záporného pohybu ani dekódování QR v konkrétní bankovní aplikaci. Implementace, build, migrace, oprávnění a databázové invarianty jsou ověřené; tyto integrační scénáře vyžadují platný testovací Fio účet/token.
+- Obnova `processing` požadavku po pádu workeru a retry QR po částečné úhradě byly po opravě ověřeny čtením diffu, lintem, typovou kontrolou a produkčním buildem, nikoli cíleným uživatelským průchodem s živým tokenem a e-mailovou schránkou.
+- Fio periodický výpis nepotvrzuje přesný rozsah oprávnění tokenu. UI proto pouze instruuje vytvořit token „Sledování účtu“ a netvrdí, že read-only rozsah technicky prokázalo. Dlouhý výpadek nad bezpečně dostupnou historii přepne integraci do stavu vyžadujícího zásah místo tichého přeskočení.
+- Další produktový milník zůstává M6. Pracovní strom je po dokončení kontrol a revizí připravený k lokálnímu uložení do Gitu; push se neprovádí.
 

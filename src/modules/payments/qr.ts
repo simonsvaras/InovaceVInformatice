@@ -27,16 +27,46 @@ export function formatCzk(amountHalere: number): string {
   }).format(amountHalere / 100);
 }
 
-function requirePublicHttpsUrl(value: string) {
-  const url = new URL(value);
-  if (url.protocol !== "https:" || url.hostname.toLowerCase() === "localhost") {
-    throw new Error("Public payment QR must contain an absolute HTTPS URL.");
-  }
-  return url.toString();
+export type CzkQrPayment = {
+  accountNumber: string;
+  amountHalere: number;
+  variableSymbol: string;
+  message: string;
+};
+
+function compactSpaydText(value: string, maxLength: number) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\*/g, "%2A")
+    .replace(/[^0-9A-Z $%+\-./:%]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
 }
 
-export async function paymentQrPng(publicPaymentUrl: string): Promise<Buffer> {
-  return QRCode.toBuffer(requirePublicHttpsUrl(publicPaymentUrl), {
+export function buildSpdPaymentString(payment: CzkQrPayment) {
+  if (!Number.isSafeInteger(payment.amountHalere) || payment.amountHalere <= 0) {
+    throw new Error("QR payment amount must be a positive integer in halere.");
+  }
+  if (!/^\d{1,10}$/.test(payment.variableSymbol)) {
+    throw new Error("QR payment variable symbol is invalid.");
+  }
+  const amount = (payment.amountHalere / 100).toFixed(2);
+  const message = compactSpaydText(payment.message, 60);
+  const fields = [
+    `ACC:${domesticAccountToIban(payment.accountNumber)}`,
+    `AM:${amount}`,
+    "CC:CZK",
+    ...(message ? [`MSG:${message}`] : []),
+    `X-VS:${payment.variableSymbol}`,
+  ];
+  return `SPD*1.0*${fields.join("*")}`;
+}
+
+export async function paymentQrPng(payment: CzkQrPayment): Promise<Buffer> {
+  return QRCode.toBuffer(buildSpdPaymentString(payment), {
     type: "png",
     errorCorrectionLevel: "M",
     margin: 2,
@@ -44,8 +74,8 @@ export async function paymentQrPng(publicPaymentUrl: string): Promise<Buffer> {
   });
 }
 
-export async function paymentQrDataUrl(publicPaymentUrl: string): Promise<string> {
-  return QRCode.toDataURL(requirePublicHttpsUrl(publicPaymentUrl), {
+export async function paymentQrDataUrl(payment: CzkQrPayment): Promise<string> {
+  return QRCode.toDataURL(buildSpdPaymentString(payment), {
     errorCorrectionLevel: "M",
     margin: 2,
     width: 420,

@@ -162,6 +162,27 @@
       "when": 1793955600000,
       "tag": "0022_public_qr_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793985905010,
+      "tag": "0023_lyrical_beyonder",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793986200000,
+      "tag": "0024_fio_sync_marker",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793988000000,
+      "tag": "0025_fio_source_guard",
+      "breakpoints": true
     }
   ]
 }

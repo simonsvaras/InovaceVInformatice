@@ -4,12 +4,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
-  activateDemoIntegrationAction,
   allocateSimulatedTransactionAction,
   ignoreSimulatedTransactionAction,
   linkSimulatedTransactionAction,
   markSimulatedTransactionDifferentAction,
 } from "@/app/actions/bank-simulator";
+import { FioSyncAccount } from "@/app/finance/fio-sync-account";
 import {
   recordCashPaymentAction,
   reversePaymentEventAction,
@@ -38,6 +38,7 @@ function reconciliationReason(code: string) {
   return ({
     invalid_vs: "chybí platný VS",
     unknown_vs: "VS nepatří jednoznačně oprávněnému dluhu",
+    ambiguous_vs: "VS odpovídá více dluhům",
     amount_mismatch: "částka neodpovídá zbývající částce",
     already_paid: "dluh už je podle evidence uhrazen",
     pending_claim: "čeká rodičovské hlášení",
@@ -46,12 +47,17 @@ function reconciliationReason(code: string) {
     manager_allocated: "část pohybu byla ručně přiřazena",
     allocation_corrected: "původní demo přiřazení bylo opraveno protizápisem",
     linked_event_corrected: "spojená ruční událost byla opravena protizápisem",
+    initial_import_review: "počáteční sedmidenní import čeká na kontrolu",
+    negative_transaction: "záporný nebo opravný pohyb vyžaduje ruční kontrolu",
+    negative_possible_reversal: "možné storno dříve přiřazeného pohybu",
+    non_czk: "pohyb není v CZK",
   } as Record<string, string>)[code] ?? code;
 }
 
 function paymentEventLabel(kind: string) {
   if (kind === "cash") return "Hotovost";
   if (kind === "simulated") return "Demo pohyb (simulated)";
+  if (kind === "fio") return "Pohyb načtený z Fio API";
   return "Potvrzené hlášení";
 }
 
@@ -327,61 +333,46 @@ export default async function FinancePage({
                 Automatické načítání nových pohybů pro rychlejší párování plateb.
               </p>
             </div>
-            <span>Demo zdroj</span>
+            <span>Fio API</span>
           </header>
           <p className="finance-sync-notice">
-            Načítají se pouze simulované pohyby. Skutečné bankovní API není připojené.
+            Fio token je uložen šifrovaně a po aktivaci se do prohlížeče už nevrací. Počáteční pohyby z posledních sedmi dní se automaticky nezaúčtují.
           </p>
           <div className="finance-sync-accounts">
             {bankDashboard.accounts.map((account) => (
-              <div className="finance-sync-account" key={account.id}>
-                <div className="finance-sync-account-copy">
-                  <div className="finance-sync-account-title">
-                    <strong>{account.account_number}</strong>
-                    <span className={account.integration_id ? "is-active" : ""}>
-                      {account.integration_id ? "Synchronizace aktivní" : "Synchronizace vypnutá"}
-                    </span>
-                  </div>
-                  <p>
-                    {account.is_default
-                      ? "Výchozí sdílený účet klubu"
-                      : account.exclusive_team_id
-                        ? "Výhradní týmový účet"
-                        : "Sdílený klubový účet"}
-                  </p>
-                  <p className="finance-sync-last-run">
-                    Poslední načtený pohyb: {account.last_processed_at
-                      ? formatDateTimeInPrague(account.last_processed_at)
-                      : "zatím žádný"}
-                  </p>
-                </div>
-                {!account.integration_id && account.canConfigure ? (
-                  <form action={activateDemoIntegrationAction} className="finance-sync-action">
-                    <ScopeFields scope={scope} />
-                    <input name="bankAccountId" type="hidden" value={account.id} />
-                    <button type="submit">Zapnout synchronizaci</button>
-                  </form>
-                ) : null}
-                {!account.canReadRaw && account.integration_id ? (
-                  <p className="finance-sync-access-note">
-                    Detail pohybů sdíleného účtu může zobrazit pouze správce klubu.
-                  </p>
-                ) : null}
-              </div>
+              <FioSyncAccount
+                account={{
+                  id: account.id,
+                  accountNumber: account.account_number,
+                  isDefault: account.is_default,
+                  exclusiveTeamId: account.exclusive_team_id,
+                  canConfigure: account.canConfigure,
+                  canReadRaw: account.canReadRaw,
+                  fioIntegrationId: account.fio_integration_id,
+                  fioStatus: account.fio_status,
+                  lastAttemptAt: account.fio_last_attempt_at?.toISOString() ?? null,
+                  lastSuccessAt: account.fio_last_success_at?.toISOString() ?? null,
+                  lastNewMovementAt: account.fio_last_new_movement_at?.toISOString() ?? null,
+                  lastErrorCode: account.fio_last_error_code,
+                  lastErrorMessage: account.fio_last_error_message,
+                }}
+                key={account.id}
+                scope={scope}
+              />
             ))}
           </div>
         </article>
-        {bankDashboard.accounts.some((account) => account.canReadRaw && account.integration_id) ? (
+        {bankDashboard.accounts.some((account) => account.canReadRaw && (account.integration_id || account.fio_integration_id)) ? (
           <article className="panel finance-reconciliation">
             <header className="finance-panel-heading">
               <span className="finance-panel-icon" aria-hidden="true">↔</span>
               <div>
-                <h2>Demo pohyby k přiřazení</h2>
-                <p>Nejasné pohyby zůstávají zde, dokud je ručně nevyřešíte.</p>
+                <h2>Bankovní pohyby k přiřazení</h2>
+                <p>Počáteční, nejasné a opravné pohyby zůstávají zde, dokud je oprávněná osoba nevyřeší.</p>
               </div>
               <span className="finance-panel-count">{bankDashboard.movements.length}</span>
             </header>
-            <p className="finance-panel-notice">Pohyby mají původ <code>simulated</code> a nejsou bankovně ověřeným převodem.</p>
+            <p className="finance-panel-notice">Zdroj každého pohybu je uložen neměnně. Historické <code>simulated</code> záznamy se nikdy nevydávají za Fio.</p>
             {bankDashboard.movements.length ? (
               <div className="finance-reconciliation-list">
                 {bankDashboard.movements.map((movement) => {
@@ -392,9 +383,13 @@ export default async function FinancePage({
                   );
                   return (
                     <div className="finance-reconciliation-item" key={movement.id}>
-                      <p><strong>DEMO {formatCzk(movement.amount_halere)}</strong> · účet {movement.account_number} · VS {movement.variable_symbol ?? "neuveden"}</p>
+                      <p><strong>{movement.source === "fio" ? "FIO" : "DEMO"} {formatCzk(movement.amount_halere)}</strong> · účet {movement.account_number} · VS {movement.variable_symbol ?? "neuveden"}</p>
                       <p>Přijato {formatDateTimeInPrague(movement.received_at)} · důvod fronty: {reconciliationReason(movement.reason_code)}</p>
-                      <p>Vstup pohybu: {movement.ingestion_origin === "public_qr" ? "veřejná QR platební stránka" : "přihlášený demo simulátor"}</p>
+                      <p>Zdroj: {movement.source === "fio" ? "Fio API" : movement.ingestion_origin === "public_qr" ? "historická veřejná simulace" : "demo simulátor"}{movement.initial_import ? " · počáteční import" : ""}</p>
+                      {movement.source === "fio" && (movement.counterparty_name || movement.recipient_message || movement.transaction_type) ? (
+                        <p>{movement.counterparty_name ?? "Neznámý plátce"}{movement.recipient_message ? ` · ${movement.recipient_message}` : ""}{movement.transaction_type ? ` · ${movement.transaction_type}` : ""}</p>
+                      ) : null}
+                      {movement.related_transaction_id ? <p className="fio-sync-error"><strong>Upozornění:</strong> pohyb může souviset s dříve přiřazenou úhradou. Aplikace původní alokaci automaticky nemění.</p> : null}
                       <p>Přiřazeno {formatCzk(movement.allocated_halere)}, volné {formatCzk(available)} · zdrojové ID <code>{movement.source_transaction_id}</code></p>
                       {movement.resolution_reason ? <p>Poslední rozhodnutí: {movement.resolution_reason}</p> : null}
                       {manualEvents.length && movement.allocated_halere === 0 ? (
@@ -450,6 +445,17 @@ export default async function FinancePage({
                           ) : null}
                         </>
                       ) : null}
+                      {movement.amount_halere < 0 && movement.allocated_halere === 0 ? (
+                        <details>
+                          <summary>Uzavřít opravný pohyb po ručním posouzení</summary>
+                          <form action={ignoreSimulatedTransactionAction} className="form-stack compact-form">
+                            <ScopeFields scope={scope} />
+                            <input name="bankTransactionId" type="hidden" value={movement.id} />
+                            <label>Odůvodnění<input maxLength={300} name="reason" required /></label>
+                            <button className="button-secondary" type="submit">Uložit rozhodnutí bez změny alokací</button>
+                          </form>
+                        </details>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -457,7 +463,7 @@ export default async function FinancePage({
             ) : (
               <div className="finance-operation-empty">
                 <span aria-hidden="true">✓</span>
-                <div><strong>Fronta je prázdná</strong><small>Žádný demo pohyb nečeká na rozhodnutí.</small></div>
+                <div><strong>Fronta je prázdná</strong><small>Žádný bankovní ani historický demo pohyb nečeká na rozhodnutí.</small></div>
               </div>
             )}
           </article>

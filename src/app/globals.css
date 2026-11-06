@@ -2871,6 +2871,11 @@ button.club-dialog-close {
   color: #187748;
 }
 
+.finance-sync-account-title span.is-warning {
+  background: #fff2d8;
+  color: #8a5711;
+}
+
 .finance-sync-account-copy p {
   margin: 0;
   color: var(--dashboard-muted);
@@ -2899,6 +2904,167 @@ button.club-dialog-close {
   margin: 0;
   color: var(--dashboard-muted);
   font-size: 0.78rem;
+}
+
+.fio-account-card {
+  background: linear-gradient(90deg, rgba(19, 58, 121, 0.035), transparent 45%);
+}
+
+.fio-sync-timeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.35rem 0 0;
+}
+
+.fio-sync-timeline div {
+  border-left: 2px solid #d5e0f7;
+  padding-left: 0.55rem;
+}
+
+.fio-sync-timeline dt {
+  color: #71809a;
+  font-size: 0.67rem;
+}
+
+.fio-sync-timeline dd {
+  margin: 0.15rem 0 0;
+  color: #263a5e;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.fio-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.fio-sync-actions form {
+  margin: 0;
+}
+
+.fio-sync-actions button {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.74rem;
+}
+
+button.button-text-danger {
+  border-color: transparent;
+  background: transparent;
+  color: #a13a3a;
+}
+
+.finance-sync-account-copy p.fio-sync-error,
+.fio-sync-error {
+  display: grid;
+  gap: 0.2rem;
+  border-left: 3px solid #d68b2d;
+  padding: 0.55rem 0.7rem;
+  background: #fff9ee;
+  color: #6e4818;
+}
+
+.fio-sync-error small {
+  color: #8a6b42;
+}
+
+.fio-activation-dialog {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  border: 0;
+  border-radius: 1rem;
+  padding: 0;
+  box-shadow: 0 1.5rem 5rem rgba(8, 24, 55, 0.3);
+}
+
+.fio-activation-dialog::backdrop {
+  background: rgba(10, 25, 50, 0.66);
+  backdrop-filter: blur(3px);
+}
+
+.fio-activation-form {
+  display: grid;
+  background: #fff;
+}
+
+.fio-activation-form > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.35rem 1.5rem;
+  background: #102f63;
+  color: #fff;
+}
+
+.fio-activation-form > header p,
+.fio-activation-form > header h2 {
+  margin: 0;
+}
+
+.fio-activation-form > header p {
+  color: #bcd1f4;
+  font-size: 0.78rem;
+}
+
+.fio-activation-form > header h2 {
+  margin-top: 0.3rem;
+  color: #fff;
+  font-size: 1.25rem;
+}
+
+button.fio-dialog-close {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  border-color: rgba(255, 255, 255, 0.25);
+  padding: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 1.35rem;
+}
+
+.fio-activation-body {
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem 1.5rem;
+}
+
+.fio-activation-body label {
+  display: grid;
+  gap: 0.4rem;
+  color: #243655;
+  font-size: 0.82rem;
+  font-weight: 680;
+}
+
+.fio-token-guide {
+  border: 1px solid #d8e2f3;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: #f6f9fe;
+  color: #344b70;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.fio-token-guide ol {
+  margin: 0.55rem 0;
+  padding-left: 1.25rem;
+}
+
+.fio-token-guide p {
+  margin: 0.6rem 0 0;
+}
+
+.fio-activation-form > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  border-top: 1px solid #e2e8f2;
+  padding: 1rem 1.5rem;
+  background: #fafbfd;
 }
 
 .finance-reconciliation,
@@ -3753,6 +3919,25 @@ button.club-dialog-close {
 
   .finance-sync-account {
     grid-template-columns: 1fr;
+  }
+
+  .fio-sync-timeline {
+    grid-template-columns: 1fr;
+  }
+
+  .fio-sync-actions,
+  .fio-sync-actions form,
+  .fio-sync-actions button {
+    width: 100%;
+  }
+
+  .fio-activation-form > footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .fio-activation-form > footer button {
+    width: 100%;
   }
 
   .finance-sync-action button {

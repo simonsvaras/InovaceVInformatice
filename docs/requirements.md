@@ -12,13 +12,13 @@ Mobilně použitelná webová aplikace pro české amatérské sportovní kluby.
 | Trenér | Pozvání správcem klubu; v MVP jeden trenér na tým | Jen přidělené týmy: členové, všechny druhy týmových předpisů, ruční evidence úhrad, vyřízení hlášení, hotovost, technické nastavení synchronizace podle práv k účtu a export. |
 | Člen/rodič | Pozvánka nebo kód týmu | Jen vlastní sportovci a jejich dluhy/platby; jména spoluhráčů a kontakt na trenéra. |
 
-Účet uživatele není sportovec. Jeden rodič může spravovat více dětí ve více týmech; dospělý sportovec může spravovat sebe. Oprávnění členství a přístupu se vyhodnocují v kontextu týmu. U dítěte se ukládá pouze jméno, příjmení a rok narození; kontakt patří rodiči. Spoluhráčům se nezobrazují kontakty ani platby ostatních.
+Účet uživatele není sportovec. Jeden rodič může spravovat více dětí ve více týmech; dospělý sportovec může spravovat sebe. Oprávnění členství a přístupu se vyhodnocují v kontextu týmu. U sportovce se ukládá celé jméno a nepovinný rok narození; kontakt dítěte patří rodiči. Spoluhráčům se nezobrazují kontakty ani platby ostatních.
 
 ## Povinné business invarianty
 
 1. Každý předpis vytvoří vybraným sportovcům samostatný dluh. Každý dluh má variabilní symbol jedinečný v rámci cílového bankovního účtu; stejný účet sdílený více týmy znamená společný prostor symbolů.
 2. Dluh rozlišuje: čeká, po splatnosti, nahlášeno, částečně zaplaceno, zaplaceno, přeplaceno, odpuštěno/zrušeno. Upomínka není stav. Jednoduché pravidlo přeplatku v demo MVP stanoví D-05.
-3. Bankovní účet nemá „ruční“ ani „automatický“ režim. Ruční evidence oprávněnou osobou a bankovní synchronizace či demo simulátor jsou nezávislé způsoby evidence úhrady. Rodič může nahlásit každý nezaplacený dluh; hlášení samo nic nezaúčtuje a smí být odvoláno do vyřízení. Později nalezený bankovní pohyb se nesmí započítat znovu proti již ručně evidované téže úhradě; nejasný případ čeká na ruční rozhodnutí. Simulovaný pohyb je vždy označen jako demo a není bankovně ověřeným převodem. Skutečné Fio a chování při jeho výpadku patří do budoucího rozvoje.
+3. Bankovní účet nemá „ruční“ ani „automatický“ režim. Ruční evidence oprávněnou osobou a Fio synchronizace jsou nezávislé způsoby evidence úhrady. Rodič může nahlásit každý nezaplacený dluh; hlášení samo nic nezaúčtuje a smí být odvoláno do vyřízení. Později nalezený bankovní pohyb se nesmí započítat znovu proti již ručně evidované téže úhradě; nejasný případ čeká na ruční rozhodnutí. Historický simulovaný pohyb zůstává označený jako demo a není bankovně ověřeným převodem.
 4. Hotovost zapisuje oprávněný trenér nebo správce klubu s datem a je v exportu oddělená od převodu. Nahlášení rodičem není potvrzení přijetí peněz.
 5. Odchod nebo vyřazení z týmu nemaže dluhy. Nezaplacený dluh může zrušit oprávněný trenér nebo správce klubu podle D-12. „Smazání“ týmu je archivace se zachováním finanční historie.
 6. Upomínky odesílá aplikace neutrálním textem. QR platba je pro CZK. Klubové i týmové předpisy smí vytvořit role určené zadáním bez dělení práv podle typu platby.
@@ -35,12 +35,12 @@ U celoklubového předpisu potvrzuje ruční hlášení, zapisuje hotovost a ru�
 | Člen/rodič | C7–C9 | Historie a stažitelné potvrzení, tým a spoluhráči v mezích soukromí, odhlášení dítěte s upozorněním na dluhy/kredit. |
 | Trenér | T1–T3 | Hromadné pozvání/kód, schvalování žádostí, předpis pro tým či výběr členů a e-mail s QR. |
 | Trenér | T4–T6 | Přehled člen × předpis, hromadné potvrzení i zamítnutí s důvodem, zápis hotovosti. |
-| Trenér | T7–T9 | V demo MVP technická konfigurace simulované synchronizace, která nevypíná ruční evidenci, čas posledního zpracovaného demo pohybu, fronta nespárovaných či nejednoznačných pohybů s potvrzením vazby, přiřazením nebo rozdělením podle přístupu k účtu a neutrální hromadná upomínka. Skutečný Fio token, test spojení a synchronizace jsou odloženy rozhodnutím D-01. |
+| Trenér | T7–T9 | Technická konfigurace Fio synchronizace, která nevypíná ruční evidenci, čas posledního pokusu, úspěchu a nového pohybu, fronta nespárovaných či nejednoznačných pohybů s potvrzením vazby, přiřazením nebo rozdělením podle přístupu k účtu a neutrální hromadná upomínka. |
 | Trenér | T10–T12 | Vyřazení člena bez ztráty dluhu, přepínání týmů, filtry a CSV export. |
 | Správce | K1–K5 | Založení klubu/týmů, pozvání trenérů, přehled napříč týmy, přesun člena, klubový export. |
 | Průřezově | §2–3 | Celoklubový předpis, archivace týmu, zrušení nezaplaceného dluhu, ochrana soukromí. Tyto body jsou v textu závazné, ale nemají samostatnou M story. |
 
-Označení „Musí být (26)“ odpovídá součtu C1–C9, T1–T12 a K1–K5. Průřezové požadavky jsou navíc. T7 a T8 mají pro schválené demo MVP popsanou simulační variantu, nikoli skutečné Fio. Archivace týmu včetně UI je v MVP podle D-08.
+Označení „Musí být (26)“ odpovídá součtu C1–C9, T1–T12 a K1–K5. Průřezové požadavky jsou navíc. T7 a T8 nyní používají skutečné čtení příchozích pohybů z Fio API; aplikace však stále peníze nepřevádí. Archivace týmu včetně UI je v MVP podle D-08.
 
 ## Po MVP
 
@@ -49,7 +49,6 @@ Označení „Musí být (26)“ odpovídá součtu C1–C9, T1–T12 a K1–K5.
 | S | C10–C13 | Předběžná připomínka, export/žádost o výmaz osobních dat, platba dopředu a kredit, pohyby kreditu. |
 | S | T13, T15, K7 | Individuální úprava/odpuštění s auditní stopou, kredity a vratky, audit log v UI. |
 | P | T14 | Pravidelně generované předpisy. |
-| Po demo MVP | část T7 | Skutečné Fio napojení, read-only token, test spojení, pravidelná synchronizace a chování při výpadku. |
 
 Auditní události pro citlivé změny patří do základu MVP; odložené je prohlížení audit logu v UI. Kreditní účetnictví a automatické použití přeplatku nejsou v demo MVP. Ověření bude ruční; žádné automatizované testy se nepíší.
 
@@ -65,14 +64,12 @@ Konkrétní pravidla pro účty, přeplatky, členství a opravy jsou v `docs/de
 - Opakované odeslání nesmí vytvořit druhý osobní profil, stejné nové dítě z jednoho formuláře ani duplicitní aktivní členství či čekající žádost.
 - Dluhy, QR a platební komunikace zůstávají na sportovci a jeho spravujícím účtu; změna reprezentace jména nemění existující ID ani finanční historii.
 
-# Upřesnění požadavků: veřejná QR platba
+# Upřesnění požadavků: Fio a QR Platba
 
-- Jediný QR kód na detailu a v e-mailu obsahuje stejnou absolutní HTTPS URL veřejné platební stránky; SPD řetězec se již nevytváří ani nezobrazuje.
-- URL používá `PUBLIC_QR_BASE_URL`, ve výchozím stavu `https://rhinencephalic-offenselessly-serenity.ngrok-free.dev`, a nesmí obsahovat `localhost`.
-- Veřejná stránka nevyžaduje session a nezveřejňuje sportovce, rodiče, e-mail ani interní ID dluhu. Zobrazuje pouze účet, aktuální zbývající částku, VS a zprávu.
-- Odkaz je vázaný na jeden dluh, v databázi je jen hash deterministicky odvozeného tokenu a identifikátor vydání. Samostatné `PUBLIC_QR_TOKEN_SECRET` umožní stejnou URL znovu sestavit bez uložení surového tokenu.
-- GET nic nezaúčtuje. POST pod zámkem znovu načte historický účet, VS, zůstatek, čekající hlášení a ruční úhrady. Změněná částka vyžaduje nové potvrzení.
-- První úspěšné potvrzení spotřebuje odkaz a uloží vazbu na simulovaný pohyb. Dvojklik a souběh vracejí původní výsledek. Oprava finanční události odkaz neobnovuje.
-- Původ vstupu je `public_qr`, aktér anonymní finanční operace je `NULL`; zdroj pohybu i druh platební události zůstává `simulated`.
-- Automaticky nepřiřaditelný pohyb se zobrazí ve frontě smíření a veřejná stránka nesmí tvrdit, že je dluh zaplacený.
+- Jediný QR kód na detailu a v e-mailu obsahuje `SPD*1.0` s historicky přiřazeným účtem dluhu, aktuální zbývající částkou v CZK, VS a zprávou. Neobsahuje URL a veřejná simulační akce není součástí platebního toku.
+- Aktivní veřejné odkazy vzniklé dřívější funkcí se zneplatní dopřednou migrací; historické `public_qr`/`simulated` pohyby, alokace a audit se nemažou ani nepřejmenovávají.
+- Token se po ověření Fio banky 2010, účtu/IBANu a CZK ukládá pomocí autentizovaného šifrování se samostatným `FIO_TOKEN_ENCRYPTION_KEY`; nevrací se do UI, auditu, e-mailu ani logu.
+- Samostatný worker používá periodický endpoint s překryvem, nejméně 30sekundový limit pro otisk tokenu, lease integrace a idempotenci `(bank_account_id, source=fio, source_transaction_id)`.
+- Počátečních sedm dní se importuje pouze k ručnímu posouzení. Automaticky se páruje jen nový kladný CZK příjem s jednoznačným účtem a VS, přesnou zbývající částkou a bez možné duplicity s hlášením nebo ruční úhradou. Záporné a ostatní nejasné pohyby zůstávají ve frontě.
+- U sdíleného účtu smí Fio konfigurovat a syrové pohyby číst pouze správce klubu; u trvale výhradního týmového účtu také oprávněný trenér. Ruční evidence a „Zaplatil jsem“ zůstávají dostupné bez ohledu na stav integrace.
 

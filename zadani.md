@@ -97,7 +97,7 @@ K7	Vidět audit log	Dohledal, kdo co změnil	Filtr podle týmu, uživatele, typu
 Může se jedna o monolit aplikaci BE + FE v jednom stacku. Aplikaci budu nasazovat na AWS, bylo by dobré kdyby vše bylo v dockeru s postgreSQL databází.
 Emaily se budou posílat přes resend 
 
-Bankovní pohyby se pro školní demo simulují v logicky odděleném modulu, který půjde jednoduše vyjmout nebo nahradit. Jediný QR obsahuje veřejný HTTPS odkaz; na otevřené stránce jsou serverově načtené údaje klubového či týmového účtu. Potvrzení vytvoří pouze simulovaný pohyb, nikoli skutečný ani bankovně ověřený převod.
+Příchozí pohyby lze synchronizovat z Fio API. Integrace je oddělená od ruční evidence, token je uložen šifrovaně a pravidelnou kontrolu provádí samostatný worker. Historické pohyby simulátoru zůstávají pravdivě označené jako `simulated` a nikdy se nepřepisují na Fio. Jediný QR na dluhu a v e-mailu obsahuje standardní českou QR Platbu `SPD*1.0` pro převod přímo na historicky přiřazený klubový nebo týmový účet; aplikace peníze nepřevádí.
 # Upřesnění vstupu člena do týmu
 
 - Členem týmu je vždy sportovec; uživatelský účet pouze spravuje přístup, kontakt a komunikaci včetně platebních e-mailů.
@@ -107,9 +107,9 @@ Bankovní pohyby se pro školní demo simulují v logicky odděleném modulu, kt
 - E-mailová pozvánka vyžaduje shodný e-mail a po úspěšném zápisu aktivuje členství. Týmový kód vytváří pouze žádost ke schválení.
 - Trenér a správce vidí na soupisce jméno sportovce a oprávněný kontakt spravujícího účtu; u dítěte je kontakt označen „účet rodiče“. Běžný spoluhráč smí vidět pouze jméno sportovce.
 
-# Veřejná platba přes QR ve školní simulaci
+# Fio synchronizace a standardní QR Platba
 
-Toto novější pravidlo nahrazuje původní požadavek na bankovní SPD QR. Jediný QR kód u dluhu i v platebním e-mailu obsahuje veřejný HTTPS odkaz na platební stránku bez registrace a přihlášení. Stránka smí ukázat pouze cílový účet, aktuální zbývající částku, variabilní symbol a zprávu. Potvrzení „Zaplatit“ nevytváří skutečný převod; vytvoří simulovaný příchozí pohyb a použije existující párování.
+Toto nejnovější pravidlo nahrazuje veřejnou simulovanou QR platbu. QR na detailu dluhu i v e-mailu je česká QR Platba `SPD*1.0` s historickým účtem dluhu, aktuální zbývající částkou v CZK, VS a zprávou. Nevede na webový simulátor a potvrzení převodu probíhá až v bankovní aplikaci. Aktivní veřejné simulační odkazy se zneplatní; již vzniklé simulované pohyby, alokace a audit zůstávají beze změny.
 
-Odkaz je neuhodnutelný omezený token právě jednoho dluhu, lze jej zrušit a znovu vydat. Surový token se neukládá. První úspěšné potvrzení jej atomicky spotřebuje; opakování vrátí původní výsledek bez dalšího pohybu, alokace či e-mailu. Anonymní návštěvník není uživatelem a finanční audit uvádí původ `public_qr`, zatímco pohyb a platební událost zůstávají `simulated`.
+Fio token patří fyzickému bankovnímu účtu, po ověření shody banky 2010, účtu/IBANu a měny CZK se ukládá autentizovaně šifrovaný. Sdílený účet konfiguruje a jeho syrové pohyby řeší jen správce klubu; u výhradního týmového účtu také oprávněný trenér. Synchronizace ukládá pohyb idempotentně podle účtu, zdroje `fio` a Fio ID. Prvních sedm dní při aktivaci jde jen do fronty; další kladné CZK příjmy se automaticky přiřadí pouze při jednoznačném účtu, VS a přesné zbývající částce bez možné ruční duplicity. Záporné a nejasné pohyby vyžadují ruční rozhodnutí. Vypnutí ani výpadek Fio nevypíná ruční evidenci nebo rodičovské hlášení.
 

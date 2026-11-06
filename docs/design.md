@@ -7,7 +7,7 @@ Zdroj: osm snímků a `prototype-design/Popis.md` (2026-11-03). Prototyp je orie
 - Tmavě modrá navigace a výrazné nadpisy, světlé pozadí, bílé karty, modré primární akce. Stavové barvy používají zelenou, oranžovou a červenou spolu s textovým štítkem; samotná barva nesmí nést význam.
 - Na široké obrazovce levý navigační panel, horní lišta s kontextem klubu/týmu a hlavní obsah v kartách či tabulkách. Na mobilu se navigace zkrátí do přístupného menu nebo spodní lišty, karty jdou pod sebe a tabulky se změní na řádky s klíčovými údaji a detailem.
 - Celé uživatelské rozhraní bude v češtině, částky v Kč a datumy podle českého prostředí. Přepínač „Testing as“ ze snímků není uživatelská funkce; role určuje přihlášení a oprávnění.
-- Výrazy v prototypu `Payment event` a `Fee` odpovídají „předpisu“; individuální povinnost je „dluh“. Upomínka je událost, nikoli stav dluhu. Zobrazení „zaplaceno“ musí odlišit ruční potvrzení, hotovost a demo simulaci.
+- Výrazy v prototypu `Payment event` a `Fee` odpovídají „předpisu“; individuální povinnost je „dluh“. Upomínka je událost, nikoli stav dluhu. Zobrazení „zaplaceno“ musí odlišit ruční potvrzení, hotovost, Fio a historickou demo simulaci.
 
 ## Navigační mapa
 
@@ -24,7 +24,7 @@ Adresy z `Popis.md` bereme jako orientační. Konečné URL mohou mít jiný tva
 - Všechny přihlášené obrazovky používají společné dvouúrovňové záhlaví. Horní řádek je stabilní: značka vede na osobní přehled a napravo je identita účtu s odhlášením. Druhý řádek se zobrazuje jen tehdy, když stránka má konkrétní kontext klubu, týmu nebo pracovního postupu.
 - Kontextový řádek ukazuje typ a název objektu, aktuální roli, lokální navigaci a nejvýše jednu primární akci. Odkazy sestavuje server až po kontrole přístupu; záhlaví samo není bezpečnostní hranice.
 - Správce klubu vidí v klubovém kontextu přehled, týmy, finance a rychlé založení předpisu. Trenér nebo správce na týmové stránce vidí přehled týmu, hráče, finance, nastavení a nový předpis. Člen nebo rodič na stejném týmu vidí přehled týmu, vlastní platby a vlastní historii; správní odkazy se nezobrazují, pokud k nim nemá oprávnění.
-- Na menší obrazovce zůstává značka, účet a kontext viditelný, lokální navigace se posouvá vodorovně a primární akce zůstává samostatně dostupná. Veřejná QR platební stránka je záměrná výjimka: kvůli soukromí a jednoduchému platebnímu toku nepoužívá navigaci přihlášené aplikace.
+- Na menší obrazovce zůstává značka, účet a kontext viditelný, lokální navigace se posouvá vodorovně a primární akce zůstává samostatně dostupná.
 
 ## Existující snímky
 
@@ -47,8 +47,8 @@ Adresy z `Popis.md` bereme jako orientační. Konečné URL mohou mít jiný tva
 | Registrace klubu | Krátký průvodce: účet správce → název klubu, IČO a bankovní účet → první tým → volitelné pozvání trenéra → souhrn. | Validace formulářů a možnost pokračovat v nedokončeném kroku. Nepředpokládat druhý bankovní účet. |
 | Vstup člena/rodiče | Odkaz z e-mailu či zadání týmového kódu → registrace nebo přihlášení → volba „sebe / dítě“ → základní údaje sportovce. Samostatný reset hesla. | Platná jednorázová e-mailová pozvánka aktivuje členství účtu se shodnou adresou bez dalšího kroku. Kód vytvoří žádost a čeká na schválení; nikdy nepřevezme existujícího sportovce podle jména. Neplatná/propadlá pozvánka vysvětlí další krok. |
 | Vytvoření předpisu | Název, částka v Kč, splatnost, cílový účet, výběr členů, souhrn adresátů a náhled e-mailu/QR. | Trenér pro svůj tým, správce také pro celý klub. Potvrzení před odesláním. |
-| Detail platby rodiče | Částka, splatnost, klub/tým, účet, VS, jediný QR veřejného odkazu, „Otevřít platbu“ a „Kopírovat údaje“. | U každého nezaplaceného dluhu zůstává „Zaplatil jsem“ a odvolání před vyřízením; text výslovně říká, že jde pouze o hlášení. Veřejná QR stránka bez přihlášení vytváří simulovaný příchozí pohyb a její výsledek rozlišuje přiřazení od fronty smíření. |
-| Nastavení bankovního účtu | Údaje účtu a oddělená technická konfigurace demo synchronizace; informační průvodce pro budoucí Fio s obrázky, test spojení a čas poslední kontroly, až bude skutečné Fio implementováno. | Nezobrazovat volbu „ruční / automatický režim“. Zapnutí či výpadek synchronizace nesmí skrýt ruční evidenci ani rodičovské hlášení. V demo MVP žádný skutečný Fio token ani falešný „test spojení s Fio“. U simulátoru zobrazit čas posledního zpracovaného demo pohybu. Při změně výchozího či týmového účtu upozornit, že staré dluhy a QR zachovají původní účet (D-13). |
+| Detail platby rodiče | Částka, splatnost, klub/tým, účet, VS, jediný standardní SPD QR a „Kopírovat údaje“. | U každého nezaplaceného dluhu zůstává „Zaplatil jsem“ a odvolání před vyřízením; text výslovně říká, že jde pouze o hlášení. QR se potvrzuje v bankovní aplikaci a nevede na simulátor. |
+| Nastavení bankovního účtu | Údaje účtu a oddělená Fio konfigurace: aktivace v modálu, návod na token „Sledování účtu“, ověření, stav, časy posledního pokusu/úspěchu/nového pohybu, bezpečná chyba, synchronizace nyní, výměna a vypnutí. | Nezobrazovat volbu „ruční / automatický režim“. Zapnutí či výpadek synchronizace nesmí skrýt ruční evidenci ani rodičovské hlášení. UI nesmí tvrdit, že z Fio odpovědi ověřilo výhradně read-only právo. Při změně účtu upozornit, že staré dluhy a QR zachovají původní účet (D-13). |
 | K potvrzení | Seznam hlášení „Zaplatil jsem“, jméno sportovce, předpis, částka a datum hlášení; výběr více řádků. | Potvrdit hromadně nebo zamítnout s důvodem bez ohledu na technickou konfiguraci účtu. Text upozorní, že potvrzení vytváří ruční evidenci, nikoli bankovní ověření. Trenér vidí své týmové dluhy, správce klubu i celoklubové dluhy podle D-12. |
 | Kdo zaplatil | Matice člen × předpis pro vybraný tým, nad ní součet vybráno/zbývá a filtr „jen nezaplacené“. Na mobilu seznam členů s rozbalenými předpisy. | Každá buňka ukáže skutečný stav dluhu a jeho původ; upomínka je samostatný údaj. Proklik vede na detail předpisu nebo platby. |
 | Nespárované platby | Příchozí demo pohyby bez správného VS, s rozdílnou částkou nebo s možnou shodou na čekající hlášení či ručně evidovanou úhradu; navržený člen a důvod, proč se pohyb nezaúčtoval automaticky. | Spojit s existující událostí bez nové alokace, označit jako jinou platbu, přiřadit nebo rozdělit pouze nealokovanou část. Nepřidělená část zůstává viditelná. U sdíleného účtu jen správce klubu. |
@@ -61,7 +61,7 @@ Adresy z `Popis.md` bereme jako orientační. Konečné URL mohou mít jiný tva
 
 - **Domovská stránka:** vlevo výrazný typografický nadpis s nejvýše dvěma akcemi, vpravo jedna kompaktní ukázka klubové evidence. Bez statistik, marketingových sekcí a dalších dekorativních karet; identitu nese modrá plocha přehledu, zbytek stránky zůstává klidný.
 - **Průvodce registrací:** uprostřed úzký formulář, nad ním čtyři kroky a pod ním tlačítka Zpět/Pokračovat. Na telefonu kroky zůstanou textově označené a formulář vyplní dostupnou šířku.
-- **Nastavení účtu:** nahoře identita a platební údaje účtu; níže samostatná technická konfigurace synchronizace a vedle ní vysvětlující panel, že ruční evidence zůstává vždy dostupná. Budoucí průvodce Fio je jasně označený jako nedostupná budoucí funkce, aby nevzbuzoval dojem aktivního propojení.
+- **Nastavení účtu:** nahoře identita a platební údaje účtu; níže samostatná technická konfigurace Fio a vedle ní vysvětlující panel, že ruční evidence zůstává vždy dostupná. Token se po uložení nikdy znovu nezobrazuje.
 - **K potvrzení a Nespárované:** nahoře počet čekajících, filtr týmu a způsobu; pod tím tabulka. Hromadná akce se zpřístupní po výběru položek. Na mobilu každý záznam tvoří karta s částkou, datem, osobou, důvodem a akcemi.
 - **Příchozí platby:** filtr období a týmu nad seznamem, součet na samostatné kartě, export vpravo u nadpisu. Na telefonu je export v menu akcí a filtry se rozbalují nad seznamem.
 
@@ -110,11 +110,8 @@ Na šířce telefonu má být nejdůležitější údaj a akce vidět bez vodoro
 - Výsledek pozvánky říká, že členství je aktivní. Výsledek kódu říká, že žádost čeká na schválení.
 - Rodičovský přehled označuje osobní profil, dítě a starší nezařazený profil. Manažerská soupiska u dítěte používá popisek „Účet rodiče“, u dospělého „Vlastní účet“; rok narození se nezobrazuje, pokud chybí.
 
-# Veřejná platební stránka z QR
+# Nahrazená veřejná platební stránka z QR
 
-- Detail dluhu i e-mail ukazují jediný QR kód a tlačítko „Otevřít platbu“, obojí se stejnou veřejnou URL. Původní SPD technický řetězec a druhý demo vstup se nezobrazují.
-- `/platba/[issueId]/[token]` je úzký mobilní platební lístek bez navigace účtu: značka, zbývající částka, cílový účet, VS, zpráva a jedno tlačítko „Zaplatit“.
-- Stránka nepoužívá osobní údaje ani název sportovce. Vizuálně připomíná čistý mobilní bankovní portál, nepoužívá opakované demo štítky a výsledek popisuje jako přijetí a přiřazení platebního požadavku, nikoli jako bankovně ověřený převod.
-- Při změně částky stránka zobrazí aktuální hodnotu a vyžádá nové potvrzení. Úspěch rozlišuje „pohyb byl přiřazen“ a „pohyb čeká ve frontě“; druhý stav se nikdy neoznačuje jako zaplacení.
-- Neplatný nebo zrušený odkaz ukáže jednotnou nedostupnost bez rozlišení existence dluhu. Veřejná stránka má `noindex`, `nofollow`, `noarchive` a dynamické vykreslení bez sdílené aplikační cache.
+- Tento dřívější návrh nahrazuje D-19. Detail dluhu i e-mail ukazují jediný standardní SPD QR; veřejná stránka ani tlačítko „Otevřít platbu“ se v běžném toku nezobrazují.
+- Původní veřejná route je odstraněná; aktivní odkazy revokuje migrace a historické záznamy zůstávají pouze v auditu.
 

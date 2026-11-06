@@ -53,6 +53,8 @@ function paymentKindLabel(kind: string) {
       return "Hotovost";
     case "simulated":
       return "Demo pohyb";
+    case "fio":
+      return "Pohyb načtený z Fio";
     case "correction":
       return "Oprava evidence";
     default:
