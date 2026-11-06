@@ -359,17 +359,18 @@ export async function verifyAndActivateFio(input: {
     );
     const existingRows = await transaction.execute<{
       id: string;
-      updated_at: Date;
+      updated_at: Date | string;
     }>(sql`
       select id, updated_at from fio_integrations where bank_account_id=${account.id} for update
     `);
     const existing = existingRows[0];
+    const expectedUpdatedAt = existing ? new Date(existing.updated_at) : null;
     const [attempt] = await transaction.insert(fioVerificationAttempts).values({
       bankAccountId: account.id,
       requestedByUserId: input.actorUserId,
       tokenFingerprint: fingerprint,
       purpose: existing ? "replace" : "activate",
-      expectedIntegrationUpdatedAt: existing?.updated_at ?? null,
+      expectedIntegrationUpdatedAt: expectedUpdatedAt,
       expiresAt: new Date(Date.now() + 5 * 60_000),
     }).returning({ id: fioVerificationAttempts.id });
     return {
@@ -377,7 +378,7 @@ export async function verifyAndActivateFio(input: {
       scope,
       account,
       purpose: existing ? "replace" as const : "activate" as const,
-      expectedUpdatedAt: existing?.updated_at ?? null,
+      expectedUpdatedAt,
     };
   });
 
@@ -426,7 +427,7 @@ export async function verifyAndActivateFio(input: {
     if (!attempt || attempt.status !== "pending" || (timestampMs(attempt.expires_at) ?? 0) < Date.now()) {
       throw new InputError("stale_verification", "Ověření vypršelo. Zopakujte aktivaci.");
     }
-    const existingRows = await transaction.execute<{ id: string; updated_at: Date }>(sql`
+    const existingRows = await transaction.execute<{ id: string; updated_at: Date | string }>(sql`
       select id, updated_at from fio_integrations where bank_account_id=${account.id} for update
     `);
     const existing = existingRows[0];

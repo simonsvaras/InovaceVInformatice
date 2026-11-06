@@ -237,5 +237,6 @@ Aktualizováno: 2026-11-06.
 - Poskytnutý skutečný token byl ověřen přímo proti Fio: API vrátilo HTTP 200, správný účet `2903642978/2010`, banku 2010, CZK a jeden pohyb. Opravená aplikační služba následně integraci aktivovala a uložila jeden pohyb sedmidenního počátečního importu do fronty s důvodem `initial_import_review`.
 - Ruční požadavek synchronizace byl zařazen a worker jej během několika sekund změnil z `pending` přes `processing` na `completed`. Integrace zůstala `active`, aktualizoval se poslední pokus i úspěch a nevznikla druhá kopie stejného Fio pohybu.
 - Po aktivaci se klubové finance poprvé pokusily vykreslit neprázdné Fio časy a skončily HTTP 500, protože stránka volala `.toISOString()` přímo nad textem z raw SQL. Všechny tři časové hodnoty nyní procházejí společným tolerantním převodem na ISO; produkční build po opravě prošel.
+- Vypnutá integrace nyní v UI nabízí opětovnou aktivaci. Obnova původně selhávala ještě před API, protože `updated_at` existující integrace šel jako text do Drizzle timestamp encoderu. Po explicitním převodu na `Date` byla reaktivace stejným skutečným tokenem úspěšně ověřena (`replaced=true`) a počáteční import nevytvořil duplicitní pohyb.
 - Oprava prošla lintem, typovou kontrolou a produkčním Docker buildem; aplikace, databáze i worker jsou zdravé.
 
