@@ -26,9 +26,15 @@ function financePath(scope: PaymentScope) {
 }
 
 function safeMessage(error: unknown) {
-  return error instanceof InputError
-    ? error.message
-    : "Spojení s bankou se nepodařilo bezpečně změnit.";
+  if (error instanceof InputError) return error.message;
+  if (
+    typeof error === "object" && error !== null &&
+    "name" in error && error.name === "InputError" &&
+    "message" in error && typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "Spojení s bankou se nepodařilo změnit.";
 }
 
 export async function verifyAndActivateFioAction(formData: FormData) {

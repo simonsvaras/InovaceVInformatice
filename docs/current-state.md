@@ -229,3 +229,9 @@ Aktualizováno: 2026-11-06.
 - Fio periodický výpis nepotvrzuje přesný rozsah oprávnění tokenu. UI proto pouze instruuje vytvořit token „Sledování účtu“ a netvrdí, že read-only rozsah technicky prokázalo. Dlouhý výpadek nad bezpečně dostupnou historii přepne integraci do stavu vyžadujícího zásah místo tichého přeskočení.
 - Další produktový milník zůstává M6. Pracovní strom je po dokončení kontrol a revizí připravený k lokálnímu uložení do Gitu; push se neprovádí.
 
+## Oprava aktivace Fio po prvním reálném pokusu
+
+- Reálná odpověď Fio ukázala, že `column0` vrací účetní datum jako text (`YYYY-MM-DD...`), zatímco první parser očekával pouze číselný timestamp. Parser nyní přijímá textové Fio datum i timestamp a u pohybu bez vlastní měny použije měnu účtu z hlavičky výpisu.
+- Chyby čekacího intervalu a odpovědi Fio se nově rozpoznávají i tehdy, když je produkční runtime obalí přes hranici databázové transakce. UI tak místo obecné věty zobrazí konkrétní bezpečné sdělení, například nutnost vyčkat 30 sekund.
+- Oprava prošla lintem a typovou kontrolou. Úspěšná aktivace stejným skutečným tokenem vyžaduje nový pokus uživatele po nasazení opraveného image; token se při neúspěšné aktivaci záměrně neukládal.
+

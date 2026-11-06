@@ -42,12 +42,29 @@ function optionalText(value: unknown, maxLength: number) {
   return text ? text.slice(0, maxLength) : null;
 }
 
-function parseMovement(transaction: FioTransaction): FioMovement {
+function parseFioDate(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  if (typeof value === "string") {
+    const calendarDate = value.match(/^(\d{4}-\d{2}-\d{2})/i)?.[1];
+    if (calendarDate) {
+      const date = new Date(`${calendarDate}T12:00:00.000Z`);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
+function parseMovement(transaction: FioTransaction, accountCurrency: string): FioMovement {
   const id = optionalText(column(transaction, "column22"), 80);
   const amount = Number(column(transaction, "column1"));
-  const timestamp = Number(column(transaction, "column0"));
-  const currency = optionalText(column(transaction, "column14"), 3)?.toUpperCase();
-  if (!id || !Number.isFinite(amount) || !Number.isFinite(timestamp) || !currency) {
+  const occurredAt = parseFioDate(column(transaction, "column0"));
+  const currency = optionalText(column(transaction, "column14"), 3)?.toUpperCase() ?? accountCurrency;
+  if (!id || !Number.isFinite(amount) || !occurredAt || !currency) {
     throw new FioApiError("invalid_response", "Fio vrátilo neúplný pohyb.", false);
   }
   const amountHalere = Math.round(amount * 100);
@@ -60,7 +77,7 @@ function parseMovement(transaction: FioTransaction): FioMovement {
     amountHalere,
     currency,
     variableSymbol: rawVs && /^\d{1,10}$/.test(rawVs) ? rawVs : null,
-    occurredAt: new Date(timestamp),
+    occurredAt,
     counterAccount: optionalText(column(transaction, "column2"), 64),
     counterBankCode: optionalText(column(transaction, "column3"), 10),
     counterpartyName: optionalText(column(transaction, "column10"), 255),
@@ -142,6 +159,6 @@ export async function readFioPeriod(
     bankId,
     currency,
     iban,
-    movements: transactions.map(parseMovement),
+    movements: transactions.map((transaction) => parseMovement(transaction, currency)),
   };
 }

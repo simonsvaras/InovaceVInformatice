@@ -48,6 +48,30 @@ type FioDelivery = {
   amountHalere: number;
 };
 
+const fioErrorCodes = new Set([
+  "cooldown",
+  "fio_cooldown",
+  "invalid_token",
+  "history_locked",
+  "unavailable",
+  "invalid_response",
+  "fio_account_mismatch",
+]);
+
+function readableFioError(error: unknown) {
+  if (error instanceof FioApiError || error instanceof InputError) {
+    return { code: error.code, message: error.message };
+  }
+  if (
+    typeof error === "object" && error !== null &&
+    "code" in error && typeof error.code === "string" && fioErrorCodes.has(error.code) &&
+    "message" in error && typeof error.message === "string"
+  ) {
+    return { code: error.code, message: error.message };
+  }
+  return null;
+}
+
 function addDays(value: string, days: number) {
   const date = new Date(`${value}T12:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -361,9 +385,8 @@ export async function verifyAndActivateFio(input: {
     period = await readFioPeriod(token, dateFrom, dateTo);
     verifyAccountIdentity(started.account.account_number, period);
   } catch (error) {
-    const code = error instanceof FioApiError || error instanceof InputError
-      ? error.code
-      : "fio_verification_failed";
+    const readable = readableFioError(error);
+    const code = readable?.code ?? "fio_verification_failed";
     await markVerificationFailed({
       attemptId: started.attemptId,
       actorUserId: input.actorUserId,
@@ -372,8 +395,7 @@ export async function verifyAndActivateFio(input: {
       bankAccountId: input.bankAccountId,
       code,
     });
-    if (error instanceof InputError) throw error;
-    if (error instanceof FioApiError) throw new InputError(error.code, error.message);
+    if (readable) throw new InputError(readable.code, readable.message);
     throw new InputError("fio_verification_failed", "Spojení s Fio se nepodařilo bezpečně ověřit.");
   } finally {
     if (tokenLease) await releaseTokenCall(fingerprint, tokenLease);
@@ -913,9 +935,10 @@ async function claimDueIntegration(): Promise<ClaimedIntegration | null> {
 }
 
 async function recordSyncFailure(claim: ClaimedIntegration, error: unknown) {
-  const code = error instanceof FioApiError || error instanceof InputError ? error.code : "sync_failed";
-  const message = error instanceof FioApiError || error instanceof InputError
-    ? error.message.slice(0, 300)
+  const readable = readableFioError(error);
+  const code = readable?.code ?? "sync_failed";
+  const message = readable
+    ? readable.message.slice(0, 300)
     : "Synchronizace se nepodařila. Zkuste ji později znovu.";
   const status = code === "invalid_token" ? "requires_token" : code === "history_locked" ? "intervention" : "active";
   await getDatabase().transaction(async (transaction) => {
