@@ -56,6 +56,7 @@ export function FioSyncAccount({ account, scope }: { account: Account; scope: Sc
   const dialogRef = useRef<HTMLDialogElement>(null);
   const isActive = account.fioStatus === "active";
   const hasIntegration = Boolean(account.fioIntegrationId);
+  const hasUsableConfiguration = hasIntegration && account.fioStatus !== "disabled";
 
   return (
     <div className="finance-sync-account fio-account-card">
@@ -94,7 +95,7 @@ export function FioSyncAccount({ account, scope }: { account: Account; scope: Sc
       <div className="fio-sync-actions">
         {account.canConfigure ? (
           <button type="button" onClick={() => dialogRef.current?.showModal()}>
-            {hasIntegration ? "Nahradit token" : "Aktivovat automatickou synchronizaci"}
+            {hasUsableConfiguration ? "Nahradit token" : "Aktivovat automatickou synchronizaci"}
           </button>
         ) : null}
         {isActive && account.canConfigure ? (
@@ -126,7 +127,7 @@ export function FioSyncAccount({ account, scope }: { account: Account; scope: Sc
           <header>
             <div>
               <p>Účet {account.accountNumber}</p>
-              <h2>{hasIntegration ? "Nahradit Fio token" : "Aktivovat automatickou synchronizaci"}</h2>
+              <h2>{hasUsableConfiguration ? "Nahradit Fio token" : "Aktivovat automatickou synchronizaci"}</h2>
             </div>
             <button
               aria-label="Zavřít"
