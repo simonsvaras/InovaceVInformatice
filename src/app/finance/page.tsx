@@ -341,9 +341,6 @@ export default async function FinancePage({
             </div>
             <span>Fio API</span>
           </header>
-          <p className="finance-sync-notice">
-            Fio token je uložen šifrovaně a po aktivaci se do prohlížeče už nevrací. Počáteční pohyby z posledních sedmi dní se automaticky nezaúčtují.
-          </p>
           <div className="finance-sync-accounts">
             {bankDashboard.accounts.map((account) => (
               <FioSyncAccount

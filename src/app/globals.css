@@ -2812,17 +2812,6 @@ button.club-dialog-close {
   font-weight: 720;
 }
 
-.finance-sync-notice {
-  margin: 0;
-  border-top: 1px solid #dce5fb;
-  border-bottom: 1px solid #dce5fb;
-  padding: 0.7rem 1.35rem;
-  background: #f5f8ff;
-  color: #41577f;
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
 .finance-sync-accounts {
   display: grid;
 }
