@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createAssessmentAction } from "@/app/actions/assessments";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { todayInPrague } from "@/lib/dates";
@@ -26,15 +26,30 @@ export default async function NewAssessmentPage({
     : await getClubAssessmentForm(user.id, query.clubId!);
   const isTeam = Boolean(query.teamId);
   const today = todayInPrague();
+  const contextHref = isTeam ? `/tymy/${context.id}` : `/kluby/${context.id}`;
+  const financeHref = isTeam
+    ? `/finance?teamId=${context.id}`
+    : `/finance?clubId=${context.id}`;
 
   return (
     <main className="dashboard-shell">
-      <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubio</Link>
-        <Link href={isTeam ? `/tymy/${context.id}` : `/kluby/${context.id}`}>Zpět</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: financeHref, label: "Finance" }}
+        context={{
+          kind: isTeam ? "Tým" : "Klub",
+          name: context.name,
+          role: "Správa předpisů",
+          href: contextHref,
+        }}
+        navigation={[
+          { href: contextHref, label: "Přehled" },
+          { href: financeHref, label: "Finance" },
+          { href: "#new-assessment", label: "Nový předpis", active: true },
+        ]}
+        user={user}
+      />
       <section className="content-stack">
-        <div>
+        <div id="new-assessment">
           <p className="eyebrow">{isTeam ? "Týmový předpis" : "Celoklubový předpis"}</p>
           <h1>Nový předpis</h1>
           <p>{context.name} · cílový účet {context.accountNumber}</p>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { retryReceivableDeliveryAction } from "@/app/actions/assessments";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getAssessmentManagerView } from "@/modules/assessments/service";
@@ -64,19 +65,22 @@ export default async function AssessmentPage({
 
   return (
     <main className="dashboard-shell dashboard-home assessment-detail-page">
-      <header className="dashboard-topbar">
-        <Link
-          className="dashboard-brand"
-          href="/prehled"
-          aria-label="Klubio – přehled"
-        >
-          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
-          <span>Klubio</span>
-        </Link>
-        <Link className="club-topbar-link" href={financeHref}>
-          Všechny předpisy
-        </Link>
-      </header>
+      <AppHeader
+        backLink={{ href: financeHref, label: "Všechny předpisy" }}
+        context={{
+          kind: assessment.teamId ? "Tým" : "Klub",
+          name: assessment.teamName ?? assessment.clubName,
+          role: "Správa předpisu",
+          href: assessment.teamId
+            ? `/tymy/${assessment.teamId}`
+            : `/kluby/${assessment.clubId}`,
+        }}
+        navigation={[
+          { href: financeHref, label: "Finance" },
+          { href: `/predpisy/${assessment.id}`, label: "Detail předpisu", active: true },
+        ]}
+        user={user}
+      />
 
       <section className="assessment-detail-content">
         <Message error={query.error} success={query.success} />

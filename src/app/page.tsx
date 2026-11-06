@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { logoutAction } from "@/app/actions/auth";
+import { AppHeader } from "@/components/app-header";
 import { getCurrentUser } from "@/modules/auth/service";
 
 export default async function Home() {
@@ -8,30 +8,7 @@ export default async function Home() {
 
   return (
     <main className="home-shell">
-      <header className="home-header">
-        <Link className="home-brand" href="/" aria-label="Klubio – domovská stránka">
-          <span className="home-brand-mark" aria-hidden="true">
-            K
-          </span>
-          <span>Klubio</span>
-          <span className="home-demo-label">školní demo</span>
-        </Link>
-
-        {user ? (
-          <div className="home-account">
-            <span>{user.displayName}</span>
-            <form action={logoutAction}>
-              <button className="home-header-action" type="submit">
-                Odhlásit se
-              </button>
-            </form>
-          </div>
-        ) : (
-          <Link className="home-header-action" href="/prihlaseni">
-            Přihlásit se
-          </Link>
-        )}
-      </header>
+      <AppHeader user={user} />
 
       <section className="home-hero" aria-labelledby="page-title">
         <div className="home-copy">

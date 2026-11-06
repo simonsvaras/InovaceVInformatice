@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { simulateBankPaymentAction } from "@/app/actions/bank-simulator";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { InputError } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
@@ -33,10 +33,19 @@ export default async function DemoBankPage({
 
   return (
     <main className="dashboard-shell">
-      <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubio</Link>
-        <Link href={`/dluhy/${receivableId}`}>Zpět na skutečné platební údaje</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: `/dluhy/${receivableId}`, label: "Platební údaje" }}
+        context={{
+          kind: "Demo",
+          name: debt.title,
+          role: "Simulace pohybu",
+        }}
+        navigation={[
+          { href: `/dluhy/${receivableId}`, label: "Platební údaje" },
+          { href: `/demo-banka/${receivableId}`, label: "Demo banka", active: true },
+        ]}
+        user={user}
+      />
       <section className="content-stack narrow-content">
         <div>
           <p className="eyebrow">Oddělený demo bankovní simulátor</p>

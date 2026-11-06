@@ -21,6 +21,7 @@ export default async function RegistrationPage({
 
   return (
     <AuthCard
+      headerAction={{ href: `/prihlaseni?next=${encodeURIComponent(next)}`, label: "Přihlásit se" }}
       title="Vytvořit účet"
       intro="Účet patří rodiči, dospělému sportovci, trenérovi nebo správci klubu. Při vstupu si zvolíte sebe nebo dítě."
     >

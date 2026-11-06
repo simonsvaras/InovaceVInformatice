@@ -20,7 +20,11 @@ export default async function LoginPage({
   }
 
   return (
-    <AuthCard title="Přihlášení" intro="Pokračujte do svého klubu, týmů a sportovců.">
+    <AuthCard
+      headerAction={{ href: `/registrace?next=${encodeURIComponent(next)}`, label: "Vytvořit účet" }}
+      title="Přihlášení"
+      intro="Pokračujte do svého klubu, týmů a sportovců."
+    >
       <Message error={params.error} success={params.success} />
       <form action={loginAction} className="form-stack">
         <input name="next" type="hidden" value={next} />

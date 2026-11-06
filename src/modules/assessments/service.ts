@@ -32,6 +32,10 @@ import {
   sendRecordedTransactionalEmail,
 } from "@/modules/notifications/email";
 import { deriveDebtState } from "@/modules/payments/status";
+import {
+  getOrIssuePublicPaymentLink,
+  issuePublicPaymentLinkInTransaction,
+} from "@/modules/public-payments/service";
 
 type AssessmentInput = {
   actorUserId: string;
@@ -59,6 +63,7 @@ type EmailRecipient = {
   variableSymbol: string;
   paymentMessage: string;
   dueDate: string;
+  publicPaymentUrl: string;
 };
 
 function fingerprint(input: AssessmentInput) {
@@ -323,6 +328,10 @@ export async function createAssessment(input: AssessmentInput) {
             status: "pending",
           })
           .returning({ id: notificationDeliveries.id });
+        const publicPaymentLink = await issuePublicPaymentLinkInTransaction(
+          transaction,
+          { receivableId: receivable.id, issuedByUserId: input.actorUserId },
+        );
         emailRecipients.push({
           deliveryId: delivery.id,
           receivableId: receivable.id,
@@ -337,6 +346,7 @@ export async function createAssessment(input: AssessmentInput) {
           variableSymbol,
           paymentMessage: input.paymentMessage,
           dueDate: input.dueDate,
+          publicPaymentUrl: publicPaymentLink.url,
         });
       }
 
@@ -663,14 +673,19 @@ export async function getGuardianReceivable(userId: string, receivableId: string
     targetType: "receivable",
     targetId: row.id,
   });
+  const debtState = deriveDebtState({
+    amountHalere: row.amountHalere,
+    allocatedHalere: row.allocatedHalere,
+    dueDate: row.dueDate,
+    hasPendingClaim: Boolean(row.pendingClaimId),
+  });
+  const publicPaymentLink = debtState.remainingHalere > 0
+    ? await getOrIssuePublicPaymentLink(row.id, userId)
+    : null;
   return {
     ...row,
-    ...deriveDebtState({
-      amountHalere: row.amountHalere,
-      allocatedHalere: row.allocatedHalere,
-      dueDate: row.dueDate,
-      hasPendingClaim: Boolean(row.pendingClaimId),
-    }),
+    publicPaymentUrl: publicPaymentLink?.url ?? null,
+    ...debtState,
   };
 }
 
@@ -782,6 +797,10 @@ export async function retryReceivableDelivery(input: {
     )
     .limit(1);
   if (!recipient) notFound();
+  const publicPaymentLink = await getOrIssuePublicPaymentLink(
+    recipient.receivableId,
+    input.actorUserId,
+  );
 
   await getDatabase().insert(auditEvents).values({
     actorUserId: input.actorUserId,
@@ -791,5 +810,5 @@ export async function retryReceivableDelivery(input: {
     targetType: "receivable",
     targetId: recipient.receivableId,
   });
-  await sendAssessmentEmails([recipient]);
+  await sendAssessmentEmails([{ ...recipient, publicPaymentUrl: publicPaymentLink.url }]);
 }

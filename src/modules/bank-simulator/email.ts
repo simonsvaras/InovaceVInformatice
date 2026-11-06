@@ -16,11 +16,15 @@ export type SimulatedPaymentEmailData = {
   teamName: string | null;
   amountHalere: number;
   sourceTransactionId: string;
+  recordedOrigin: "user" | "public_qr";
 };
 
 export function buildSimulatedPaymentEmail(data: SimulatedPaymentEmailData) {
   const scope = data.teamName ? `${data.clubName} · ${data.teamName}` : data.clubName;
   const subject = `Demo evidence platby – ${data.assessmentTitle}`;
+  const origin = data.recordedOrigin === "public_qr"
+    ? "Veřejná QR platební stránka"
+    : "Přihlášený demo simulátor";
   const text = [
     "DEMO – nejde o potvrzení skutečného bankovního převodu ani spojení s Fio.",
     "",
@@ -29,6 +33,7 @@ export function buildSimulatedPaymentEmail(data: SimulatedPaymentEmailData) {
     `Klub / tým: ${scope}`,
     `Částka: ${formatCzk(data.amountHalere)}`,
     `Demo ID pohybu: ${data.sourceTransactionId}`,
+    `Vstup pohybu: ${origin}`,
     "",
     "Původ záznamu je trvale označen jako simulated.",
   ].join("\n");
@@ -39,6 +44,7 @@ export function buildSimulatedPaymentEmail(data: SimulatedPaymentEmailData) {
       <li>Klub / tým: ${escapeHtml(scope)}</li>
       <li>Částka: ${escapeHtml(formatCzk(data.amountHalere))}</li>
       <li>Demo ID pohybu: ${escapeHtml(data.sourceTransactionId)}</li>
+      <li>Vstup pohybu: ${escapeHtml(origin)}</li>
     </ul>
     <p>Původ záznamu je trvale označen jako <code>simulated</code>.</p>`;
   return { subject, text, html };

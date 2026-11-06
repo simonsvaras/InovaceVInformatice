@@ -14,6 +14,10 @@ Požadavky: Docker s Compose pluginem.
    `PUBLIC_APP_URL` musí odpovídat adrese, ze které uživatelé otevírají
    pozvánky a reset hesla. Pro skutečné odeslání e-mailu doplňte
    `RESEND_API_KEY` a ověřenou adresu `EMAIL_FROM`.
+   `PUBLIC_QR_BASE_URL` musí být veřejná absolutní HTTPS adresa bez
+   `localhost`; výchozí hodnota míří na školní ngrok adresu. Nastavte také
+   samostatné náhodné `PUBLIC_QR_TOKEN_SECRET` o délce nejméně 32 znaků.
+   Toto tajemství neměňte, dokud mají vydané platební odkazy zůstat platné.
 3. Spusťte aplikaci a databázi jediným příkazem:
 
    ```sh
@@ -52,6 +56,15 @@ npm run db:generate
 
 Projekt záměrně neobsahuje automatizované testy ani testovací soubory. Ověření
 milníků probíhá ručně podle `docs/development-plan.md`.
+
+## Veřejná QR platba
+
+Jediný QR kód na detailu dluhu a v e-mailu obsahuje veřejný HTTPS odkaz na
+mobilní platební stránku. Návštěvník nepotřebuje účet ani session. Stránka
+zobrazuje pouze účet, aktuální zbývající částku, variabilní symbol a zprávu;
+potvrzení vytvoří simulovaný příchozí pohyb a nepředstavuje skutečný bankovní
+převod. Odkazy jsou omezené na jeden dluh, lze je zrušit a znovu vydat a jejich
+surové tokeny se v databázi neukládají.
 
 ## Účty, pozvánky a e-mail
 

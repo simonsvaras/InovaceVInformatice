@@ -24,14 +24,38 @@ import { consumeRateLimit } from "@/modules/security/rate-limit";
 
 const INVITATION_HOURS = 48;
 
-function databaseConstraint(error: unknown, message: string): never {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  ) {
-    throw new InputError("duplicate", message);
+function uniqueConstraintName(error: unknown) {
+  let current = error;
+
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (typeof current !== "object" || current === null) return null;
+    const candidate = current as {
+      code?: unknown;
+      constraint_name?: unknown;
+      constraint?: unknown;
+      cause?: unknown;
+    };
+    if (candidate.code === "23505") {
+      const constraint = candidate.constraint_name ?? candidate.constraint;
+      return typeof constraint === "string" ? constraint : "unknown_unique";
+    }
+    current = candidate.cause;
+  }
+
+  return null;
+}
+
+function databaseConstraint(
+  error: unknown,
+  message: string,
+  messagesByConstraint: Record<string, string> = {},
+): never {
+  const constraint = uniqueConstraintName(error);
+  if (constraint) {
+    throw new InputError(
+      "duplicate",
+      messagesByConstraint[constraint] ?? message,
+    );
   }
   throw error;
 }
@@ -73,6 +97,11 @@ export async function createClubWithFirstTeam(
     databaseConstraint(
       error,
       "Klub s tímto IČO nebo bankovním účtem už v demu existuje.",
+      {
+        clubs_ico_unique: "Klub s tímto IČO už existuje. Zadejte jiné IČO.",
+        bank_accounts_number_idx:
+          "Tento bankovní účet už používá jiný klub. Zadejte jiný účet.",
+      },
     );
   }
 }

@@ -34,6 +34,8 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      PUBLIC_QR_BASE_URL: ${PUBLIC_QR_BASE_URL:-https://rhinencephalic-offenselessly-serenity.ngrok-free.dev}
+      PUBLIC_QR_TOKEN_SECRET: ${PUBLIC_QR_TOKEN_SECRET:?PUBLIC_QR_TOKEN_SECRET must be set}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-Klubio <demo@example.invalid>}
     ports:

@@ -1,5 +1,5 @@
 import { absoluteAppUrl } from "@/modules/notifications/email";
-import { buildCzechPaymentDescriptor, formatCzk, paymentQrPng } from "@/modules/payments/qr";
+import { formatCzk, paymentQrPng } from "@/modules/payments/qr";
 
 type ReceivableEmailData = {
   receivableId: string;
@@ -12,6 +12,7 @@ type ReceivableEmailData = {
   variableSymbol: string;
   paymentMessage: string;
   dueDate: string;
+  publicPaymentUrl: string;
 };
 
 function escapeHtml(value: string) {
@@ -25,17 +26,10 @@ function escapeHtml(value: string) {
 }
 
 export async function buildReceivableEmail(data: ReceivableEmailData) {
-  const qrData = {
-    accountNumber: data.accountNumber,
-    amountHalere: data.amountHalere,
-    variableSymbol: data.variableSymbol,
-    message: data.paymentMessage,
-  };
-  const qrPng = await paymentQrPng(qrData);
+  const qrPng = await paymentQrPng(data.publicPaymentUrl);
   const detailUrl = absoluteAppUrl(`/dluhy/${data.receivableId}`);
   const scope = data.teamName ?? "Celý klub";
   const amount = formatCzk(data.amountHalere);
-  const descriptor = buildCzechPaymentDescriptor(qrData);
   const text = [
     `Nový předpis: ${data.assessmentTitle}`,
     `Sportovec: ${data.athleteName}`,
@@ -45,9 +39,9 @@ export async function buildReceivableEmail(data: ReceivableEmailData) {
     `Účet: ${data.accountNumber}`,
     `Variabilní symbol: ${data.variableSymbol}`,
     `Zpráva pro příjemce: ${data.paymentMessage}`,
-    `Detail a QR: ${detailUrl}`,
-    `Řetězec QR Platby: ${descriptor}`,
-    "Aplikace peníze nepřijímá ani nepřevádí; platba směřuje přímo na uvedený účet.",
+    `Veřejná platební stránka: ${data.publicPaymentUrl}`,
+    `Detail dluhu: ${detailUrl}`,
+    "Veřejná stránka vytvoří pouze simulovaný příchozí pohyb; aplikace peníze nepřijímá ani nepřevádí.",
   ].join("\n");
   const html = `
     <h1>${escapeHtml(data.assessmentTitle)}</h1>
@@ -60,9 +54,10 @@ export async function buildReceivableEmail(data: ReceivableEmailData) {
       <li>Variabilní symbol: ${escapeHtml(data.variableSymbol)}</li>
       <li>Zpráva: ${escapeHtml(data.paymentMessage)}</li>
     </ul>
-    <p><img src="cid:payment-qr" width="280" height="280" alt="QR Platba" /></p>
+    <p><img src="cid:payment-qr" width="280" height="280" alt="QR odkaz na veřejnou platební stránku" /></p>
+    <p><a href="${escapeHtml(data.publicPaymentUrl)}">Otevřít veřejnou platbu</a></p>
     <p><a href="${escapeHtml(detailUrl)}">Otevřít detail dluhu</a></p>
-    <p>Aplikace peníze nepřijímá ani nepřevádí; platba směřuje přímo na uvedený účet.</p>
+    <p>Veřejná stránka vytvoří pouze simulovaný příchozí pohyb; aplikace peníze nepřijímá ani nepřevádí.</p>
   `;
 
   return {
@@ -71,7 +66,7 @@ export async function buildReceivableEmail(data: ReceivableEmailData) {
     html,
     attachments: [
       {
-        filename: `qr-platba-${data.variableSymbol}.png`,
+        filename: `qr-verejna-platba-${data.variableSymbol}.png`,
         content: qrPng.toString("base64"),
         content_type: "image/png",
         content_id: "payment-qr",

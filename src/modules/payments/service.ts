@@ -695,7 +695,7 @@ export async function getManagerFinanceDashboard(
     join athletes ath on ath.id=r.athlete_id
     left join teams t on t.id=r.origin_team_id
     where ${condition}
-    order by ath.last_name, ath.first_name, a.due_date, a.created_at
+    order by ath.full_name, a.due_date, a.created_at
   `);
   const pendingClaims = await database.execute<{
     id: string;

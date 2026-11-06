@@ -16,6 +16,7 @@ import {
   reviewPaymentClaimsAction,
   sendBulkRemindersAction,
 } from "@/app/actions/payments";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { formatDateTimeInPrague, todayInPrague } from "@/lib/dates";
 import { requireUser } from "@/modules/auth/service";
@@ -62,6 +63,15 @@ function formatDueDate(value: string) {
     year: "numeric",
     timeZone: "Europe/Prague",
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toLocaleUpperCase("cs"))
+    .join("");
 }
 
 export default async function FinancePage({
@@ -149,52 +159,72 @@ export default async function FinancePage({
   const assessmentRows = Array.from(assessmentMap.values()).sort((left, right) =>
     left.dueDate.localeCompare(right.dueDate),
   );
+  const collectionPercentage = dashboard.totals.expectedHalere > 0
+    ? (dashboard.totals.collectedHalere / dashboard.totals.expectedHalere) * 100
+    : 0;
+  const collectionRate = Math.min(100, Math.max(0, collectionPercentage));
 
   return (
     <main className="dashboard-shell dashboard-home finance-admin-page">
-      <header className="dashboard-topbar">
-        <Link
-          className="dashboard-brand"
-          href="/prehled"
-          aria-label="Klubio – přehled"
-        >
-          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
-          <span>Klubio</span>
-        </Link>
-        <Link className="club-topbar-link" href={back}>Zpět</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: back, label: "Zpět" }}
+        context={{
+          kind: "teamId" in scope ? "Tým" : "Klub",
+          name: dashboard.name,
+          role: "Správa financí",
+          href: back,
+        }}
+        navigation={[
+          { href: back, label: "Přehled" },
+          { href: `/finance?${scopeQuery}`, label: "Finance", active: true },
+        ]}
+        primaryAction={{
+          href: `/predpisy/novy?${scopeQuery}`,
+          label: "Nový předpis",
+        }}
+        user={user}
+      />
       <section className="content-stack finance-admin-content">
         <header className="finance-admin-hero">
-          <div>
-            <p className="finance-admin-role">Správa financí</p>
-            <h1>Klubové finance</h1>
-            <p>
-              {dashboard.name}. Přehled předpisů a úhrad evidovaných v aplikaci.
-            </p>
+          <div className="finance-admin-hero-main">
+            <div>
+              <p className="finance-admin-role">
+                {"teamId" in scope ? "Finance týmu" : "Finance klubu"}
+              </p>
+              <h1>{dashboard.name}</h1>
+              <p>Předpisy, úhrady a otevřené finanční úkoly na jednom místě.</p>
+            </div>
+            <Link
+              className="finance-admin-hero-action"
+              href={`/predpisy/novy?${scopeQuery}`}
+            >
+              Vytvořit předpis
+            </Link>
           </div>
-          <Link
-            className="club-primary-action"
-            href={`/predpisy/novy?${scopeQuery}`}
-          >
-            Nový předpis
-          </Link>
+
+          <dl className="finance-overview" aria-label="Souhrn financí">
+            <div>
+              <dt>Předepsáno</dt>
+              <dd>{formatCzk(dashboard.totals.expectedHalere)}</dd>
+            </div>
+            <div>
+              <dt>Evidováno</dt>
+              <dd>{formatCzk(dashboard.totals.collectedHalere)}</dd>
+            </div>
+            <div>
+              <dt>Zbývá</dt>
+              <dd>{formatCzk(dashboard.totals.remainingHalere)}</dd>
+            </div>
+            <div className="finance-overview-progress">
+              <dt>
+                {Math.round(collectionPercentage)} % evidováno
+                {collectionPercentage > 100 ? " · přeplatek" : ""}
+              </dt>
+              <dd aria-hidden="true"><span style={{ width: `${collectionRate}%` }} /></dd>
+            </div>
+          </dl>
         </header>
         <Message error={query.error} success={query.success} />
-
-        <section className="finance-overview" aria-label="Souhrn financí">
-          <div>
-            <span>Předepsáno</span>
-            <strong>{formatCzk(dashboard.totals.expectedHalere)}</strong>
-          </div>
-          <div>
-            <span>Evidováno</span>
-            <strong>{formatCzk(dashboard.totals.collectedHalere)}</strong>
-          </div>
-          <div>
-            <span>Zbývá</span>
-            <strong>{formatCzk(dashboard.totals.remainingHalere)}</strong>
-          </div>
-        </section>
 
         <section className="finance-assessments" aria-labelledby="assessments-title">
           <header className="finance-assessments-header">
@@ -277,26 +307,30 @@ export default async function FinancePage({
           )}
         </section>
 
-        <div className="finance-advanced-heading">
-          <h2>Rozšířená správa</h2>
-          <p>Hlášení, ruční evidence, demo banka a upomínky.</p>
-        </div>
+        <section className="finance-workspace" aria-labelledby="finance-workspace-title">
+          <header className="finance-advanced-heading">
+            <div>
+              <h2 id="finance-workspace-title">Finanční operace</h2>
+              <p>Úkoly, které vyžadují rozhodnutí, a podpůrné nástroje pro správu plateb.</p>
+            </div>
+            <span>
+              {dashboard.pendingClaims.length + bankDashboard.movements.length} k vyřízení
+            </span>
+          </header>
 
+          <div className="finance-workspace-grid">
         <article className="panel finance-sync-settings">
           <header className="finance-sync-header">
             <div>
-              <h2>Nastavení automatické synchronizace účtu</h2>
+              <h2>Synchronizace účtu</h2>
               <p>
-                Zapněte pravidelné načítání nových pohybů a zrychlete jejich
-                párování s platbami členů. Ruční evidence i hlášení rodičů
-                zůstávají vždy dostupné.
+                Automatické načítání nových pohybů pro rychlejší párování plateb.
               </p>
             </div>
             <span>Demo zdroj</span>
           </header>
           <p className="finance-sync-notice">
-            V této verzi se načítají pouze simulované pohyby. Skutečné bankovní
-            API ani přístupový token nejsou připojené.
+            Načítají se pouze simulované pohyby. Skutečné bankovní API není připojené.
           </p>
           <div className="finance-sync-accounts">
             {bankDashboard.accounts.map((account) => (
@@ -325,7 +359,7 @@ export default async function FinancePage({
                   <form action={activateDemoIntegrationAction} className="finance-sync-action">
                     <ScopeFields scope={scope} />
                     <input name="bankAccountId" type="hidden" value={account.id} />
-                    <button type="submit">Zapnout automatickou synchronizaci</button>
+                    <button type="submit">Zapnout synchronizaci</button>
                   </form>
                 ) : null}
                 {!account.canReadRaw && account.integration_id ? (
@@ -338,11 +372,18 @@ export default async function FinancePage({
           </div>
         </article>
         {bankDashboard.accounts.some((account) => account.canReadRaw && account.integration_id) ? (
-          <article className="panel">
-            <h2>Fronta smíření demo pohybů ({bankDashboard.movements.length})</h2>
-            <p>Všechny položky mají neměnný původ <code>simulated</code>. Nejsou bankovně ověřeným převodem. Spojení s ruční událostí nevytváří novou alokaci.</p>
+          <article className="panel finance-reconciliation">
+            <header className="finance-panel-heading">
+              <span className="finance-panel-icon" aria-hidden="true">↔</span>
+              <div>
+                <h2>Demo pohyby k přiřazení</h2>
+                <p>Nejasné pohyby zůstávají zde, dokud je ručně nevyřešíte.</p>
+              </div>
+              <span className="finance-panel-count">{bankDashboard.movements.length}</span>
+            </header>
+            <p className="finance-panel-notice">Pohyby mají původ <code>simulated</code> a nejsou bankovně ověřeným převodem.</p>
             {bankDashboard.movements.length ? (
-              <div className="list-stack">
+              <div className="finance-reconciliation-list">
                 {bankDashboard.movements.map((movement) => {
                   const available = movement.amount_halere - movement.allocated_halere;
                   const debts = bankDashboard.debts.filter((debt) => debt.bank_account_id === movement.bank_account_id);
@@ -350,9 +391,10 @@ export default async function FinancePage({
                     (event) => event.bank_account_id === movement.bank_account_id && event.amount_halere === movement.amount_halere,
                   );
                   return (
-                    <div className="subcard" key={movement.id}>
+                    <div className="finance-reconciliation-item" key={movement.id}>
                       <p><strong>DEMO {formatCzk(movement.amount_halere)}</strong> · účet {movement.account_number} · VS {movement.variable_symbol ?? "neuveden"}</p>
                       <p>Přijato {formatDateTimeInPrague(movement.received_at)} · důvod fronty: {reconciliationReason(movement.reason_code)}</p>
+                      <p>Vstup pohybu: {movement.ingestion_origin === "public_qr" ? "veřejná QR platební stránka" : "přihlášený demo simulátor"}</p>
                       <p>Přiřazeno {formatCzk(movement.allocated_halere)}, volné {formatCzk(available)} · zdrojové ID <code>{movement.source_transaction_id}</code></p>
                       {movement.resolution_reason ? <p>Poslední rozhodnutí: {movement.resolution_reason}</p> : null}
                       {manualEvents.length && movement.allocated_halere === 0 ? (
@@ -412,10 +454,15 @@ export default async function FinancePage({
                   );
                 })}
               </div>
-            ) : <p>Žádné demo pohyby nečekají na rozhodnutí.</p>}
+            ) : (
+              <div className="finance-operation-empty">
+                <span aria-hidden="true">✓</span>
+                <div><strong>Fronta je prázdná</strong><small>Žádný demo pohyb nečeká na rozhodnutí.</small></div>
+              </div>
+            )}
           </article>
         ) : null}
-        <article className="panel">
+        <article className="panel finance-matrix-panel">
           <div className="section-heading">
             <div><h2>Člen × předpis</h2><p>Stav je odvozený z evidovaných platebních událostí a alokací.</p></div>
             <Link className="button-link button-secondary" href={`/finance?${scopeQuery}${onlyUnpaid ? "" : "&unpaid=1"}`}>
@@ -489,37 +536,65 @@ export default async function FinancePage({
             </div>
           ) : <p>V tomto filtru nejsou žádné dluhy.</p>}
         </article>
-        <article className="panel">
-          <h2>K potvrzení ({dashboard.pendingClaims.length})</h2>
-          <p>Hlášení rodiče není bankovně ověřený převod. Potvrzení pouze vytvoří auditovanou evidenci v aplikaci.</p>
+        <article className="panel finance-claims">
+          <header className="finance-panel-heading">
+            <span className="finance-panel-icon is-attention" aria-hidden="true">✓</span>
+            <div>
+              <h2>Platební hlášení</h2>
+              <p>Hlášení členů, která čekají na vaše potvrzení nebo zamítnutí.</p>
+            </div>
+            <span className="finance-panel-count is-attention">{dashboard.pendingClaims.length}</span>
+          </header>
+          <p className="finance-panel-notice">Potvrzení vytvoří auditovanou evidenci v aplikaci, nikoli bankovně ověřený převod.</p>
           {dashboard.pendingClaims.length ? (
-            <form action={reviewPaymentClaimsAction} className="form-stack">
+            <form action={reviewPaymentClaimsAction} className="finance-claim-form">
               <ScopeFields scope={scope} />
-              <div className="list-stack">
+              <div className="finance-claim-list">
                 {dashboard.pendingClaims.map((claim) => (
-                  <label className="subcard checkbox-label" key={claim.id}>
+                  <label className="finance-claim-row" key={claim.id}>
                     <input name="claimId" type="checkbox" value={claim.id} />
-                    <span><strong>{claim.athlete_name}</strong><br />{claim.assessment_title} · {formatCzk(claim.amount_halere)} · {claim.guardian_email}<br />Nahlášeno {formatDateTimeInPrague(claim.created_at)}</span>
+                    <span className="finance-claim-avatar" aria-hidden="true">{initials(claim.athlete_name)}</span>
+                    <span className="finance-claim-person">
+                      <strong>{claim.athlete_name}</strong>
+                      <small>{claim.guardian_email}</small>
+                    </span>
+                    <span className="finance-claim-assessment">
+                      <strong>{claim.assessment_title}</strong>
+                      <small>Nahlášeno {formatDateTimeInPrague(claim.created_at)}</small>
+                    </span>
+                    <strong className="finance-claim-amount">{formatCzk(claim.amount_halere)}</strong>
                   </label>
                 ))}
               </div>
-              <label>Důvod zamítnutí<input maxLength={300} name="rejectionReason" placeholder="Povinný jen při zamítnutí" /></label>
-              <div className="button-row">
+              <div className="finance-claim-actions">
+                <label>Důvod zamítnutí<input maxLength={300} name="rejectionReason" placeholder="Doplňte pouze při zamítnutí" /></label>
+                <div>
                 <button name="decision" type="submit" value="approved">Potvrdit vybrané</button>
                 <button className="button-secondary" name="decision" type="submit" value="rejected">Zamítnout vybrané</button>
+                </div>
               </div>
             </form>
-          ) : <p>Žádná hlášení nečekají.</p>}
+          ) : (
+            <div className="finance-operation-empty">
+              <span aria-hidden="true">✓</span>
+              <div><strong>Všechna hlášení jsou vyřízená</strong><small>Nová hlášení členů se zobrazí na tomto místě.</small></div>
+            </div>
+          )}
         </article>
-        <article className="panel">
-          <h2>Neutrální hromadná upomínka</h2>
-          <p>Automatický e-mail dostanou pouze aktuálně nezaplacené dluhy v tomto rozsahu. Odeslání nemění stav dluhu.</p>
+        <article className="panel finance-reminder">
+          <header className="finance-panel-heading">
+            <span className="finance-panel-icon" aria-hidden="true">✉</span>
+            <div><h2>Připomenout nezaplacené</h2><p>Jedna neutrální zpráva všem aktuálně nezaplaceným členům.</p></div>
+          </header>
           <form action={sendBulkRemindersAction}>
             <ScopeFields scope={scope} />
             <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-            <button type="submit">Připomenout všem nezaplaceným</button>
+            <button type="submit">Odeslat hromadnou upomínku</button>
           </form>
+          <small>Odeslání upomínky nemění stav dluhu ani nevytváří úhradu.</small>
         </article>
+          </div>
+        </section>
       </section>
     </main>
   );

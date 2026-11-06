@@ -65,3 +65,14 @@ Konkrétní pravidla pro účty, přeplatky, členství a opravy jsou v `docs/de
 - Opakované odeslání nesmí vytvořit druhý osobní profil, stejné nové dítě z jednoho formuláře ani duplicitní aktivní členství či čekající žádost.
 - Dluhy, QR a platební komunikace zůstávají na sportovci a jeho spravujícím účtu; změna reprezentace jména nemění existující ID ani finanční historii.
 
+# Upřesnění požadavků: veřejná QR platba
+
+- Jediný QR kód na detailu a v e-mailu obsahuje stejnou absolutní HTTPS URL veřejné platební stránky; SPD řetězec se již nevytváří ani nezobrazuje.
+- URL používá `PUBLIC_QR_BASE_URL`, ve výchozím stavu `https://rhinencephalic-offenselessly-serenity.ngrok-free.dev`, a nesmí obsahovat `localhost`.
+- Veřejná stránka nevyžaduje session a nezveřejňuje sportovce, rodiče, e-mail ani interní ID dluhu. Zobrazuje pouze účet, aktuální zbývající částku, VS a zprávu.
+- Odkaz je vázaný na jeden dluh, v databázi je jen hash deterministicky odvozeného tokenu a identifikátor vydání. Samostatné `PUBLIC_QR_TOKEN_SECRET` umožní stejnou URL znovu sestavit bez uložení surového tokenu.
+- GET nic nezaúčtuje. POST pod zámkem znovu načte historický účet, VS, zůstatek, čekající hlášení a ruční úhrady. Změněná částka vyžaduje nové potvrzení.
+- První úspěšné potvrzení spotřebuje odkaz a uloží vazbu na simulovaný pohyb. Dvojklik a souběh vracejí původní výsledek. Oprava finanční události odkaz neobnovuje.
+- Původ vstupu je `public_qr`, aktér anonymní finanční operace je `NULL`; zdroj pohybu i druh platební události zůstává `simulated`.
+- Automaticky nepřiřaditelný pohyb se zobrazí ve frontě smíření a veřejná stránka nesmí tvrdit, že je dluh zaplacený.
+

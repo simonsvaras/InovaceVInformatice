@@ -5,6 +5,7 @@ import {
   reviewJoinRequestAction,
   revokeInvitationAction,
 } from "@/app/actions/memberships";
+import { AppHeader } from "@/components/app-header";
 import { JoinCodeForm } from "@/components/join-code-form";
 import { MemberInviteForm } from "@/components/member-invite-form";
 import { Message } from "@/components/message";
@@ -16,10 +17,12 @@ import {
   getTeamMembershipDashboard,
 } from "@/modules/memberships/service";
 import { formatCzk } from "@/modules/payments/qr";
+import { getManagerFinanceDashboard } from "@/modules/payments/service";
 import { debtStatusLabel } from "@/modules/payments/status";
 
 type Query = { success?: string; error?: string; view?: string };
 type ManagerTeam = Awaited<ReturnType<typeof getTeamMembershipDashboard>>;
+type ManagerFinance = Awaited<ReturnType<typeof getManagerFinanceDashboard>>;
 type MemberTeam = Awaited<ReturnType<typeof getMemberTeamDashboard>>;
 type MemberFinance = Awaited<ReturnType<typeof getGuardianTeamFinance>>;
 
@@ -61,23 +64,38 @@ function MemberTeamView({
   team,
   finance,
   query,
+  user,
+  canManage,
 }: {
   team: MemberTeam;
   finance: MemberFinance;
   query: Query;
+  user: { displayName: string; email: string };
+  canManage: boolean;
 }) {
   const openDebts = finance.debts.filter((debt) => debt.remainingHalere > 0);
   const ownAthletes = new Set(team.managedMembers.map((member) => member.athleteId));
 
   return (
     <main className="dashboard-shell dashboard-home member-team-page">
-      <header className="dashboard-topbar">
-        <Link className="dashboard-brand" href="/prehled" aria-label="Klubio – přehled">
-          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
-          <span>Klubio</span>
-        </Link>
-        <Link className="club-topbar-link" href="/prehled">Zpět na přehled</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: "/prehled", label: "Přehled" }}
+        context={{
+          kind: "Tým",
+          name: team.name,
+          role: "Člen / rodič",
+          href: `/tymy/${team.id}?view=member`,
+        }}
+        navigation={[
+          { href: `/tymy/${team.id}?view=member`, label: "Přehled týmu", active: true },
+          { href: "#team-payments-title", label: "Moje platby" },
+          { href: "#team-history-title", label: "Historie" },
+          ...(canManage
+            ? [{ href: `/tymy/${team.id}`, label: "Správa týmu" }]
+            : []),
+        ]}
+        user={user}
+      />
 
       <section className="member-team-content">
         <Message error={query.error} success={query.success} />
@@ -200,84 +218,264 @@ function MemberTeamView({
   );
 }
 
-function ManagerTeamView({ team, query }: { team: ManagerTeam; query: Query }) {
+function ManagerTeamView({
+  team,
+  finance,
+  query,
+  user,
+}: {
+  team: ManagerTeam;
+  finance: ManagerFinance;
+  query: Query;
+  user: { displayName: string; email: string };
+}) {
+  const playerMap = new Map<
+    string,
+    {
+      membershipId: string;
+      fullName: string;
+      birthYear: number | null;
+      guardians: Array<{
+        relationship: string | null;
+        name: string;
+        email: string;
+      }>;
+    }
+  >();
+  for (const member of team.roster) {
+    const player = playerMap.get(member.membershipId) ?? {
+      membershipId: member.membershipId,
+      fullName: member.fullName,
+      birthYear: member.birthYear,
+      guardians: [],
+    };
+    player.guardians.push({
+      relationship: member.relationship,
+      name: member.guardianName,
+      email: member.guardianEmail,
+    });
+    playerMap.set(member.membershipId, player);
+  }
+  const players = [...playerMap.values()];
+  const openDebts = finance.debts
+    .filter((debt) => debt.remainingHalere > 0)
+    .sort((left, right) => left.due_date.localeCompare(right.due_date));
+  const paymentProgress = finance.totals.expectedHalere > 0
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          (finance.totals.collectedHalere / finance.totals.expectedHalere) * 100,
+        ),
+      )
+    : 0;
+
   return (
-    <main className="dashboard-shell">
-      <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubio</Link>
-        <Link href="/prehled">Přehled</Link>
-      </header>
-      <section className="content-stack">
-        <div><p className="eyebrow">Správa týmu</p><h1>{team.name}</h1></div>
+    <main className="dashboard-shell dashboard-home team-admin-page">
+      <AppHeader
+        backLink={{ href: "/prehled", label: "Přehled" }}
+        context={{
+          kind: "Tým",
+          name: team.name,
+          role: team.accessRole === "admin" ? "Správce klubu" : "Trenér",
+          href: `/tymy/${team.id}`,
+        }}
+        navigation={[
+          { href: `/tymy/${team.id}`, label: "Přehled týmu", active: true },
+          { href: `#manager-roster-title`, label: "Hráči" },
+          { href: `/finance?teamId=${team.id}`, label: "Finance" },
+          { href: "#team-tools-title", label: "Nastavení" },
+        ]}
+        primaryAction={{
+          href: `/predpisy/novy?teamId=${team.id}`,
+          label: "Nový předpis",
+        }}
+        user={user}
+      />
+
+      <section className="team-admin-content">
         <Message error={query.error} success={query.success} />
-        <article className="panel">
-          <h2>Předpisy a účet týmu</h2>
-          <p>Týmový účet je volitelný. Není-li nastaven, předpis použije výchozí účet klubu.</p>
-          <div className="button-row">
-            <Link className="button-link" href={`/predpisy/novy?teamId=${team.id}`}>Nový týmový předpis</Link>
-            <Link className="button-link button-secondary" href={`/finance?teamId=${team.id}`}>Platby a hlášení</Link>
+
+        <header className="team-admin-hero">
+          <div className="team-admin-hero-main">
+            <div>
+              <p>{team.clubName}</p>
+              <h1>{team.name}</h1>
+              <span>{team.accessRole === "admin" ? "Správa klubu a týmu" : "Trenérský přehled"}</span>
+            </div>
+            <div className="team-admin-hero-actions">
+              <Link href={`/predpisy/novy?teamId=${team.id}`}>Vytvořit předpis</Link>
+              <Link href={`/finance?teamId=${team.id}`}>Otevřít finance</Link>
+            </div>
           </div>
-          <form action={setTeamBankAccountAction} className="form-stack inline-form">
-            <input name="teamId" type="hidden" value={team.id} />
-            <label>Český účet týmu<input name="accountNumber" placeholder="19-2000145399/0800" required /></label>
-            <button className="button-secondary" type="submit">Uložit týmový účet</button>
-          </form>
-        </article>
-        <article className="panel">
-          <h2>Členové a žádosti</h2>
-          {team.pendingRequests.length ? (
-            <div className="list-stack">
-              {team.pendingRequests.map((request) => (
-                <section className="subcard" key={request.id}>
-                  <strong>{request.fullName}{request.birthYear ? ` (${request.birthYear})` : ""}</strong>
-                  <span>{request.relationship === "child" ? "Účet rodiče" : request.relationship === "self" ? "Vlastní účet" : "Spravující účet"}: {request.guardianName} · {request.guardianEmail}</span>
-                  <form action={reviewJoinRequestAction} className="button-row">
-                    <input name="teamId" type="hidden" value={team.id} />
-                    <input name="requestId" type="hidden" value={request.id} />
-                    <button name="decision" type="submit" value="approved">Schválit</button>
-                    <button className="button-secondary" name="decision" type="submit" value="rejected">Zamítnout</button>
-                  </form>
-                </section>
-              ))}
+
+          <dl className="team-admin-hero-stats">
+            <div><dt>Hráči</dt><dd>{players.length}</dd></div>
+            <div><dt>Čekající žádosti</dt><dd>{team.pendingRequests.length}</dd></div>
+            <div><dt>Aktivní pozvánky</dt><dd>{team.pendingInvitations.length}</dd></div>
+          </dl>
+        </header>
+
+        <section className="team-admin-finance" aria-labelledby="team-finance-title">
+          <header className="team-admin-section-heading">
+            <div>
+              <h2 id="team-finance-title">Platby týmu</h2>
+              <p>Aktuální stav všech týmových předpisů a evidovaných úhrad.</p>
             </div>
-          ) : <p>Žádná žádost nečeká na schválení.</p>}
-        </article>
-        <article className="panel">
-          <h2>Aktivní členové</h2>
-          {team.roster.length ? (
-            <div className="list-stack">
-              {team.roster.map((member) => (
-                <section className="subcard" key={member.membershipId}>
-                  <strong>{member.fullName}{member.birthYear ? ` (${member.birthYear})` : ""}</strong>
-                  <span>{member.relationship === "child" ? "Účet rodiče" : member.relationship === "self" ? "Vlastní účet" : "Spravující účet"}: {member.guardianName} · {member.guardianEmail}</span>
-                </section>
-              ))}
+            <Link href={`/finance?teamId=${team.id}`}>Zobrazit celý přehled</Link>
+          </header>
+
+          <div className="team-admin-finance-summary">
+            <div><span>Předepsáno</span><strong>{formatCzk(finance.totals.expectedHalere)}</strong></div>
+            <div><span>Evidováno</span><strong>{formatCzk(finance.totals.collectedHalere)}</strong></div>
+            <div><span>Zbývá</span><strong>{formatCzk(finance.totals.remainingHalere)}</strong></div>
+            <div className="team-admin-finance-progress">
+              <span>{Math.round(paymentProgress)} % uhrazeno</span>
+              <span><span style={{ width: `${paymentProgress}%` }} /></span>
             </div>
-          ) : <p>Tým zatím nemá aktivní členy.</p>}
-        </article>
-        <article className="panel">
-          <h2>E-mailové pozvánky</h2>
-          <p>Každý odkaz je jednorázový, platí 48 hodin a funguje jen s pozvaným e-mailem.</p>
-          <MemberInviteForm teamId={team.id} />
-          {team.pendingInvitations.length ? (
-            <div className="list-stack spaced-section">
-              <h3>Aktivní pozvánky</h3>
-              {team.pendingInvitations.map((invitation) => (
-                <form action={revokeInvitationAction} className="subcard" key={invitation.id}>
+          </div>
+
+          {openDebts.length ? (
+            <div className="team-admin-debt-list">
+              {openDebts.slice(0, 5).map((debt) => (
+                <div className="team-admin-debt" key={debt.id}>
+                  <span className="team-admin-avatar" aria-hidden="true">{initials(debt.athlete_name)}</span>
+                  <div>
+                    <strong>{debt.athlete_name}</strong>
+                    <span>{debt.assessment_title} · splatnost {formatDate(debt.due_date)}</span>
+                  </div>
+                  <span className={debt.status === "overdue" ? "status-overdue" : "status-open"}>
+                    {debtStatusLabel(debt.status)}
+                  </span>
+                  <strong>{formatCzk(debt.remainingHalere)}</strong>
+                </div>
+              ))}
+              {openDebts.length > 5 ? (
+                <Link className="team-admin-more" href={`/finance?teamId=${team.id}`}>
+                  Zobrazit dalších {openDebts.length - 5}
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <div className="team-admin-empty"><strong>Žádné otevřené platby.</strong><span>Všechny vystavené předpisy jsou vyřízené.</span></div>
+          )}
+        </section>
+
+        <div className="team-admin-workspace">
+          <section className="team-admin-roster" aria-labelledby="manager-roster-title">
+            <header className="team-admin-section-heading">
+              <div>
+                <h2 id="manager-roster-title">Soupiska</h2>
+                <p>Hráči a kontakty účtů, které jejich členství spravují.</p>
+              </div>
+              <span>{players.length}</span>
+            </header>
+
+            {players.length ? (
+              <div className="team-admin-player-grid">
+                {players.map((player) => (
+                  <article className="team-admin-player" key={player.membershipId}>
+                    <span className="team-admin-player-avatar" aria-hidden="true">{initials(player.fullName)}</span>
+                    <div className="team-admin-player-name">
+                      <h3>{player.fullName}</h3>
+                      <span>{player.birthYear ? `Ročník ${player.birthYear}` : "Rok narození neuveden"}</span>
+                    </div>
+                    <div className="team-admin-player-contact">
+                      {player.guardians.map((guardian) => (
+                        <div key={guardian.email}>
+                          <span>{guardian.relationship === "child" ? "Účet rodiče" : guardian.relationship === "self" ? "Vlastní účet" : "Spravující účet"}</span>
+                          <strong>{guardian.name}</strong>
+                          <a href={`mailto:${guardian.email}`}>{guardian.email}</a>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="team-admin-empty"><strong>Soupiska je zatím prázdná.</strong><span>Pozvěte první členy e-mailem nebo týmovým kódem.</span></div>
+            )}
+          </section>
+
+          <aside className="team-admin-sidebar">
+            {team.pendingRequests.length ? (
+              <section className="team-admin-requests" aria-labelledby="team-requests-title">
+                <header className="team-admin-section-heading">
+                  <div>
+                    <h2 id="team-requests-title">Žádosti o vstup</h2>
+                    <p>Čekají na vaše rozhodnutí.</p>
+                  </div>
+                  <span>{team.pendingRequests.length}</span>
+                </header>
+                <div className="team-admin-request-list">
+                  {team.pendingRequests.map((request) => (
+                    <article className="team-admin-request" key={request.id}>
+                      <div>
+                        <span className="team-admin-avatar" aria-hidden="true">{initials(request.fullName)}</span>
+                        <div><strong>{request.fullName}</strong><span>{request.guardianEmail}</span></div>
+                      </div>
+                      <form action={reviewJoinRequestAction}>
+                        <input name="teamId" type="hidden" value={team.id} />
+                        <input name="requestId" type="hidden" value={request.id} />
+                        <button name="decision" type="submit" value="approved">Přijmout</button>
+                        <button className="button-secondary" name="decision" type="submit" value="rejected">Zamítnout</button>
+                      </form>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <section className="team-admin-invite" aria-labelledby="team-invite-title">
+              <header className="team-admin-section-heading">
+                <div>
+                  <h2 id="team-invite-title">Přidat členy</h2>
+                  <p>Pošlete jednorázovou pozvánku rodičům nebo hráčům.</p>
+                </div>
+              </header>
+              <div className="team-admin-invite-body">
+                <MemberInviteForm teamId={team.id} />
+              </div>
+              {team.pendingInvitations.length ? (
+                <div className="team-admin-invitation-list">
+                  <strong>Aktivní pozvánky</strong>
+                  {team.pendingInvitations.map((invitation) => (
+                    <form action={revokeInvitationAction} key={invitation.id}>
+                      <input name="teamId" type="hidden" value={team.id} />
+                      <input name="invitationId" type="hidden" value={invitation.id} />
+                      <span>{invitation.email}</span>
+                      <button type="submit">Zrušit</button>
+                    </form>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="team-admin-tools" aria-labelledby="team-tools-title">
+              <header className="team-admin-section-heading">
+                <div><h2 id="team-tools-title">Nastavení týmu</h2><p>Vstupní kód a účet pro nové předpisy.</p></div>
+              </header>
+
+              <details className="team-admin-tool">
+                <summary><span>Týmový kód</span><small>Vstup se schválením</small></summary>
+                <div><p>Kód vytvoří žádost, neposkytne přímý přístup k datům.</p><JoinCodeForm teamId={team.id} /></div>
+              </details>
+
+              <details className="team-admin-tool">
+                <summary>
+                  <span>Účet pro předpisy</span>
+                  <small>{team.hasOwnAccount ? "Vlastní účet týmu" : "Výchozí účet klubu"}</small>
+                </summary>
+                <form action={setTeamBankAccountAction} className="team-admin-account-form">
                   <input name="teamId" type="hidden" value={team.id} />
-                  <input name="invitationId" type="hidden" value={invitation.id} />
-                  <span>{invitation.kind === "coach" ? "Trenér" : "Člen"}: {invitation.email}</span>
-                  <button className="button-secondary" type="submit">Zrušit pozvánku</button>
+                  <p>Aktuálně používaný účet: <strong>{team.accountNumber || "není nastaven"}</strong></p>
+                  <label>Nový český účet<input name="accountNumber" placeholder="19-2000145399/0800" required /></label>
+                  <button type="submit">Uložit účet týmu</button>
                 </form>
-              ))}
-            </div>
-          ) : null}
-        </article>
-        <article className="panel">
-          <h2>Sdílený týmový kód</h2>
-          <p>Kód neposkytne přístup k datům. Vytvoří pouze žádost, kterou musí trenér nebo správce schválit.</p>
-          <JoinCodeForm teamId={team.id} />
-        </article>
+              </details>
+            </section>
+          </aside>
+        </div>
       </section>
     </main>
   );
@@ -300,9 +498,20 @@ export default async function TeamPage({
       getMemberTeamDashboard(user.id, teamId),
       getGuardianTeamFinance(user.id, teamId),
     ]);
-    return <MemberTeamView finance={finance} query={query} team={team} />;
+    return (
+      <MemberTeamView
+        canManage={access.canManage}
+        finance={finance}
+        query={query}
+        team={team}
+        user={user}
+      />
+    );
   }
 
-  const team = await getTeamMembershipDashboard(user.id, teamId);
-  return <ManagerTeamView query={query} team={team} />;
+  const [team, finance] = await Promise.all([
+    getTeamMembershipDashboard(user.id, teamId),
+    getManagerFinanceDashboard(user.id, { teamId }),
+  ]);
+  return <ManagerTeamView finance={finance} query={query} team={team} user={user} />;
 }

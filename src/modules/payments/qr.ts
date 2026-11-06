@@ -1,12 +1,5 @@
 import QRCode from "qrcode";
 
-type PaymentData = {
-  accountNumber: string;
-  amountHalere: number;
-  variableSymbol: string;
-  message: string;
-};
-
 function mod97(value: string) {
   let remainder = 0;
   for (const digit of value) {
@@ -34,21 +27,16 @@ export function formatCzk(amountHalere: number): string {
   }).format(amountHalere / 100);
 }
 
-export function buildCzechPaymentDescriptor(data: PaymentData): string {
-  const amount = (data.amountHalere / 100).toFixed(2);
-  const message = data.message.replace(/\*/g, " ").trim().slice(0, 60);
-  return [
-    "SPD*1.0",
-    `ACC:${domesticAccountToIban(data.accountNumber)}`,
-    `AM:${amount}`,
-    "CC:CZK",
-    `X-VS:${data.variableSymbol}`,
-    `MSG:${message}`,
-  ].join("*");
+function requirePublicHttpsUrl(value: string) {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || url.hostname.toLowerCase() === "localhost") {
+    throw new Error("Public payment QR must contain an absolute HTTPS URL.");
+  }
+  return url.toString();
 }
 
-export async function paymentQrPng(data: PaymentData): Promise<Buffer> {
-  return QRCode.toBuffer(buildCzechPaymentDescriptor(data), {
+export async function paymentQrPng(publicPaymentUrl: string): Promise<Buffer> {
+  return QRCode.toBuffer(requirePublicHttpsUrl(publicPaymentUrl), {
     type: "png",
     errorCorrectionLevel: "M",
     margin: 2,
@@ -56,8 +44,8 @@ export async function paymentQrPng(data: PaymentData): Promise<Buffer> {
   });
 }
 
-export async function paymentQrDataUrl(data: PaymentData): Promise<string> {
-  return QRCode.toDataURL(buildCzechPaymentDescriptor(data), {
+export async function paymentQrDataUrl(publicPaymentUrl: string): Promise<string> {
+  return QRCode.toDataURL(requirePublicHttpsUrl(publicPaymentUrl), {
     errorCorrectionLevel: "M",
     margin: 2,
     width: 420,

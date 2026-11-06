@@ -698,7 +698,20 @@ export async function requestJoinByCode(input: {
 export async function getTeamMembershipDashboard(userId: string, teamId: string) {
   const team = await requireTeamManagementAccess(userId, teamId);
   const database = getDatabase();
-  const [roster, pendingRequests, pendingInvitations] = await Promise.all([
+  const [teamMetaRows, roster, pendingRequests, pendingInvitations] = await Promise.all([
+    database
+      .select({
+        clubName: clubs.name,
+        accountNumber: sql<string | null>`coalesce(
+          (select account_number from bank_accounts where id = ${teams.bankAccountId}),
+          (select account_number from bank_accounts where club_id = ${teams.clubId} and is_default = true limit 1)
+        )`,
+        hasOwnAccount: sql<boolean>`${teams.bankAccountId} is not null`,
+      })
+      .from(teams)
+      .innerJoin(clubs, eq(clubs.id, teams.clubId))
+      .where(eq(teams.id, teamId))
+      .limit(1),
     database
       .select({
         membershipId: memberships.id,
@@ -766,7 +779,16 @@ export async function getTeamMembershipDashboard(userId: string, teamId: string)
       .orderBy(invitations.createdAt),
   ]);
 
-  return { ...team, roster, pendingRequests, pendingInvitations };
+  const [teamMeta] = teamMetaRows;
+  return {
+    ...team,
+    clubName: teamMeta?.clubName ?? "",
+    accountNumber: teamMeta?.accountNumber ?? "",
+    hasOwnAccount: teamMeta?.hasOwnAccount ?? false,
+    roster,
+    pendingRequests,
+    pendingInvitations,
+  };
 }
 
 export async function revokeInvitation(input: {
