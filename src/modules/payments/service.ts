@@ -42,9 +42,20 @@ function isUniqueViolation(error: unknown) {
   );
 }
 
-function scopeFingerprint(scope: PaymentScope) {
+function scopeFingerprint(
+  scope: PaymentScope,
+  target?: { assessmentId: string; receivableId: string },
+) {
+  const payload = target
+    ? {
+        scope: scope.teamId ? { teamId: scope.teamId } : { clubId: scope.clubId },
+        target,
+      }
+    : scope.teamId
+      ? { teamId: scope.teamId }
+      : { clubId: scope.clubId };
   return createHash("sha256")
-    .update(JSON.stringify(scope.teamId ? { teamId: scope.teamId } : { clubId: scope.clubId }))
+    .update(JSON.stringify(payload))
     .digest("hex");
 }
 
@@ -861,8 +872,9 @@ export async function sendBulkReminders(input: {
   actorUserId: string;
   scope: PaymentScope;
   idempotencyKey: string;
+  target?: { assessmentId: string; receivableId: string };
 }) {
-  const fingerprint = scopeFingerprint(input.scope);
+  const fingerprint = scopeFingerprint(input.scope, input.target);
   await authorizeManagerRead(input.actorUserId, input.scope);
   const existing = await existingReminderBatch({
     actorUserId: input.actorUserId,
@@ -886,6 +898,9 @@ export async function sendBulkReminders(input: {
       const condition = scope.teamId
         ? sql`a.team_id=${scope.teamId} and r.origin_team_id=${scope.teamId}`
         : sql`a.club_id=${scope.clubId}`;
+      const targetCondition = input.target
+        ? sql`${condition} and a.id=${input.target.assessmentId} and r.id=${input.target.receivableId}`
+        : condition;
       const [batch] = await transaction
         .insert(reminderBatches)
         .values({
@@ -919,7 +934,7 @@ export async function sendBulkReminders(input: {
         join athlete_guardians ag on ag.athlete_id=ath.id
         join users u on u.id=ag.user_id
         left join teams t on t.id=r.origin_team_id
-        where ${condition}
+        where ${targetCondition}
           and r.amount_halere - coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0) > 0
         order by u.email, a.due_date
       `);
@@ -967,7 +982,10 @@ export async function sendBulkReminders(input: {
         eventType: "payment_reminder.batch_created",
         targetType: "reminder_batch",
         targetId: batch.id,
-        details: { recipientCount: recipients.length },
+        details: {
+          recipientCount: recipients.length,
+          ...(input.target ?? {}),
+        },
       });
       return { batchId: batch.id, recipients };
     });

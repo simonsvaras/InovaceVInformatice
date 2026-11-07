@@ -725,6 +725,21 @@ export async function getAssessmentManagerView(userId: string, assessmentId: str
       guardianEmail: users.email,
       deliveryStatus: notificationDeliveries.status,
       deliveryError: notificationDeliveries.errorCode,
+      allocatedHalere: sql<number>`coalesce(
+        (select sum(${paymentAllocations.amountHalere})
+           from ${paymentAllocations}
+          where ${paymentAllocations.receivableId}=${receivables.id}),
+        0
+      )::int`,
+      lastReminderAt: sql<Date | string | null>`(
+        select max(delivery.sent_at)
+          from reminder_recipients reminder
+          join notification_deliveries delivery
+            on delivery.kind='payment_reminder'
+           and delivery.reference_id=reminder.id
+         where reminder.receivable_id=${receivables.id}
+           and delivery.status='sent'
+      )`,
     })
     .from(receivables)
     .innerJoin(athletes, eq(athletes.id, receivables.athleteId))

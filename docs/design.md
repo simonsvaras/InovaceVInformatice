@@ -99,8 +99,10 @@ Na šířce telefonu má být nejdůležitější údaj a akce vidět bez vodoro
 
 - `/finance` používá stejnou vizuální hierarchii jako manažerský detail týmu. Tmavě modrý banner nese identitu rozsahu, hlavní akci a souhrn předepsáno, evidováno, zbývá a průběh evidence; nejde o tvrzení bankovně ověřené inkasované částky.
 - Předpisy zůstávají hlavním pracovním seznamem. Finanční operace jsou seskupené podle úkolu: synchronizace účtu, demo pohyby k přiřazení, detailní matice člen × předpis, platební hlášení a hromadná upomínka.
-- Čekající hlášení používají kompaktní řádky se sportovcem, kontaktem, předpisem, časem a částkou. Potvrzení a zamítnutí zůstává hromadné; text výslovně říká, že potvrzení vytváří evidenci, nikoli bankovní ověření.
-- Prázdná fronta pohybů nebo hlášení se zobrazuje jako krátký stav vyřízení, nikoli jako vysoký prázdný panel. Technické demo upozornění zůstává viditelné, ale vizuálně nepřebíjí úkoly uživatele.
+- Čekající hlášení používají kompaktní řádky se sportovcem, kontaktem, předpisem, časem a částkou. Potvrzení a zamítnutí zůstává hromadné.
+- Prázdná fronta pohybů nebo hlášení se zobrazuje jako krátký stav vyřízení, nikoli jako vysoký prázdný panel.
+- Původní tabulka „Člen × předpis“ je nahrazena responzivní členskou účetní knihou. Každý člen má jeden kompaktní rozbalovací řádek se jménem, celkovým počtem předpisů, počtem předpisů k vyřízení a zbývající částkou. Akce „Zobrazit předpisy“ teprve otevře mřížku skutečně existujících předpisů, takže základní přehled zůstává rychle skenovatelný bez prázdných buněk a vodorovného posouvání.
+- Karta předpisu ukazuje stav, splatnost, předepsanou, evidovanou a zbývající částku či přeplatek, průběh evidence, čekající hlášení a poslední upomínku. Zápis hotovosti, historie původu událostí a nedestruktivní oprava zůstávají přímo u daného dluhu.
 
 # Oprava obrazovek vstupu člena
 

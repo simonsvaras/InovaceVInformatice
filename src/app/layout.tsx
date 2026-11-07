@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Klubio — školní demo",
+  title: "Klubio",
   description:
     "Jednoduchá evidence klubových předpisů a úhrad pro správce, trenéry a rodiče.",
 };

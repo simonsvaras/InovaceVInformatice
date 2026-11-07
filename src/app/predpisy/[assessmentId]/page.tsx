@@ -1,6 +1,11 @@
+import { randomUUID } from "node:crypto";
+
 import Link from "next/link";
 
-import { retryReceivableDeliveryAction } from "@/app/actions/assessments";
+import {
+  retryReceivableDeliveryAction,
+  sendAssessmentReminderAction,
+} from "@/app/actions/assessments";
 import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
@@ -28,6 +33,15 @@ function deliveryPresentation(status: string | null) {
     return { label: "Doručení selhalo", className: "assessment-delivery-failed" };
   }
   return { label: "Čeká na odeslání", className: "assessment-delivery-pending" };
+}
+
+function formatReminderDate(value: Date | string | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("cs-CZ", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Europe/Prague",
+  }).format(new Date(value));
 }
 
 function initials(name: string) {
@@ -58,8 +72,12 @@ export default async function AssessmentPage({
   const deliveredCount = assessment.debts.filter(
     (debt) => debt.deliveryStatus === "sent",
   ).length;
-  const deliveryRate = assessment.debts.length
-    ? Math.round((deliveredCount / assessment.debts.length) * 100)
+  const paidCount = assessment.debts.filter(
+    (debt) => debt.allocatedHalere >= assessment.amountHalere,
+  ).length;
+  const unpaidCount = assessment.debts.length - paidCount;
+  const paidRate = assessment.debts.length
+    ? Math.round((paidCount / assessment.debts.length) * 100)
     : 0;
   const totalExpectedHalere = assessment.amountHalere * assessment.debts.length;
 
@@ -127,13 +145,17 @@ export default async function AssessmentPage({
           </article>
           <article>
             <div className="assessment-rate-heading">
-              <span>Úspěšnost doručení</span>
-              <strong>{deliveryRate} %</strong>
+              <span>Zaplaceno / nezaplaceno</span>
+              <strong>{paidRate} %</strong>
             </div>
-            <span className="assessment-rate-track">
-              <span style={{ width: `${deliveryRate}%` }} />
+            <span className="assessment-rate-track assessment-payment-rate-track">
+              <span className="is-paid" style={{ width: `${paidRate}%` }} />
+              <span className="is-unpaid" style={{ width: `${100 - paidRate}%` }} />
             </span>
-            <small>Nejde o stav zaplacení.</small>
+            <span className="assessment-payment-legend">
+              <span><i className="is-paid" /> {paidCount} zaplaceno</span>
+              <span><i className="is-unpaid" /> {unpaidCount} nezaplaceno</span>
+            </span>
           </article>
         </section>
 
@@ -149,7 +171,7 @@ export default async function AssessmentPage({
           <header className="assessment-members-header">
             <div>
               <h2 id="members-title">Adresáti předpisu</h2>
-              <p>Stav níže popisuje doručení platebních údajů, nikoli úhradu.</p>
+              <p>Stav úhrady, doručení platebních údajů a poslední upozornění.</p>
             </div>
             <span>{assessment.debts.length}</span>
           </header>
@@ -158,6 +180,8 @@ export default async function AssessmentPage({
             <span>Člen</span>
             <span>Platební údaje</span>
             <span>Doručení</span>
+            <span>Status platby</span>
+            <span>Datum posledního upozornění</span>
             <span>Částka</span>
             <span>Akce</span>
           </div>
@@ -165,6 +189,7 @@ export default async function AssessmentPage({
           <div className="assessment-member-list">
             {assessment.debts.map((debt) => {
               const delivery = deliveryPresentation(debt.deliveryStatus);
+              const isPaid = debt.allocatedHalere >= assessment.amountHalere;
               return (
                 <article className="assessment-member-row" key={debt.id}>
                   <div className="assessment-member-person">
@@ -184,10 +209,36 @@ export default async function AssessmentPage({
                     <span className={delivery.className}>{delivery.label}</span>
                     {debt.deliveryError ? <small>{debt.deliveryError}</small> : null}
                   </div>
+                  <div className="assessment-member-status">
+                    <span className={isPaid ? "is-paid" : "is-unpaid"}>
+                      {isPaid ? "Zaplaceno" : "Nezaplaceno"}
+                    </span>
+                  </div>
+                  <time
+                    className="assessment-member-reminder"
+                    dateTime={debt.lastReminderAt ? new Date(debt.lastReminderAt).toISOString() : undefined}
+                  >
+                    {formatReminderDate(debt.lastReminderAt)}
+                  </time>
                   <strong className="assessment-member-amount">
                     {formatCzk(assessment.amountHalere)}
                   </strong>
                   <div className="assessment-member-action">
+                    {!isPaid ? (
+                      <form action={sendAssessmentReminderAction}>
+                        <input name="assessmentId" type="hidden" value={assessment.id} />
+                        <input name="receivableId" type="hidden" value={debt.id} />
+                        <input
+                          name={assessment.teamId ? "teamId" : "clubId"}
+                          type="hidden"
+                          value={assessment.teamId ?? assessment.clubId}
+                        />
+                        <input name="idempotencyKey" type="hidden" value={randomUUID()} />
+                        <button className="button-secondary" type="submit">
+                          Odeslat oznámení
+                        </button>
+                      </form>
+                    ) : null}
                     {debt.deliveryStatus !== "sent" ? (
                       <form action={retryReceivableDeliveryAction}>
                         <input name="assessmentId" type="hidden" value={assessment.id} />
@@ -196,9 +247,9 @@ export default async function AssessmentPage({
                           Zkusit znovu
                         </button>
                       </form>
-                    ) : (
+                    ) : isPaid ? (
                       <span aria-label="Bez dostupné akce">—</span>
-                    )}
+                    ) : null}
                   </div>
                 </article>
               );

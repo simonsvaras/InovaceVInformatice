@@ -109,6 +109,9 @@ export const notificationDeliveries = pgTable(
       table.referenceId,
       table.userId,
     ),
+    uniqueIndex("notification_kind_reference_anonymous_idx")
+      .on(table.kind, table.referenceId)
+      .where(sql`${table.userId} is null and ${table.referenceId} is not null`),
   ],
 );
 
@@ -391,6 +394,7 @@ export const invitations = pgTable(
       .references(() => teams.id, { onDelete: "restrict" }),
     email: varchar("email", { length: 320 }).notNull(),
     tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    idempotencyKey: uuid("idempotency_key"),
     replaceExistingCoach: boolean("replace_existing_coach")
       .notNull()
       .default(false),
@@ -410,6 +414,9 @@ export const invitations = pgTable(
   (table) => [
     index("invitations_team_id_idx").on(table.teamId),
     index("invitations_email_idx").on(table.email),
+    uniqueIndex("invitations_request_email_idx")
+      .on(table.teamId, table.kind, table.idempotencyKey, table.email)
+      .where(sql`${table.idempotencyKey} is not null`),
   ],
 );
 

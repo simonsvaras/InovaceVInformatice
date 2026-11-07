@@ -16,7 +16,7 @@ export function AuthCard({
       <AppHeader guestAction={headerAction} />
       <main className="auth-shell">
         <section className="panel auth-card">
-          <p className="eyebrow">Školní demo</p>
+          <p className="eyebrow">Klubová agenda</p>
           <h1>{title}</h1>
           <p>{intro}</p>
           {children}

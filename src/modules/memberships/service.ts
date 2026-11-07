@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { PostgresJsTransaction } from "drizzle-orm/postgres-js";
@@ -20,7 +22,6 @@ import {
 } from "@/db/schema";
 import {
   createHumanCode,
-  createOpaqueToken,
   hashOpaqueToken,
 } from "@/lib/tokens";
 import { InputError, normalizeEmail } from "@/lib/validation";
@@ -94,6 +95,18 @@ function assertLockedTeamAccess(access: LockedTeamAccess | undefined) {
   return access;
 }
 
+function memberInvitationToken(input: {
+  email: string;
+  idempotencyKey: string;
+  teamId: string;
+}) {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET must be configured.");
+  return createHmac("sha256", secret)
+    .update(`member-invitation:${input.teamId}:${input.idempotencyKey}:${input.email}`)
+    .digest("base64url");
+}
+
 export function parseInvitationEmails(value: string): string[] {
   const rawEmails = value
     .split(/[\s,;]+/)
@@ -119,15 +132,32 @@ export async function createMemberInvitations(input: {
   actorUserId: string;
   teamId: string;
   emails: string[];
+  idempotencyKey: string;
 }) {
   await requireTeamManagementAccess(input.actorUserId, input.teamId);
-  await consumeRateLimit("member_invitation", input.actorUserId, 10, 15);
   const database = getDatabase();
   const expiresAt = new Date(Date.now() + MEMBER_INVITATION_HOURS * 3_600_000);
   const prepared = input.emails.map((email) => ({
     email,
-    rawToken: createOpaqueToken(),
+    rawToken: memberInvitationToken({
+      email,
+      idempotencyKey: input.idempotencyKey,
+      teamId: input.teamId,
+    }),
   }));
+  let links: Array<{ email: string; link: string }>;
+  try {
+    links = prepared.map((item) => ({
+      email: item.email,
+      link: absoluteAppUrl(`/pozvanka/${item.rawToken}`),
+    }));
+  } catch {
+    throw new InputError(
+      "public_url_misconfigured",
+      "Odkaz pozvánky nelze vytvořit. Zkontrolujte nastavení veřejné adresy aplikace.",
+    );
+  }
+  await consumeRateLimit("member_invitation", input.actorUserId, 10, 15);
 
   const teamContext = await database.transaction(async (transaction) => {
     const [locked] = await transaction.execute<LockedTeamAccess>(
@@ -135,6 +165,48 @@ export async function createMemberInvitations(input: {
     );
     const context = assertLockedTeamAccess(locked);
 
+    const existingBatch = await transaction
+      .select({
+        id: invitations.id,
+        email: invitations.email,
+        consumedAt: invitations.consumedAt,
+        revokedAt: invitations.revokedAt,
+      })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.teamId, input.teamId),
+          eq(invitations.kind, "member"),
+          eq(invitations.idempotencyKey, input.idempotencyKey),
+        ),
+      );
+    if (existingBatch.length) {
+      const expectedEmails = [...input.emails].sort();
+      const existingEmails = existingBatch.map((item) => item.email).sort();
+      if (
+        expectedEmails.length !== existingEmails.length ||
+        expectedEmails.some((email, index) => email !== existingEmails[index])
+      ) {
+        throw new InputError(
+          "idempotency_conflict",
+          "Tento formulář už byl použit s jinými adresami.",
+        );
+      }
+      if (existingBatch.some((item) => item.consumedAt || item.revokedAt)) {
+        throw new InputError(
+          "invitation_closed",
+          "Tento požadavek už byl zpracován a pozvánka není aktivní.",
+        );
+      }
+      const idsByEmail = new Map(existingBatch.map((item) => [item.email, item.id]));
+      return {
+        teamName: context.team_name,
+        clubName: context.club_name,
+        invitationIds: links.map((item) => idsByEmail.get(item.email)!),
+      };
+    }
+
+    const invitationIds: string[] = [];
     for (const item of prepared) {
       await transaction
         .update(invitations)
@@ -156,10 +228,12 @@ export async function createMemberInvitations(input: {
           teamId: input.teamId,
           email: item.email,
           tokenHash: hashOpaqueToken(item.rawToken),
+          idempotencyKey: input.idempotencyKey,
           expiresAt,
           createdByUserId: input.actorUserId,
         })
         .returning({ id: invitations.id });
+      invitationIds.push(created.id);
       await transaction.insert(auditEvents).values({
         actorUserId: input.actorUserId,
         clubId: context.club_id,
@@ -170,26 +244,36 @@ export async function createMemberInvitations(input: {
       });
     }
 
-    return { teamName: context.team_name, clubName: context.club_name };
+    return {
+      teamName: context.team_name,
+      clubName: context.club_name,
+      invitationIds,
+    };
   });
 
-  const links = prepared.map((item) => ({
-    email: item.email,
-    link: absoluteAppUrl(`/pozvanka/${item.rawToken}`),
-  }));
-
-  await Promise.all(
-    links.map((item) =>
-      sendTransactionalEmail({
-        recipient: item.email,
-        kind: "member_invitation",
-        subject: `Pozvání do týmu — ${teamContext.teamName}`,
-        text: `Byli jste pozváni ke vstupu do týmu ${teamContext.teamName} v klubu ${teamContext.clubName}. Jednorázový odkaz platí ${MEMBER_INVITATION_HOURS} hodin: ${item.link}`,
-      }),
-    ),
+  const deliveries = await Promise.all(
+    links.map(async (item, index) => {
+      try {
+        return await sendTransactionalEmail({
+          recipient: item.email,
+          kind: "member_invitation",
+          referenceId: teamContext.invitationIds[index],
+          subject: `Pozvání do týmu — ${teamContext.teamName}`,
+          text: `Byli jste pozváni ke vstupu do týmu ${teamContext.teamName} v klubu ${teamContext.clubName}. Jednorázový odkaz platí ${MEMBER_INVITATION_HOURS} hodin: ${item.link}`,
+        });
+      } catch {
+        return { delivered: false as const, reason: "delivery_failed" };
+      }
+    }),
   );
 
-  return { links, expiresAt };
+  return {
+    links,
+    expiresAt,
+    failedEmails: links
+      .filter((_item, index) => !deliveries[index]?.delivered)
+      .map((item) => item.email),
+  };
 }
 
 export async function generateTeamJoinCode(actorUserId: string, teamId: string) {

@@ -84,7 +84,7 @@ export default async function NewAssessmentPage({
               <span>Sportovec ve více týmech dostane jediný dluh.</span>
             </div>
           )}
-          <p>Potvrzením vzniknou jednotlivé dluhy. Aplikace peníze nepřijímá ani nepřevádí.</p>
+          <p>Potvrzením vzniknou jednotlivé dluhy.</p>
           <button disabled={!context.athletes.length} type="submit">Vytvořit předpis</button>
         </form>
       </section>

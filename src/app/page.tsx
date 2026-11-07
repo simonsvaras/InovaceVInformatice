@@ -37,9 +37,6 @@ export default async function Home() {
             </div>
           )}
 
-          <p className="home-disclaimer">
-            Klubio peníze neposílá ani nepřijímá. Pouze eviduje jejich stav.
-          </p>
         </div>
 
         <div className="home-ledger" aria-hidden="true">

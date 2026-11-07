@@ -84,15 +84,12 @@ export default async function ReceivablePage({
                 <p>Naskenujte QR v bankovní aplikaci. Obsahuje účet, aktuální zbývající částku, variabilní symbol a zprávu.</p>
               </>
             ) : <p>Dluh je podle evidovaných platebních událostí uhrazen.</p>}
-            {debt.remainingHalere > 0 ? (
-              <p>Platbu potvrzujete ve své bance. Aplikace peníze nepřijímá ani nepřevádí. Ruční hlášení „Zaplatil jsem“ zůstává dostupné.</p>
-            ) : null}
           </div>
         </article>
         {debt.hasSimulatedPayment ? (
           <article className="panel">
-            <h2>Demo automatická kontrola</h2>
-            <p>Část evidované úhrady pochází ze simulovaného pohybu (<code>simulated</code>). Nejde o potvrzení skutečného ani bankovně ověřeného převodu a aplikace není spojena s Fio.</p>
+            <h2>Zdroj úhrady</h2>
+            <p>Simulovaný pohyb</p>
           </article>
         ) : null}
         {debt.hasFioPayment ? (
@@ -103,13 +100,13 @@ export default async function ReceivablePage({
         ) : debt.fioIntegrationEnabled && debt.remainingHalere > 0 ? (
           <article className="panel">
             <h2>Automatická kontrola banky</h2>
-            <p>Příchozí pohyby se kontrolují automaticky. Propis platby může chvíli trvat; „Zaplatil jsem“ můžete použít i nadále.</p>
+            <p>Příchozí pohyby se průběžně kontrolují.</p>
           </article>
         ) : null}
         {debt.pendingClaimId ? (
           <article className="panel">
             <h2>Hlášení o odeslané platbě</h2>
-            <p><strong>{formatCzk(debt.pendingClaimAmountHalere ?? 0)}</strong> čeká na potvrzení. Jde pouze o vaše hlášení, nikoli bankovně ověřený převod.</p>
+            <p><strong>{formatCzk(debt.pendingClaimAmountHalere ?? 0)}</strong> čeká na potvrzení.</p>
             <form action={withdrawManualPaymentAction}>
               <input name="receivableId" type="hidden" value={debt.id} />
               <input name="claimId" type="hidden" value={debt.pendingClaimId} />
@@ -119,7 +116,7 @@ export default async function ReceivablePage({
         ) : debt.remainingHalere > 0 ? (
           <article className="panel">
             <h2>Zaplatil jsem</h2>
-            <p>Nahlaste částku, kterou jste odeslali. Hlášení čeká na vyřízení trenérem či správcem; samo nepotvrzuje, že klub peníze přijal, a není bankovně ověřeným převodem.</p>
+            <p>Nahlaste částku, kterou jste odeslali.</p>
             <form action={reportManualPaymentAction} className="form-stack inline-form">
               <input name="receivableId" type="hidden" value={debt.id} />
               <label>Částka v Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} min="0.01" name="amount" required step="0.01" type="number" /></label>

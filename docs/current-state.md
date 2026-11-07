@@ -199,6 +199,16 @@ Aktualizováno: 2026-11-06.
 - Read-only `code-reviewer` nenašel únik správy ani osobních údajů. Jeho dvě nízké připomínky byly přijaty: štítek aktivního týmu vyžaduje vedle uložené preference také aktuální trenérskou roli a počty týmů používají správné české tvary pro 0, 1, 2–4 a 5 a více.
 - Automatizované testy ani testovací soubory nevznikly. Build, lint, aplikace a ruční vizuální ověření nebyly v tomto kroku spuštěny.
 
+# Nová komponenta přehledu členů a předpisů (2026-11-07, neověřeno spuštěním)
+
+- Tabulka „Člen × předpis“ na manažerských financích byla nahrazena samostatnou serverovou komponentou `MemberAssessmentLedger`. Data se seskupují po členu a každý existující dluh má vlastní responzivní kartu bez prázdných buněk a bez nutnosti horizontálního posouvání.
+- Komponenta zobrazuje stav, splatnost, předepsanou, evidovanou a zbývající částku nebo přeplatek, textově popsaný průběh, čekající hlášení a poslední upomínku. Člen je nově jeden kompaktní nativní rozbalovací řádek: ukazuje jméno, celkový počet předpisů, počet k vyřízení a zbývající částku; jednotlivé předpisy otevře až akce „Zobrazit předpisy“.
+- Filtr „Jen nezaplacené“ skrývá vyřízené detailní karty, ale souhrnný počet „Celkem předpisů“ dál vychází ze všech předpisů člena a neztrácí kontext.
+- Filtr nezaplacených, zápis hotovosti, scope klubu/týmu, idempotency klíč, historie původu finančních událostí a nedestruktivní oprava protizápisem zůstaly zachované. Ovládání je přesunuto do rozbalovacích nástrojů konkrétního předpisu.
+- Read-only `code-reviewer` nenašel konkrétní problém v zachování scope, cílových ID, idempotency klíčů, akcí ani rozlišení `cash`, `manual_claim`, `simulated` a `fio`. Zbytkem zůstává pouze neprovedené spuštění a vizuální kontrola rozbalených formulářů na úzkém telefonu.
+- Následná read-only revize rozbalovacího řádku potvrdila konzistenci souhrnných počtů, filtru i zachování finančních akcí. Nenašla konkrétní problém; neověřeným zbytkem zůstává vykreslení nativního `<details>/<summary>` v cílových prohlížečích.
+- Automatizované testy ani testovací soubory nevznikly. Build, lint, aplikace a ruční vizuální ověření nebyly v tomto kroku spuštěny.
+
 # Skutečná Fio synchronizace a návrat standardního SPD QR (2026-11-06)
 
 ## Implementace
@@ -240,4 +250,24 @@ Aktualizováno: 2026-11-06.
 - Vypnutá integrace nyní v UI nabízí opětovnou aktivaci. Obnova původně selhávala ještě před API, protože `updated_at` existující integrace šel jako text do Drizzle timestamp encoderu. Po explicitním převodu na `Date` byla reaktivace stejným skutečným tokenem úspěšně ověřena (`replaced=true`) a počáteční import nevytvořil duplicitní pohyb.
 - E-mailové pozvánky, reset hesla, upomínky a odkazy na dluh používají povinnou konfiguraci `PUBLIC_APP_URL`. Produkční Compose už nemá tichý fallback na localhost a produkční builder localhost odmítne. Lokální prostředí bylo nastaveno na veřejnou ngrok adresu; přímá kontrola v kontejneru sestavila pozvánku jako `https://rhinencephalic-offenselessly-serenity.ngrok-free.dev/pozvanka/example-token`.
 - Oprava prošla lintem, typovou kontrolou a produkčním Docker buildem; aplikace, databáze i worker jsou zdravé.
+
+# Detail předpisu a úklid technických mikrotextů (2026-11-07)
+
+- Detail předpisu nově zobrazuje u každého člena stav `Zaplaceno`/`Nezaplaceno`, čas posledního úspěšně odeslaného upozornění v `Europe/Prague` a u nezaplaceného dluhu akci „Odeslat oznámení“. Stav se odvozuje z finančních alokací; částečně uhrazený dluh zůstává nezaplacený.
+- Souhrnná dlaždice úspěšnosti doručení byla nahrazena poměrem zaplacených a nezaplacených dluhů s děleným barevným pruhem a počty obou stavů.
+- Řádkové oznámení používá existující neutrální upomínku omezenou serverem na konkrétní předpis a dluh. Zachovává autorizaci klubu/týmu, audit a idempotenci; opakovaný požadavek nevytvoří druhou dávku.
+- Z uživatelských komponent byly odstraněny technické vysvětlivky o MVP, auditu, bankovním ověření, interním původu historických simulací a dalších implementačních detailech. Funkční zdrojové štítky, stavy, chyby a potřebné pokyny zůstaly zachované; backendová pravidla a historie se neměnily.
+- Read-only `code-reviewer` našel, že první návrh zobrazoval vytvoření upomínky i po neúspěšném doručení. Nález byl přijat: datum se nyní bere výhradně z `notification_deliveries.sent_at` se stavem `sent`. Jiný problém v oprávnění, cílení, idempotenci, auditu ani hromadných upomínkách reviewer nenašel.
+- Nevznikly automatizované testy ani testovací soubory. Lint, typová kontrola, produkční Next.js build i finální Docker build prošly po dokončení změn.
+- V nasazené aplikaci byl ručně otevřen týmový předpis se dvěma dluhy: souhrn ukázal `50 %`, jeden řádek `Zaplaceno`, druhý `Nezaplaceno` a tlačítko „Odeslat oznámení“ bylo pouze u nezaplaceného dluhu. Datum bez úspěšné upomínky zobrazilo pomlčku. Odeslání e-mailu nebylo při této vizuální kontrole spuštěno. Na finanční stránce byly zároveň ověřeny odstraněné technické vysvětlivky.
+
+# Oprava e-mailových pozvánek členů (2026-11-07)
+
+- Příčinou obecné chyby byla lokální produkční konfigurace `PUBLIC_APP_URL=http://localhost:3000`. Server odmítl sestavit produkční odkaz po commitu databázové pozvánky, takže nevznikl ani záznam doručení. Ignorovaný lokální `.env` byl vrácen na veřejnou ngrok HTTPS adresu.
+- Veřejná URL se nyní ověří ještě před databázovou transakcí. Selhání poskytovatele e-mailu už nezakryje vytvořenou pozvánku: formulář zobrazí konkrétní varování a ponechá jednorázový odkaz ke zkopírování. Doručení je navázané na ID pozvánky.
+- Migrace `0026_invitation_delivery_idempotency.sql` přidává idempotency klíč dávky pozvánek, unikátní ochranu dávka × e-mail a samostatnou unikátní ochranu anonymního doručení podle typu a reference. Token členské pozvánky je pro stejný požadavek deterministicky odvozený HMAC; souběžný dvojklik pod zámkem týmu vrátí původní aktivní pozvánku a nevytvoří druhý e-mail.
+- Před migrací nebyly v zachované databázi nalezeny kolidující anonymní delivery záznamy. Docker migraci aplikoval, `schema_version` je `INVITE-0026`, oba nové indexy i sloupec jsou přítomné a aplikační kontejner je zdravý. Uvnitř kontejneru je potvrzena správná veřejná ngrok URL.
+- Lint, typová kontrola, produkční build a Docker build prošly. Formulář byl po nasazení ručně otevřen s aktivní pozvánkou. Nový e-mail nebyl bez výběru adresáta odeslán; existující databáze potvrzuje, že stejná konfigurace Resendu před chybnou změnou URL úspěšně doručovala.
+- Read-only `code-reviewer` našel riziko dvou e-mailů při souběžném odeslání a nález byl zapracován uvedenou databázovou idempotencí. Závěrečná kontrola nenašla otevřený problém. Automatizované testy ani testovací soubory nevznikly.
+- Po opravě byly 7. listopadu 2026 v 15:14 a 15:15 Europe/Prague vytvořeny dvě členské pozvánky na univerzitní adresy. Resend oba požadavky přijal, vrátil provider ID a databáze neobsahuje chybový kód. API klíč je omezený pouze na odesílání, proto přes něj nelze načíst následný stav doručení; nepřítomnost zprávy ve schránce je nutné ověřit ve spamu/karanténě nebo v Resend dashboardu. Další změna odesílacího kódu nebyla provedena.
 

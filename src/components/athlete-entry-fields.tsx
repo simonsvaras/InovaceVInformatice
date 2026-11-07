@@ -56,7 +56,7 @@ export function AthleteEntryFields({
             <>
               <input name="selfAthleteId" type="hidden" value="" />
               <strong>{profileLabel(selfProfile)}</strong>
-              <span>Tento osobní profil už máte a zůstane mu stejné ID.</span>
+              <span>Váš osobní profil</span>
             </>
           ) : legacyProfiles.length ? (
             <label>
@@ -71,7 +71,6 @@ export function AthleteEntryFields({
               </select>
               <small>
                 Starší profil přiřaďte jen tehdy, pokud skutečně patří vám.
-                Profily se podle jména nikdy neslučují automaticky.
               </small>
             </label>
           ) : (
@@ -113,7 +112,6 @@ export function AthleteEntryFields({
                 </option>
               ))}
             </select>
-            <small>Vybrat lze pouze profily spravované vaším účtem.</small>
           </label>
 
           {childAthleteId === "new" ? (

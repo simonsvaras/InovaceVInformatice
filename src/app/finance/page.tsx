@@ -11,19 +11,20 @@ import {
 } from "@/app/actions/bank-simulator";
 import { FioSyncAccount } from "@/app/finance/fio-sync-account";
 import {
-  recordCashPaymentAction,
-  reversePaymentEventAction,
   reviewPaymentClaimsAction,
   sendBulkRemindersAction,
 } from "@/app/actions/payments";
 import { AppHeader } from "@/components/app-header";
+import {
+  MemberAssessmentLedger,
+  type LedgerMember,
+} from "@/components/member-assessment-ledger";
 import { Message } from "@/components/message";
 import { formatDateTimeInPrague, todayInPrague } from "@/lib/dates";
 import { requireUser } from "@/modules/auth/service";
 import { getBankReconciliationDashboard } from "@/modules/bank-simulator/service";
 import { formatCzk } from "@/modules/payments/qr";
 import { getManagerFinanceDashboard, type PaymentScope } from "@/modules/payments/service";
-import { debtStatusLabel } from "@/modules/payments/status";
 
 function ScopeFields({ scope }: { scope: PaymentScope }) {
   return (
@@ -52,13 +53,6 @@ function reconciliationReason(code: string) {
     negative_possible_reversal: "možné storno dříve přiřazeného pohybu",
     non_czk: "pohyb není v CZK",
   } as Record<string, string>)[code] ?? code;
-}
-
-function paymentEventLabel(kind: string) {
-  if (kind === "cash") return "Hotovost";
-  if (kind === "simulated") return "Demo pohyb (simulated)";
-  if (kind === "fio") return "Pohyb načtený z Fio API";
-  return "Potvrzené hlášení";
 }
 
 function formatDueDate(value: string) {
@@ -108,25 +102,37 @@ export default async function FinancePage({
     getBankReconciliationDashboard(user.id, scope),
   ]);
   const onlyUnpaid = query.unpaid === "1";
-  const visibleDebts = onlyUnpaid
-    ? dashboard.debts.filter((debt) => debt.remainingHalere > 0)
-    : dashboard.debts;
-  const assessments = Array.from(
-    new Map(
-      visibleDebts.map((debt) => [
-        debt.assessment_id,
-        { id: debt.assessment_id, title: debt.assessment_title },
-      ]),
-    ).values(),
-  );
-  const athletes = Array.from(
-    new Map(
-      visibleDebts.map((debt) => [
-        debt.athlete_id,
-        { id: debt.athlete_id, name: debt.athlete_name },
-      ]),
-    ).values(),
-  );
+  const ledgerMemberMap = new Map<string, LedgerMember>();
+
+  for (const debt of dashboard.debts) {
+    const member = ledgerMemberMap.get(debt.athlete_id) ?? {
+      id: debt.athlete_id,
+      name: debt.athlete_name,
+      assessments: [],
+    };
+    member.assessments.push({
+      id: debt.id,
+      title: debt.assessment_title,
+      dueDate: debt.due_date,
+      amountHalere: debt.amount_halere,
+      allocatedHalere: debt.allocated_halere,
+      remainingHalere: debt.remainingHalere,
+      overpaidHalere: debt.overpaidHalere,
+      status: debt.status,
+      hasPendingClaim: debt.has_pending_claim,
+      lastReminderAt: debt.last_reminder_at,
+      lastReminderStatus: debt.last_reminder_status,
+      events: debt.events.map((event) => ({
+        id: event.id,
+        kind: event.kind,
+        amountHalere: event.amount_halere,
+        occurredOn: event.occurred_on,
+        reversed: event.reversed,
+      })),
+    });
+    ledgerMemberMap.set(debt.athlete_id, member);
+  }
+  const ledgerMembers = [...ledgerMemberMap.values()];
   const scopeQuery = "teamId" in scope
     ? `teamId=${encodeURIComponent(scope.teamId!)}`
     : `clubId=${encodeURIComponent(scope.clubId!)}`;
@@ -375,7 +381,6 @@ export default async function FinancePage({
               </div>
               <span className="finance-panel-count">{bankDashboard.movements.length}</span>
             </header>
-            <p className="finance-panel-notice">Zdroj každého pohybu je uložen neměnně. Historické <code>simulated</code> záznamy se nikdy nevydávají za Fio.</p>
             {bankDashboard.movements.length ? (
               <div className="finance-reconciliation-list">
                 {bankDashboard.movements.map((movement) => {
@@ -392,7 +397,7 @@ export default async function FinancePage({
                       {movement.source === "fio" && (movement.counterparty_name || movement.recipient_message || movement.transaction_type) ? (
                         <p>{movement.counterparty_name ?? "Neznámý plátce"}{movement.recipient_message ? ` · ${movement.recipient_message}` : ""}{movement.transaction_type ? ` · ${movement.transaction_type}` : ""}</p>
                       ) : null}
-                      {movement.related_transaction_id ? <p className="fio-sync-error"><strong>Upozornění:</strong> pohyb může souviset s dříve přiřazenou úhradou. Aplikace původní alokaci automaticky nemění.</p> : null}
+                      {movement.related_transaction_id ? <p className="fio-sync-error"><strong>Možná shoda s dříve přiřazenou úhradou.</strong></p> : null}
                       <p>Přiřazeno {formatCzk(movement.allocated_halere)}, volné {formatCzk(available)} · zdrojové ID <code>{movement.source_transaction_id}</code></p>
                       {movement.resolution_reason ? <p>Poslední rozhodnutí: {movement.resolution_reason}</p> : null}
                       {manualEvents.length && movement.allocated_halere === 0 ? (
@@ -466,85 +471,18 @@ export default async function FinancePage({
             ) : (
               <div className="finance-operation-empty">
                 <span aria-hidden="true">✓</span>
-                <div><strong>Fronta je prázdná</strong><small>Žádný bankovní ani historický demo pohyb nečeká na rozhodnutí.</small></div>
+                <div><strong>Fronta je prázdná</strong><small>Žádný pohyb nečeká na rozhodnutí.</small></div>
               </div>
             )}
           </article>
         ) : null}
-        <article className="panel finance-matrix-panel">
-          <div className="section-heading">
-            <div><h2>Člen × předpis</h2><p>Stav je odvozený z evidovaných platebních událostí a alokací.</p></div>
-            <Link className="button-link button-secondary" href={`/finance?${scopeQuery}${onlyUnpaid ? "" : "&unpaid=1"}`}>
-              {onlyUnpaid ? "Zobrazit všechny" : "Jen nezaplacené"}
-            </Link>
-          </div>
-          {visibleDebts.length ? (
-            <div className="table-scroll">
-              <table className="finance-matrix">
-                <thead><tr><th>Člen</th>{assessments.map((assessment) => <th key={assessment.id}>{assessment.title}</th>)}</tr></thead>
-                <tbody>
-                  {athletes.map((athlete) => (
-                    <tr key={athlete.id}>
-                      <th>{athlete.name}</th>
-                      {assessments.map((assessment) => {
-                        const debt = visibleDebts.find(
-                          (item) => item.athlete_id === athlete.id && item.assessment_id === assessment.id,
-                        );
-                        if (!debt) return <td key={assessment.id}>—</td>;
-                        return (
-                          <td key={assessment.id}>
-                            <div className="matrix-cell">
-                              <strong>{debtStatusLabel(debt.status)}</strong>
-                              <span>{formatCzk(debt.allocated_halere)} / {formatCzk(debt.amount_halere)}</span>
-                              {debt.has_pending_claim ? <span>Čeká hlášení rodiče</span> : null}
-                              {debt.last_reminder_at ? (
-                                <span>
-                                  {debt.last_reminder_status === "sent"
-                                    ? "Upomínka odeslána"
-                                    : debt.last_reminder_status === "failed"
-                                      ? "Pokus o upomínku selhal"
-                                      : "Upomínka čeká na odeslání"}
-                                  {": "}
-                                  {new Intl.DateTimeFormat("cs-CZ", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Prague" }).format(new Date(debt.last_reminder_at))}
-                                </span>
-                              ) : null}
-                              <details>
-                                <summary>Zapsat hotovost</summary>
-                                <form action={recordCashPaymentAction} className="form-stack compact-form">
-                                  <ScopeFields scope={scope} />
-                                  <input name="receivableId" type="hidden" value={debt.id} />
-                                  <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-                                  <label>Částka Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} name="amount" required /></label>
-                                  <label>Datum<input defaultValue={today} max={today} name="occurredOn" required type="date" /></label>
-                                  <button type="submit">Zaplaceno hotově</button>
-                                </form>
-                              </details>
-                              {debt.events.filter((event) => event.kind !== "correction").map((event) => (
-                                <details key={event.id}>
-                                  <summary>{paymentEventLabel(event.kind)}: {formatCzk(event.amount_halere)}</summary>
-                                  <p>{event.occurred_on}{event.reversed ? " · opraveno protizápisem" : ""}</p>
-                                  {!event.reversed ? (
-                                    <form action={reversePaymentEventAction} className="form-stack compact-form">
-                                      <ScopeFields scope={scope} />
-                                      <input name="paymentEventId" type="hidden" value={event.id} />
-                                      <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-                                      <label>Důvod opravy<input maxLength={300} name="reason" required /></label>
-                                      <button className="button-secondary" type="submit">Zapsat opravu</button>
-                                    </form>
-                                  ) : null}
-                                </details>
-                              ))}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : <p>V tomto filtru nejsou žádné dluhy.</p>}
-        </article>
+        <MemberAssessmentLedger
+          members={ledgerMembers}
+          onlyUnpaid={onlyUnpaid}
+          scope={scope}
+          scopeQuery={scopeQuery}
+          today={today}
+        />
         <article className="panel finance-claims">
           <header className="finance-panel-heading">
             <span className="finance-panel-icon is-attention" aria-hidden="true">✓</span>
@@ -554,7 +492,6 @@ export default async function FinancePage({
             </div>
             <span className="finance-panel-count is-attention">{dashboard.pendingClaims.length}</span>
           </header>
-          <p className="finance-panel-notice">Potvrzení vytvoří auditovanou evidenci v aplikaci, nikoli bankovně ověřený převod.</p>
           {dashboard.pendingClaims.length ? (
             <form action={reviewPaymentClaimsAction} className="finance-claim-form">
               <ScopeFields scope={scope} />
@@ -600,7 +537,6 @@ export default async function FinancePage({
             <input name="idempotencyKey" type="hidden" value={randomUUID()} />
             <button type="submit">Odeslat hromadnou upomínku</button>
           </form>
-          <small>Odeslání upomínky nemění stav dluhu ani nevytváří úhradu.</small>
         </article>
           </div>
         </section>

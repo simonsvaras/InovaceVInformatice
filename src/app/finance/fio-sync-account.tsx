@@ -87,9 +87,6 @@ export function FioSyncAccount({ account, scope }: { account: Account; scope: Sc
             {account.lastErrorCode ? <small>Kód: {account.lastErrorCode}</small> : null}
           </p>
         ) : null}
-        <p className="finance-sync-last-run">
-          Automatická synchronizace nikdy nevypíná ruční evidenci ani rodičovské hlášení „Zaplatil jsem“.
-        </p>
       </div>
 
       <div className="fio-sync-actions">
@@ -113,12 +110,6 @@ export function FioSyncAccount({ account, scope }: { account: Account; scope: Sc
           </form>
         ) : null}
       </div>
-
-      {!account.canReadRaw && hasIntegration ? (
-        <p className="finance-sync-access-note">
-          Syrové pohyby sdíleného účtu může zobrazit a řešit pouze správce klubu.
-        </p>
-      ) : null}
 
       <dialog className="fio-activation-dialog" ref={dialogRef}>
         <form action={verifyAndActivateFioAction} className="fio-activation-form">
@@ -150,7 +141,6 @@ export function FioSyncAccount({ account, scope }: { account: Account; scope: Sc
                 <li>Vytvořte token s oprávněním „Sledování účtu“ pro tento CZK účet.</li>
                 <li>Token vložte níže. Nový token může začít fungovat až za pět minut.</li>
               </ol>
-              <p>Aplikace ověří čtení, účet, IBAN, banku a měnu. Fio ve výpisu nepotvrzuje, zda má token pouze právo ke čtení.</p>
             </div>
             <label>
               Fio API token

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import Link from "next/link";
 
 import { setTeamBankAccountAction } from "@/app/actions/assessments";
@@ -436,7 +438,10 @@ function ManagerTeamView({
                 </div>
               </header>
               <div className="team-admin-invite-body">
-                <MemberInviteForm teamId={team.id} />
+                <MemberInviteForm
+                  initialIdempotencyKey={randomUUID()}
+                  teamId={team.id}
+                />
               </div>
               {team.pendingInvitations.length ? (
                 <div className="team-admin-invitation-list">
