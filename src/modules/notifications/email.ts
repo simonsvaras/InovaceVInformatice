@@ -22,11 +22,17 @@ type EmailMessage = {
 };
 
 function publicAppUrl(): URL {
-  const raw = process.env.PUBLIC_APP_URL ?? "http://localhost:3000";
+  const raw = process.env.PUBLIC_APP_URL;
+  if (!raw) {
+    throw new Error("PUBLIC_APP_URL must be configured.");
+  }
   const url = new URL(raw);
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("PUBLIC_APP_URL must use HTTP or HTTPS.");
+  }
+  if (process.env.NODE_ENV === "production" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+    throw new Error("PUBLIC_APP_URL must not use localhost in production.");
   }
 
   return url;

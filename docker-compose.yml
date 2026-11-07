@@ -33,7 +33,7 @@ services:
       PGUSER: ${POSTGRES_USER:?POSTGRES_USER must be set}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL must be set}
       FIO_TOKEN_ENCRYPTION_KEY: ${FIO_TOKEN_ENCRYPTION_KEY:?FIO_TOKEN_ENCRYPTION_KEY must be set}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-Klubio <demo@example.invalid>}
@@ -75,7 +75,7 @@ services:
       FIO_TOKEN_ENCRYPTION_KEY: ${FIO_TOKEN_ENCRYPTION_KEY:?FIO_TOKEN_ENCRYPTION_KEY must be set}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-Klubio <demo@example.invalid>}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL must be set}
     networks:
       - backend
 
