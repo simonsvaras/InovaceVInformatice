@@ -2,6 +2,7 @@ import { ChevronLeft, LogOut, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
+import { HeaderNavLink } from "@/components/header-nav-link";
 import { IconLabel } from "@/components/icon-label";
 
 type HeaderUser = {
@@ -108,14 +109,14 @@ export function AppHeader({
             {navigation.length ? (
               <nav className="app-header-nav" aria-label="Navigace kontextu">
                 {navigation.map((item) => (
-                  <Link
+                  <HeaderNavLink
                     aria-current={item.active ? "page" : undefined}
                     className={item.active ? "is-active" : undefined}
                     href={item.href}
                     key={`${item.href}-${item.label}`}
                   >
                     {item.icon ? <IconLabel icon={item.icon} size={15}>{item.label}</IconLabel> : item.label}
-                  </Link>
+                  </HeaderNavLink>
                 ))}
               </nav>
             ) : null}
