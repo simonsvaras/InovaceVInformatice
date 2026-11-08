@@ -5837,7 +5837,7 @@ button.home-header-action {
 
 .payments-filter {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.9rem;
   align-items: end;
   padding: 1.1rem 1.25rem;
@@ -5855,6 +5855,8 @@ button.home-header-action {
 
 .payments-filter input,
 .payments-filter select {
+  width: 100%;
+  min-width: 0;
   min-height: 2.6rem;
   border: 1px solid var(--dashboard-line);
   border-radius: 0.65rem;
@@ -5863,10 +5865,32 @@ button.home-header-action {
   color: var(--dashboard-ink);
 }
 
-.payments-method-summary {
-  font-size: 0.85rem !important;
+.payments-overview {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payments-overview-methods dd {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: 0;
   line-height: 1.5;
-  letter-spacing: 0 !important;
+}
+
+@media (max-width: 42rem) {
+  .payments-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .payments-overview > div,
+  .payments-overview > div:nth-child(2n),
+  .payments-overview > div:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 16%);
+  }
+
+  .payments-overview > div:last-child {
+    border-bottom: 0;
+  }
 }
 
 .payments-register {

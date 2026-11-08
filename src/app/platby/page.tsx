@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { InputError, validateUuid } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
@@ -82,24 +82,61 @@ export default async function PaymentRegisterPage({
 
   return (
     <main className="dashboard-shell dashboard-home finance-admin-page">
-      <header className="dashboard-topbar">
-        <Link className="dashboard-brand" href="/prehled" aria-label="Klubio – přehled">
-          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
-          <span>Klubio</span>
-        </Link>
-        <Link className="club-topbar-link" href={back}>Zpět</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: back, label: "Zpět" }}
+        context={{
+          kind: scope.teamId ? "Tým" : "Klub",
+          name: register.name,
+          role: "Správa financí",
+          href: back,
+        }}
+        navigation={[
+          { href: back, label: "Přehled" },
+          { href: `/finance?${scopeQuery}`, label: "Finance" },
+          { href: `/platby?${scopeQuery}`, label: "Příchozí platby", active: true },
+        ]}
+        primaryAction={{
+          href: `/predpisy/novy?${scopeQuery}`,
+          label: "Nový předpis",
+        }}
+        user={user}
+      />
       <section className="content-stack finance-admin-content">
         <header className="finance-admin-hero">
-          <div>
-            <p className="finance-admin-role">Správa financí</p>
-            <h1>Příchozí platby</h1>
-            <p>
-              {register.name}. Úhrady evidované v aplikaci; demo pohyby a ruční
-              potvrzení nejsou bankovně ověřené převody.
-            </p>
+          <div className="finance-admin-hero-main">
+            <div>
+              <p className="finance-admin-role">
+                {scope.teamId ? "Platby týmu" : "Platby klubu"}
+              </p>
+              <h1>Příchozí platby</h1>
+              <p>
+                {register.name}. Úhrady evidované v aplikaci; demo pohyby a ruční
+                potvrzení nejsou bankovně ověřené převody.
+              </p>
+            </div>
+            <a className="finance-admin-hero-action" href={exportHref}>Export CSV</a>
           </div>
-          <a className="club-primary-action" href={exportHref}>Export CSV</a>
+
+          <dl className="finance-overview payments-overview" aria-label="Souhrn plateb">
+            <div>
+              <dt>Součet za výběr</dt>
+              <dd>{formatCzk(register.summary.totalHalere)}</dd>
+            </div>
+            <div>
+              <dt>Počet záznamů</dt>
+              <dd>{register.rows.length}</dd>
+            </div>
+            <div className="payments-overview-methods">
+              <dt>Podle způsobu</dt>
+              <dd>
+                {register.summary.byMethod.length
+                  ? register.summary.byMethod
+                      .map((item) => `${paymentMethodLabel(item.method)}: ${formatCzk(item.totalHalere)}`)
+                      .join(" · ")
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
         </header>
         <Message error={filterError} />
 
@@ -132,27 +169,6 @@ export default async function PaymentRegisterPage({
           </label>
           <button type="submit">Filtrovat</button>
         </form>
-
-        <section className="finance-overview" aria-label="Souhrn plateb">
-          <div>
-            <span>Součet za výběr</span>
-            <strong>{formatCzk(register.summary.totalHalere)}</strong>
-          </div>
-          <div>
-            <span>Počet záznamů</span>
-            <strong>{register.rows.length}</strong>
-          </div>
-          <div>
-            <span>Podle způsobu</span>
-            <strong className="payments-method-summary">
-              {register.summary.byMethod.length
-                ? register.summary.byMethod
-                    .map((item) => `${paymentMethodLabel(item.method)}: ${formatCzk(item.totalHalere)}`)
-                    .join(" · ")
-                : "—"}
-            </strong>
-          </div>
-        </section>
 
         <section className="payments-register" aria-labelledby="register-title">
           <header className="finance-assessments-header">
