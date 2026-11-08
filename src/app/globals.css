@@ -509,19 +509,6 @@ button,
   text-decoration: none;
 }
 
-.dashboard-brand-mark {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 0.55rem;
-  background: var(--dashboard-blue);
-  color: var(--dashboard-white);
-  font-size: 0.98rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
-}
-
 .dashboard-account {
   display: flex;
   align-items: center;
@@ -5277,19 +5264,6 @@ main.home-shell {
   font-weight: 750;
   letter-spacing: -0.02em;
   text-decoration: none;
-}
-
-.home-brand-mark {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 0.55rem;
-  background: var(--home-blue);
-  color: var(--home-white);
-  font-size: 0.98rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
 }
 
 .home-demo-label {
