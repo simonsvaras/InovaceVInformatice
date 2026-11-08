@@ -56,7 +56,8 @@ export function AppHeader({
           href={user ? "/prehled" : "/"}
           aria-label="Klubio – přehled"
         >
-          <span aria-hidden="true">K</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="" className="app-header-logo" height={32} src="/logo.png" width={28} />
           <strong>Klubio</strong>
         </Link>
 

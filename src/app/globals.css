@@ -283,17 +283,10 @@ button,
   text-decoration: none;
 }
 
-.app-header-brand > span {
-  display: grid;
-  width: 2rem;
+.app-header-logo {
+  display: block;
+  width: auto;
   height: 2rem;
-  place-items: center;
-  border-radius: 0.55rem;
-  background: #2456d6;
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
 }
 
 .app-header-brand > strong {
