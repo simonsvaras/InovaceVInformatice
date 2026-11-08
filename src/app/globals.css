@@ -4,7 +4,7 @@
   --surface: #ffffff;
   --text: #152033;
   --muted: #526078;
-  --accent: #1859a9;
+  --accent: #2456d6;
   --border: #dce4ef;
 }
 
@@ -160,7 +160,7 @@ a:focus-visible {
 .form-stack select:focus,
 .form-stack textarea:focus {
   border-color: var(--accent);
-  outline: 0.16rem solid rgb(24 89 169 / 18%);
+  outline: 0.16rem solid rgb(36 86 214 / 18%);
 }
 
 .form-stack small {
