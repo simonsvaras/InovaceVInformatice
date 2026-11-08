@@ -556,7 +556,7 @@ button.dashboard-logout {
 .dashboard-home .dashboard-content {
   width: min(100% - 3rem, 76rem);
   gap: 1.25rem;
-  padding: clamp(3.5rem, 8vw, 6.5rem) 0 5rem;
+  padding: clamp(1.75rem, 4vw, 3rem) 0 5rem;
 }
 
 .dashboard-welcome {
