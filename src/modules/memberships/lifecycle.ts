@@ -468,8 +468,58 @@ export async function getTransferTargets(userId: string, teamId: string) {
 export async function getArchivedTeams(userId: string, clubId: string) {
   await requireClubAdminAccess(userId, clubId);
   return getDatabase()
-    .select({ id: teams.id, name: teams.name, archivedAt: teams.archivedAt })
+    .select({
+      id: teams.id,
+      name: teams.name,
+      archivedAt: teams.archivedAt,
+      restorableMembers: sql<number>`(
+        select count(*) from ${memberships} m
+        where m.team_id = ${teams.id}
+          and m.ended_reason = 'archived'
+          and m.ended_at = ${teams.archivedAt}
+      )::int`,
+    })
     .from(teams)
     .where(and(eq(teams.clubId, clubId), sql`${teams.archivedAt} is not null`))
     .orderBy(teams.name);
+}
+
+/**
+ * Vrátí archivovaný tým mezi aktivní a obnoví členství ukončená právě touto archivací.
+ * Pozvánky, týmový kód ani zamítnuté žádosti se neobnovují; trenér a finanční data zůstala.
+ */
+export async function restoreTeam(input: {
+  actorUserId: string;
+  clubId: string;
+  teamId: string;
+}) {
+  await requireClubAdminAccess(input.actorUserId, input.clubId);
+  return getDatabase().transaction(async (transaction) => {
+    const [team] = await transaction.execute<{ id: string; name: string; archived_at: Date | null }>(sql`
+      select t.id, t.name, t.archived_at
+      from teams t
+      where t.id=${input.teamId} and t.club_id=${input.clubId}
+      for update of t
+    `);
+    if (!team) throw new InputError("access_denied", "Tým nepatří do tohoto klubu.");
+    if (!team.archived_at) throw new InputError("not_archived", "Tým není archivovaný.");
+    const restored = await transaction.execute<{ id: string }>(sql`
+      update memberships set ended_at = null, ended_reason = null
+      where team_id = ${input.teamId}
+        and ended_reason = 'archived'
+        and ended_at = (select archived_at from teams where id = ${input.teamId})
+      returning id
+    `);
+    await transaction.update(teams).set({ archivedAt: null }).where(eq(teams.id, input.teamId));
+    await transaction.insert(auditEvents).values({
+      actorUserId: input.actorUserId,
+      clubId: input.clubId,
+      teamId: input.teamId,
+      eventType: "team.restored",
+      targetType: "team",
+      targetId: input.teamId,
+      details: { restoredMemberships: restored.length },
+    });
+    return { name: team.name, restoredMemberships: restored.length };
+  });
 }

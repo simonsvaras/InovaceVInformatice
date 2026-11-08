@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-import { archiveTeamAction, inviteCoachAction } from "@/app/actions/clubs";
+import {
+  archiveTeamAction,
+  inviteCoachAction,
+  restoreTeamAction,
+} from "@/app/actions/clubs";
 import { AppHeader } from "@/components/app-header";
 import { CreateTeamModal } from "@/components/create-team-modal";
 import { Message } from "@/components/message";
@@ -288,6 +292,22 @@ export default async function ClubPage({
                   <strong>{team.name}</strong>
                   <Link href={`/finance?teamId=${team.id}`}>Platby</Link>
                   <Link href={`/platby?teamId=${team.id}`}>Příchozí platby a export</Link>
+                  <details className="club-archive club-restore">
+                    <summary>Obnovit tým</summary>
+                    <form action={restoreTeamAction} className="club-coach-form">
+                      <input name="clubId" type="hidden" value={club.id} />
+                      <input name="teamId" type="hidden" value={team.id} />
+                      <p>
+                        Tým se vrátí mezi aktivní týmy a obnoví se členství ukončená archivací ({team.restorableMembers}).
+                        Pozvánky, týmový kód a zamítnuté žádosti se neobnovují, vytvořte je znovu.
+                      </p>
+                      <label className="checkbox-label">
+                        <input name="confirm" required type="checkbox" value="yes" />
+                        Potvrzuji obnovení týmu
+                      </label>
+                      <button className="club-secondary-action" type="submit">Obnovit tým</button>
+                    </form>
+                  </details>
                 </div>
               ))}
             </div>

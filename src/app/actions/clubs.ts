@@ -10,7 +10,7 @@ import {
   setActiveCoachTeam,
 } from "@/modules/clubs/service";
 import { requireUser } from "@/modules/auth/service";
-import { archiveTeam } from "@/modules/memberships/lifecycle";
+import { archiveTeam, restoreTeam } from "@/modules/memberships/lifecycle";
 import {
   formText,
   InputError,
@@ -131,6 +131,26 @@ export async function archiveTeamAction(formData: FormData) {
       teamId: validateUuid(formText(formData, "teamId"), "Tým"),
     });
     success = `Tým ${result.name} byl archivován. Finanční historie a export zůstaly dostupné.`;
+  } catch (error) {
+    redirect(`/kluby/${clubId}?error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(`/kluby/${clubId}?success=${encodeURIComponent(success)}`);
+}
+
+export async function restoreTeamAction(formData: FormData) {
+  const user = await requireUser();
+  const clubId = validateUuid(formText(formData, "clubId"), "Klub");
+  let success: string;
+  try {
+    if (formText(formData, "confirm") !== "yes") {
+      throw new InputError("confirm_required", "Potvrďte obnovení týmu.");
+    }
+    const result = await restoreTeam({
+      actorUserId: user.id,
+      clubId,
+      teamId: validateUuid(formText(formData, "teamId"), "Tým"),
+    });
+    success = `Tým ${result.name} byl obnoven. Obnovených členství: ${result.restoredMemberships}. Pozvánky a týmový kód vytvořte znovu.`;
   } catch (error) {
     redirect(`/kluby/${clubId}?error=${encodeURIComponent(message(error))}`);
   }

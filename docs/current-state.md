@@ -312,3 +312,8 @@ Aktualizováno: 2026-11-06.
 
 - Stránka `/platby` používá sdílenou `AppHeader`, hero se souhrnem jako finance a opravené rozložení filtrů.
 - Tlačítko **Export** je rozbalovací nabídka s volbou CSV a Excel (.xlsx). Route `/platby/export?format=csv|xlsx` (neznámý formát vrací 400). Soubor .xlsx byl ověřen načtením v `openpyxl` (platný ZIP, číselné částky, filtr, ukotvení, diakritika, text začínající `=` zůstává textem). Otevření ve skutečném Excelu ani Numbers nebylo provedeno.
+
+# Obnova archivovaného týmu (2026-11-08)
+
+- Správce klubu může v sekci **Archivované týmy** na stránce klubu tým obnovit (`restoreTeam`). Obnoví se jen členství ukončená touto archivací; pozvánky a týmový kód se nevracejí. Audit `team.restored`.
+- Ověřeno ručně: obnovení týmu s jedním členem odhlášeným archivací (obnoven) a jedním dříve vyřazeným (zůstal vyřazen), zápis auditu, tým se vrátil mezi aktivní. `npm run lint`, `npx tsc --noEmit` a build prošly. Oprávnění stejné jako u archivace (kontrola správce klubu na serveru); podvržení trenérem nebylo zkoušeno.

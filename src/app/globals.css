@@ -6103,3 +6103,8 @@ button.home-header-action {
   color: var(--dashboard-muted);
   font-weight: 500;
 }
+
+.club-restore {
+  margin-top: 0;
+  flex-basis: 100%;
+}
