@@ -6230,3 +6230,102 @@ button.home-header-action {
     margin-right: auto;
   }
 }
+
+/* Rozbalovače akcí vypadají jako tlačítka: rámeček, ikona, šipka a barevné odlišení rizikových akcí. */
+.action-disclosure {
+  margin-top: 0;
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 0.7rem;
+  background: #fff;
+  font-size: 0.8rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.action-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.62rem 0.8rem;
+  color: var(--dashboard-blue-dark);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  list-style: none;
+  user-select: none;
+}
+
+.action-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-disclosure > summary::after {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: none;
+  border-right: 2px solid currentcolor;
+  border-bottom: 2px solid currentcolor;
+  content: "";
+  opacity: 0.7;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.action-disclosure[open] > summary::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.action-disclosure:hover {
+  border-color: #b9c8ec;
+}
+
+.action-disclosure > summary:hover {
+  background: #f1f5ff;
+}
+
+.action-disclosure[open] {
+  border-color: #b9c8ec;
+}
+
+.action-disclosure[open] > summary {
+  border-bottom: 1px solid var(--dashboard-line);
+  background: #eef3ff;
+}
+
+.action-disclosure > form,
+.action-disclosure > div {
+  padding: 0.8rem;
+}
+
+.action-disclosure.is-danger > summary {
+  color: #b33d46;
+}
+
+.action-disclosure.is-danger:hover,
+.action-disclosure.is-danger[open] {
+  border-color: #efc4c8;
+}
+
+.action-disclosure.is-danger > summary:hover {
+  background: #fff4f4;
+}
+
+.action-disclosure.is-danger[open] > summary {
+  background: #fff1f1;
+}
+
+.team-admin-player-lifecycle {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  align-items: start;
+}
+
+.team-admin-player-lifecycle > span,
+.team-admin-player-lifecycle .action-disclosure[open] {
+  grid-column: 1 / -1;
+}
+
+.action-disclosure > form,
+.action-disclosure > .form-stack {
+  margin-top: 0;
+}

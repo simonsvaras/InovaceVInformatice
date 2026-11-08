@@ -189,7 +189,7 @@ function MemberTeamView({
             {team.managedMembers.map((member) => {
               const debts = ownOpenDebts.get(member.athleteId);
               return (
-                <details className="member-team-leave" key={`leave-${member.athleteId}`}>
+                <details className="member-team-leave action-disclosure is-danger" key={`leave-${member.athleteId}`}>
                   <summary><IconLabel icon={LogOut} size={15}>Odhlásit {member.fullName} z týmu</IconLabel></summary>
                   <form action={leaveTeamAction} className="form-stack compact-form">
                     <input name="teamId" type="hidden" value={team.id} />
@@ -417,7 +417,7 @@ function ManagerTeamView({
                           ? `Nezaplacené předpisy: ${memberOpenDebts.get(player.athleteId)!.count} (${formatCzk(memberOpenDebts.get(player.athleteId)!.halere)})`
                           : "Bez nezaplacených předpisů"}
                       </span>
-                      <details>
+                      <details className="action-disclosure is-danger">
                         <summary><IconLabel icon={UserMinus} size={15}>Vyřadit z týmu</IconLabel></summary>
                         <form action={removeMemberAction} className="form-stack compact-form">
                           <input name="teamId" type="hidden" value={team.id} />
@@ -428,7 +428,7 @@ function ManagerTeamView({
                         </form>
                       </details>
                       {transferTargets.length ? (
-                        <details>
+                        <details className="action-disclosure">
                           <summary><IconLabel icon={ArrowRightLeft} size={15}>Přesunout do jiného týmu</IconLabel></summary>
                           <form action={transferMemberAction} className="form-stack compact-form">
                             <input name="teamId" type="hidden" value={team.id} />

@@ -243,7 +243,7 @@ export default async function ClubPage({
                   </button>
                 </form>
 
-                <details className="club-archive">
+                <details className="club-archive action-disclosure is-danger">
                   <summary><IconLabel icon={Archive}>Archivovat tým</IconLabel></summary>
                   <form action={archiveTeamAction} className="club-coach-form">
                     <input name="clubId" type="hidden" value={club.id} />
@@ -280,7 +280,7 @@ export default async function ClubPage({
                   <strong>{team.name}</strong>
                   <Link href={`/finance?teamId=${team.id}`}>Platby</Link>
                   <Link href={`/platby?teamId=${team.id}`}><IconLabel icon={Receipt} size={14}>Příchozí platby a export</IconLabel></Link>
-                  <details className="club-archive club-restore">
+                  <details className="club-archive club-restore action-disclosure">
                     <summary><IconLabel icon={ArchiveRestore}>Obnovit tým</IconLabel></summary>
                     <RestoreTeamForm
                       action={restoreTeamAction}
