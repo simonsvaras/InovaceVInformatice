@@ -474,6 +474,9 @@ button,
 }
 
 .app-header-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   align-self: center;
   border-radius: 0.58rem;
   padding: 0.62rem 0.78rem;
@@ -6163,6 +6166,8 @@ button.home-header-action {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
+  line-height: 1.25;
+  vertical-align: middle;
 }
 
 .icon-label svg {
