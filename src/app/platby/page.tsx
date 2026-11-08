@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
+import { ExportMenu } from "@/components/export-menu";
 import { Message } from "@/components/message";
 import { InputError, validateUuid } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
@@ -115,13 +116,7 @@ export default async function PaymentRegisterPage({
                 potvrzení nejsou bankovně ověřené převody.
               </p>
             </div>
-            <details className="export-menu">
-              <summary className="finance-admin-hero-action">Export <span aria-hidden="true">▾</span></summary>
-              <div className="export-menu-list">
-                <a href={exportHref("csv")}>CSV <small>.csv</small></a>
-                <a href={exportHref("xlsx")}>Excel <small>.xlsx</small></a>
-              </div>
-            </details>
+            <ExportMenu csvHref={exportHref("csv")} xlsxHref={exportHref("xlsx")} />
           </div>
 
           <dl className="finance-overview payments-overview" aria-label="Souhrn plateb">

@@ -6057,16 +6057,13 @@ button.home-header-action {
   position: relative;
 }
 
-.export-menu > summary {
+.export-menu-button {
   display: inline-flex;
   gap: 0.4rem;
   align-items: center;
+  border: 0;
   cursor: pointer;
-  list-style: none;
-}
-
-.export-menu > summary::-webkit-details-marker {
-  display: none;
+  font: inherit;
 }
 
 .export-menu-list {
