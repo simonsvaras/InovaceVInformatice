@@ -6,7 +6,7 @@ import {
   retryReceivableDeliveryAction,
   sendAssessmentReminderAction,
 } from "@/app/actions/assessments";
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getAssessmentManagerView } from "@/modules/assessments/service";
@@ -84,20 +84,9 @@ export default async function AssessmentPage({
 
   return (
     <main className="dashboard-shell dashboard-home assessment-detail-page">
-      <AppHeader
-        backLink={{ href: financeHref, label: "Všechny předpisy" }}
-        context={{
-          kind: assessment.teamId ? "Tým" : "Klub",
-          name: assessment.teamName ?? assessment.clubName,
-          role: "Správa předpisu",
-          href: assessment.teamId
-            ? `/tymy/${assessment.teamId}`
-            : `/kluby/${assessment.clubId}`,
-        }}
-        navigation={[
-          { href: financeHref, label: "Finance" },
-          { href: `/predpisy/${assessment.id}`, label: "Detail předpisu", active: true },
-        ]}
+      <ManagementHeader
+        active="finance"
+        scope={assessment.teamId ? { teamId: assessment.teamId } : { clubId: assessment.clubId }}
         user={user}
       />
 

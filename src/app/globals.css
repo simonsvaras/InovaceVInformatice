@@ -3905,7 +3905,7 @@ button.fio-dialog-close {
 
 .finance-reminder form {
   margin: 0;
-  padding: 0 1.25rem;
+  padding: 0 1.25rem 1.25rem;
 }
 
 .finance-reminder form button {

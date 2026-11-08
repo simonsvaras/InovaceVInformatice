@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/memberships";
 import { AppHeader } from "@/components/app-header";
 import { JoinCodeForm } from "@/components/join-code-form";
+import { ManagementHeader } from "@/components/management-header";
 import { MemberInviteForm } from "@/components/member-invite-form";
 import { Message } from "@/components/message";
 import { getGuardianTeamFinance } from "@/modules/assessments/service";
@@ -260,7 +261,7 @@ function ManagerTeamView({
   team: ManagerTeam;
   finance: ManagerFinance;
   query: Query;
-  user: { displayName: string; email: string };
+  user: { id: string; displayName: string; email: string };
   memberOpenDebts: MemberOpenDebts;
   transferTargets: TransferTargets;
 }) {
@@ -309,26 +310,7 @@ function ManagerTeamView({
 
   return (
     <main className="dashboard-shell dashboard-home team-admin-page">
-      <AppHeader
-        backLink={{ href: "/prehled", label: "Přehled" }}
-        context={{
-          kind: "Tým",
-          name: team.name,
-          role: team.accessRole === "admin" ? "Správce klubu" : "Trenér",
-          href: `/tymy/${team.id}`,
-        }}
-        navigation={[
-          { href: `/tymy/${team.id}`, label: "Přehled týmu", active: true },
-          { href: `#manager-roster-title`, label: "Hráči" },
-          { href: `/finance?teamId=${team.id}`, label: "Finance" },
-          { href: "#team-tools-title", label: "Nastavení" },
-        ]}
-        primaryAction={{
-          href: `/predpisy/novy?teamId=${team.id}`,
-          label: "Nový předpis",
-        }}
-        user={user}
-      />
+      <ManagementHeader active="overview" scope={{ teamId: team.id }} user={user} />
 
       <section className="team-admin-content">
         <Message error={query.error} success={query.success} />

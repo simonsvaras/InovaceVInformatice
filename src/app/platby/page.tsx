@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import { ExportMenu } from "@/components/export-menu";
 import { Message } from "@/components/message";
 import { InputError, validateUuid } from "@/lib/validation";
@@ -80,29 +80,10 @@ export default async function PaymentRegisterPage({
   if (filters.state !== "all") filterQuery.set("state", filters.state);
   const exportHref = (format: "csv" | "xlsx") =>
     `/platby/export?${scopeQuery}${filterQuery.size ? `&${filterQuery}` : ""}&format=${format}`;
-  const back = scope.teamId ? `/tymy/${scope.teamId}` : `/kluby/${scope.clubId!}`;
 
   return (
     <main className="dashboard-shell dashboard-home finance-admin-page">
-      <AppHeader
-        backLink={{ href: back, label: "Zpět" }}
-        context={{
-          kind: scope.teamId ? "Tým" : "Klub",
-          name: register.name,
-          role: "Správa financí",
-          href: back,
-        }}
-        navigation={[
-          { href: back, label: "Přehled" },
-          { href: `/finance?${scopeQuery}`, label: "Finance" },
-          { href: `/platby?${scopeQuery}`, label: "Příchozí platby", active: true },
-        ]}
-        primaryAction={{
-          href: `/predpisy/novy?${scopeQuery}`,
-          label: "Nový předpis",
-        }}
-        user={user}
-      />
+      <ManagementHeader active="payments" scope={scope} user={user} />
       <section className="content-stack finance-admin-content">
         <header className="finance-admin-hero">
           <div className="finance-admin-hero-main">

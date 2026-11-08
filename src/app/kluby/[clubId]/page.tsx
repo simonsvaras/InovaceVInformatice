@@ -5,7 +5,7 @@ import {
   inviteCoachAction,
   restoreTeamAction,
 } from "@/app/actions/clubs";
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import { CreateTeamModal } from "@/components/create-team-modal";
 import { RestoreTeamForm } from "@/components/restore-team-form";
 import { Message } from "@/components/message";
@@ -42,24 +42,7 @@ export default async function ClubPage({
 
   return (
     <main className="dashboard-shell dashboard-home club-admin-page">
-      <AppHeader
-        context={{
-          kind: "Klub",
-          name: club.name,
-          role: "Správce klubu",
-          href: `/kluby/${club.id}`,
-        }}
-        navigation={[
-          { href: `/kluby/${club.id}`, label: "Přehled klubu", active: true },
-          { href: `#teams-title`, label: "Týmy" },
-          { href: `/finance?clubId=${club.id}`, label: "Finance" },
-        ]}
-        primaryAction={{
-          href: `/predpisy/novy?clubId=${club.id}`,
-          label: "Nový předpis",
-        }}
-        user={user}
-      />
+      <ManagementHeader active="overview" scope={{ clubId: club.id }} user={user} />
 
       <section className="club-admin-content">
         <Message error={query.error} success={query.success} />

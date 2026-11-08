@@ -14,7 +14,7 @@ import {
   reviewPaymentClaimsAction,
   sendBulkRemindersAction,
 } from "@/app/actions/payments";
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import {
   MemberAssessmentLedger,
   type LedgerMember,
@@ -139,7 +139,6 @@ export default async function FinancePage({
   const scopeQuery = "teamId" in scope
     ? `teamId=${encodeURIComponent(scope.teamId!)}`
     : `clubId=${encodeURIComponent(scope.clubId!)}`;
-  const back = "teamId" in scope ? `/tymy/${scope.teamId!}` : `/kluby/${scope.clubId!}`;
   const today = todayInPrague();
   const assessmentMap = new Map<
     string,
@@ -192,24 +191,7 @@ export default async function FinancePage({
 
   return (
     <main className="dashboard-shell dashboard-home finance-admin-page">
-      <AppHeader
-        backLink={{ href: back, label: "Zpět" }}
-        context={{
-          kind: "teamId" in scope ? "Tým" : "Klub",
-          name: dashboard.name,
-          role: "Správa financí",
-          href: back,
-        }}
-        navigation={[
-          { href: back, label: "Přehled" },
-          { href: `/finance?${scopeQuery}`, label: "Finance", active: true },
-        ]}
-        primaryAction={{
-          href: `/predpisy/novy?${scopeQuery}`,
-          label: "Nový předpis",
-        }}
-        user={user}
-      />
+      <ManagementHeader active="finance" scope={scope} user={user} />
       <section className="content-stack finance-admin-content">
         <header className="finance-admin-hero">
           <div className="finance-admin-hero-main">
