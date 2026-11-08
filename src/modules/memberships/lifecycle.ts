@@ -473,10 +473,10 @@ export async function getArchivedTeams(userId: string, clubId: string) {
       name: teams.name,
       archivedAt: teams.archivedAt,
       restorableMembers: sql<number>`(
-        select count(*) from ${memberships} m
-        where m.team_id = ${teams.id}
+        select count(*) from memberships m
+        where m.team_id = teams.id
           and m.ended_reason = 'archived'
-          and m.ended_at = ${teams.archivedAt}
+          and m.ended_at = teams.archived_at
       )::int`,
     })
     .from(teams)
@@ -492,6 +492,7 @@ export async function restoreTeam(input: {
   actorUserId: string;
   clubId: string;
   teamId: string;
+  restoreMembers: boolean;
 }) {
   await requireClubAdminAccess(input.actorUserId, input.clubId);
   return getDatabase().transaction(async (transaction) => {
@@ -503,13 +504,15 @@ export async function restoreTeam(input: {
     `);
     if (!team) throw new InputError("access_denied", "Tým nepatří do tohoto klubu.");
     if (!team.archived_at) throw new InputError("not_archived", "Tým není archivovaný.");
-    const restored = await transaction.execute<{ id: string }>(sql`
-      update memberships set ended_at = null, ended_reason = null
-      where team_id = ${input.teamId}
-        and ended_reason = 'archived'
-        and ended_at = (select archived_at from teams where id = ${input.teamId})
-      returning id
-    `);
+    const restored = input.restoreMembers
+      ? await transaction.execute<{ id: string }>(sql`
+          update memberships set ended_at = null, ended_reason = null
+          where team_id = ${input.teamId}
+            and ended_reason = 'archived'
+            and ended_at = (select archived_at from teams where id = ${input.teamId})
+          returning id
+        `)
+      : [];
     await transaction.update(teams).set({ archivedAt: null }).where(eq(teams.id, input.teamId));
     await transaction.insert(auditEvents).values({
       actorUserId: input.actorUserId,
@@ -518,8 +521,8 @@ export async function restoreTeam(input: {
       eventType: "team.restored",
       targetType: "team",
       targetId: input.teamId,
-      details: { restoredMemberships: restored.length },
+      details: { restoredMemberships: restored.length, restoreMembers: input.restoreMembers },
     });
-    return { name: team.name, restoredMemberships: restored.length };
+    return { name: team.name, restoredMemberships: restored.length, restoreMembers: input.restoreMembers };
   });
 }

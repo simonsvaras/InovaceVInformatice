@@ -317,3 +317,4 @@ Aktualizováno: 2026-11-06.
 
 - Správce klubu může v sekci **Archivované týmy** na stránce klubu tým obnovit (`restoreTeam`). Obnoví se jen členství ukončená touto archivací; pozvánky a týmový kód se nevracejí. Audit `team.restored`.
 - Ověřeno ručně: obnovení týmu s jedním členem odhlášeným archivací (obnoven) a jedním dříve vyřazeným (zůstal vyřazen), zápis auditu, tým se vrátil mezi aktivní. `npm run lint`, `npx tsc --noEmit` a build prošly. Oprávnění stejné jako u archivace (kontrola správce klubu na serveru); podvržení trenérem nebylo zkoušeno.
+- Obnova týmu má podřízenou volbu „Obnovit i členy“: bez ní se tým vrátí prázdný. Ověřeno obě varianty a že se obnoví jen členství z poslední archivace. Při testu se našly a opravily dvě chyby: počet obnovitelných členů ve výpisu (Drizzle bez názvu tabulky) a odškrtnutý checkbox, který formulář nepošle.

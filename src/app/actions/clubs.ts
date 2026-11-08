@@ -149,8 +149,12 @@ export async function restoreTeamAction(formData: FormData) {
       actorUserId: user.id,
       clubId,
       teamId: validateUuid(formText(formData, "teamId"), "Tým"),
+      // Odškrtnutý checkbox se v odeslaném formuláři vůbec neobjeví.
+      restoreMembers: formData.get("restoreMembers") === "yes",
     });
-    success = `Tým ${result.name} byl obnoven. Obnovených členství: ${result.restoredMemberships}. Pozvánky a týmový kód vytvořte znovu.`;
+    success = result.restoreMembers
+      ? `Tým ${result.name} byl obnoven. Obnovených členství: ${result.restoredMemberships}. Pozvánky a týmový kód vytvořte znovu.`
+      : `Tým ${result.name} byl obnoven bez členů. Členy přidejte znovu pozvánkou nebo kódem.`;
   } catch (error) {
     redirect(`/kluby/${clubId}?error=${encodeURIComponent(message(error))}`);
   }

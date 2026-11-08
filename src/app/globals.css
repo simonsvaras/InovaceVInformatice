@@ -6108,3 +6108,17 @@ button.home-header-action {
   margin-top: 0;
   flex-basis: 100%;
 }
+
+.restore-sub-option {
+  margin-left: 1.5rem;
+}
+
+.restore-sub-option.is-disabled {
+  opacity: 0.5;
+}
+
+.restore-sub-note {
+  margin: 0;
+  color: var(--dashboard-muted);
+  font-size: 0.8rem;
+}
