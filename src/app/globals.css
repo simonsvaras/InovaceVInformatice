@@ -6310,3 +6310,11 @@ button:disabled,
 .club-team-card > .club-archive {
   margin: 0 1.4rem 1.4rem;
 }
+
+.member-team-roster > .member-team-leave {
+  margin: 0.85rem 1.2rem 1.2rem;
+}
+
+.member-team-roster > .member-team-leave + .member-team-leave {
+  margin-top: 0;
+}
