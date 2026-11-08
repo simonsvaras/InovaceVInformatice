@@ -99,11 +99,6 @@ export default async function ReceivablePage({
             <h2>Automatická kontrola banky</h2>
             <p>Část evidované úhrady byla načtena z Fio API a spárována podle účtu, variabilního symbolu a částky.</p>
           </article>
-        ) : debt.fioIntegrationEnabled && debt.remainingHalere > 0 ? (
-          <article className="panel">
-            <h2>Automatická kontrola banky</h2>
-            <p>Příchozí pohyby se průběžně kontrolují.</p>
-          </article>
         ) : null}
         {debt.pendingClaimId ? (
           <article className="panel">
@@ -114,6 +109,11 @@ export default async function ReceivablePage({
               <input name="claimId" type="hidden" value={debt.pendingClaimId} />
               <button className="button-secondary" type="submit">Odvolat hlášení</button>
             </form>
+          </article>
+        ) : debt.remainingHalere > 0 && debt.fioIntegrationEnabled ? (
+          <article className="panel">
+            <h2>Platbu nemusíte hlásit</h2>
+            <p>Účet klubu je napojený na banku. Jakmile platba dorazí, spáruje se sama podle variabilního symbolu a částky a dluh se změní na zaplacený. Pošlete ji jen s údaji výše.</p>
           </article>
         ) : debt.remainingHalere > 0 ? (
           <article className="panel">

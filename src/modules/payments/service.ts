@@ -172,8 +172,10 @@ export async function reportManualPayment(input: {
         allocated_halere: number;
         allowed: boolean;
         cancelled_at: Date | null;
+        fio_active: boolean;
       }>(sql`
         select r.id, a.club_id, a.team_id, r.amount_halere, r.cancelled_at,
+               exists(select 1 from fio_integrations fi where fi.bank_account_id=r.bank_account_id and fi.status='active') as fio_active,
                coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere,
                exists(select 1 from athlete_guardians ag where ag.athlete_id=r.athlete_id and ag.user_id=${input.actorUserId}) as allowed
         from receivables r
@@ -190,6 +192,12 @@ export async function reportManualPayment(input: {
       }
       if (debt.allocated_halere >= debt.amount_halere) {
         throw new InputError("already_paid", "Dluh je už podle evidence uhrazen.");
+      }
+      if (debt.fio_active) {
+        throw new InputError(
+          "fio_auto_match",
+          "Účet je napojený na banku, platba se spáruje sama. Hlášení není potřeba.",
+        );
       }
 
       const [claim] = await transaction
