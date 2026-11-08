@@ -6191,3 +6191,33 @@ button.home-header-action {
   align-items: center;
   justify-content: center;
 }
+
+/* Lišta se záložkami se na užších oknech rozdělí na dva řádky: nahoře kontext a hlavní akce, pod nimi záložky. */
+@media (max-width: 72rem) {
+  .app-header.has-navigation .app-header-context-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 1rem;
+  }
+
+  .app-header.has-navigation .app-header-context-start {
+    min-height: 3.8rem;
+  }
+
+  .app-header.has-navigation .app-header-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    overflow-x: auto;
+    border-top: 1px solid #e3e8f1;
+    scrollbar-width: none;
+  }
+
+  .app-header.has-navigation .app-header-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-header.has-navigation .app-header-nav a {
+    min-height: 3rem;
+    padding: 0 0.8rem;
+  }
+}
