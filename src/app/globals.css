@@ -17,6 +17,12 @@ body {
   min-height: 100%;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 button,
 input,
 select,
