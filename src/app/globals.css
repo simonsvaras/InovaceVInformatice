@@ -6306,3 +6306,7 @@ button:disabled,
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.club-team-card > .club-archive {
+  margin: 0 1.4rem 1.4rem;
+}
