@@ -57,7 +57,7 @@ export function AppHeader({
           aria-label="Klubio – přehled"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt="" className="app-header-logo" height={32} src="/logo.png" width={28} />
+          <img alt="" className="app-header-logo" height={32} src="/logo.png" width={24} />
           <strong>Klubio</strong>
         </Link>
 
