@@ -4,21 +4,13 @@ import { notFound } from "next/navigation";
 import { getDatabase } from "@/db/client";
 import { auditEvents } from "@/db/schema";
 import { formatDateTimeInPrague } from "@/lib/dates";
+import { buildPdf, type PdfRow } from "@/lib/pdf";
 import { InputError, validateUuid } from "@/lib/validation";
 import { formatCzk } from "@/modules/payments/qr";
 import {
   paymentConfirmedByLabel,
   paymentMethodLabel,
 } from "@/modules/payments/status";
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 type ConfirmationRow = {
   allocation_id: string;
@@ -84,10 +76,10 @@ export async function getPaymentConfirmation(userId: string, allocationId: strin
   return row;
 }
 
-export function buildPaymentConfirmationHtml(row: ConfirmationRow) {
+export function buildPaymentConfirmationPdf(row: ConfirmationRow) {
   const isDemo = row.kind === "simulated";
   const scope = row.team_name ? `${row.club_name} · ${row.team_name}` : `${row.club_name} · Celý klub`;
-  const lines: [string, string][] = [
+  const rows: PdfRow[] = [
     ["Sportovec", row.athlete_name],
     ["Předpis", row.assessment_title],
     ["Klub / tým", scope],
@@ -99,37 +91,16 @@ export function buildPaymentConfirmationHtml(row: ConfirmationRow) {
     ["Cílový účet", row.account_number],
   ];
   if ((isDemo || row.kind === "fio") && row.source_transaction_id) {
-    lines.push([isDemo ? "ID demo pohybu" : "ID bankovního pohybu", row.source_transaction_id]);
+    rows.push([isDemo ? "ID demo pohybu" : "ID bankovního pohybu", row.source_transaction_id]);
   }
-  lines.push(["Číslo záznamu", row.allocation_id]);
-  const rows = lines
-    .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
-    .join("");
-  const warning = isDemo
-    ? "DEMO – simulovaná platba v aplikaci. Nejde o bankovně ověřený převod ani o spojení s Fio."
-    : "Toto potvrzení dokládá pouze evidenci v aplikaci Klubio. Není to bankovní výpis ani daňový doklad.";
-  return `<!doctype html>
-<html lang="cs">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Potvrzení evidence úhrady</title>
-<style>
-body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#152033;margin:2rem auto;max-width:42rem;padding:0 1rem}
-h1{font-size:1.4rem;margin:0 0 .25rem}
-p.muted{color:#526078;margin:0 0 1.5rem}
-p.warning{border:1px solid #f1c46b;background:#fff8e6;border-radius:.5rem;padding:.75rem 1rem}
-table{border-collapse:collapse;width:100%}
-th,td{border-bottom:1px solid #dce4ef;padding:.6rem .5rem;text-align:left;vertical-align:top}
-th{width:40%;color:#526078;font-weight:600}
-</style>
-</head>
-<body>
-<h1>Potvrzení evidence úhrady</h1>
-<p class="muted">Vystaveno ${escapeHtml(formatDateTimeInPrague(new Date()))}</p>
-<p class="warning">${escapeHtml(warning)}</p>
-<table>${rows}</table>
-</body>
-</html>
-`;
+  rows.push(["Číslo záznamu", row.allocation_id]);
+  return buildPdf({
+    title: "Potvrzení evidence úhrady",
+    subtitle: `Vystaveno ${formatDateTimeInPrague(new Date())}`,
+    warning: isDemo
+      ? "DEMO – simulovaná platba v aplikaci. Nejde o bankovně ověřený převod ani o spojení s Fio."
+      : "Toto potvrzení dokládá pouze evidenci v aplikaci Klubio. Není to bankovní výpis ani daňový doklad.",
+    rows,
+    footer: "Dokument vygenerovala aplikace Klubio.",
+  });
 }

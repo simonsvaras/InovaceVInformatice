@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { InputError } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
 import {
-  buildPaymentConfirmationHtml,
+  buildPaymentConfirmationPdf,
   getPaymentConfirmation,
 } from "@/modules/payments/confirmation";
 
@@ -17,12 +17,11 @@ export async function GET(
   const { allocationId } = await params;
   try {
     const confirmation = await getPaymentConfirmation(user.id, allocationId);
-    return new NextResponse(buildPaymentConfirmationHtml(confirmation), {
+    return new NextResponse(new Uint8Array(buildPaymentConfirmationPdf(confirmation)), {
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": `attachment; filename="potvrzeni-evidence-${confirmation.allocation_id.slice(0, 8)}.html"`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="potvrzeni-evidence-${confirmation.allocation_id.slice(0, 8)}.pdf"`,
         "Cache-Control": "private, no-store",
-        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         "X-Content-Type-Options": "nosniff",
       },
     });
