@@ -4,7 +4,7 @@
   --surface: #ffffff;
   --text: #152033;
   --muted: #526078;
-  --accent: #1859a9;
+  --accent: #2456d6;
   --border: #dce4ef;
 }
 
@@ -15,6 +15,12 @@
 html,
 body {
   min-height: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 button,
@@ -154,7 +160,7 @@ a:focus-visible {
 .form-stack select:focus,
 .form-stack textarea:focus {
   border-color: var(--accent);
-  outline: 0.16rem solid rgb(24 89 169 / 18%);
+  outline: 0.16rem solid rgb(36 86 214 / 18%);
 }
 
 .form-stack small {
@@ -241,6 +247,7 @@ button,
   --dashboard-ink: #162033;
   --dashboard-blue: #2456d6;
   --dashboard-blue-dark: #1945b9;
+  --dashboard-hero: #133b99;
   --dashboard-paper: #f6f8fc;
   --dashboard-white: #ffffff;
   --dashboard-muted: #61708a;
@@ -1407,7 +1414,7 @@ button.dashboard-team-switch:disabled {
   position: relative;
   overflow: hidden;
   border-radius: 1.25rem;
-  background: #133b99;
+  background: var(--dashboard-hero);
   color: #fff;
 }
 
@@ -2425,7 +2432,7 @@ button.club-dialog-close {
 .finance-admin-hero {
   overflow: hidden;
   border-radius: 1.2rem;
-  background: #173b78;
+  background: var(--dashboard-hero);
   color: #fff;
 }
 
@@ -2470,7 +2477,7 @@ button.club-dialog-close {
   border-radius: 0.65rem;
   padding: 0.7rem 1rem;
   background: #fff;
-  color: #173b78;
+  color: var(--dashboard-blue-dark);
   font-size: 0.82rem;
   text-decoration: none;
 }
@@ -3942,7 +3949,7 @@ button.fio-dialog-close {
   gap: 2rem;
   border-radius: 1.2rem;
   padding: clamp(1.75rem, 4vw, 2.5rem);
-  background: #173b78;
+  background: var(--dashboard-hero);
   color: #fff;
 }
 
@@ -3992,7 +3999,7 @@ button.fio-dialog-close {
   border-radius: 0.65rem;
   padding: 0.75rem 1rem;
   background: #fff;
-  color: #173b78;
+  color: var(--dashboard-blue-dark);
   font-size: 0.86rem;
   font-weight: 720;
   text-decoration: none;

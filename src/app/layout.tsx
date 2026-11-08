@@ -12,7 +12,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="cs">
+    <html data-scroll-behavior="smooth" lang="cs">
       <body>{children}</body>
     </html>
   );
