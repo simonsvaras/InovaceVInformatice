@@ -298,7 +298,7 @@ export async function getDemoSimulator(userId: string, receivableId: string) {
       join athlete_guardians ag on ag.athlete_id=ath.id and ag.user_id=${userId}
       join bank_accounts ba on ba.id=r.bank_account_id
       join bank_integrations bi on bi.bank_account_id=ba.id and bi.enabled=true
-     where r.id=${receivableId}
+     where r.id=${receivableId} and r.cancelled_at is null
   `);
   const row = rows[0];
   if (!row) throw new InputError("access_denied", "Demo simulátor pro tento dluh není dostupný.");
@@ -332,9 +332,10 @@ async function allocateAutomatically(
     assessment_title: string;
     club_name: string;
     team_name: string | null;
+    cancelled_at: Date | null;
   }>(sql`
     select r.id, a.club_id, a.team_id as assessment_team_id, r.origin_team_id,
-           r.amount_halere, u.id as guardian_user_id, u.email as guardian_email,
+           r.amount_halere, r.cancelled_at, u.id as guardian_user_id, u.email as guardian_email,
            ath.full_name as athlete_name,
            a.title as assessment_title, c.name as club_name, t.name as team_name
       from receivables r
@@ -352,7 +353,10 @@ async function allocateAutomatically(
   `);
   if (candidates.length !== 1) return { status: "unmatched", reasonCode: "unknown_vs", deliveries: [] as Delivery[] };
   const candidate = candidates[0];
-  await transaction.execute(sql`select id from receivables where id=${candidate.id} for update`);
+  const [lockedDebt] = await transaction.execute<{ cancelled_at: Date | null }>(
+    sql`select cancelled_at from receivables where id=${candidate.id} for update`,
+  );
+  if (lockedDebt?.cancelled_at) return { status: "unmatched", reasonCode: "cancelled", deliveries: [] as Delivery[] };
   const stateRows = await transaction.execute<{
     allocated_halere: number;
     pending_claim: boolean;
@@ -734,9 +738,10 @@ export async function allocateSimulatedTransaction(input: {
       assessment_title: string;
       club_name: string;
       team_name: string | null;
+      cancelled_at: Date | null;
     }>(sql`
       select r.id, a.club_id, a.team_id as assessment_team_id, r.origin_team_id, r.bank_account_id,
-             u.id as guardian_user_id, u.email as guardian_email,
+             r.cancelled_at, u.id as guardian_user_id, u.email as guardian_email,
              ath.full_name as athlete_name,
              a.title as assessment_title, c.name as club_name, t.name as team_name
         from receivables r
@@ -754,6 +759,7 @@ export async function allocateSimulatedTransaction(input: {
       scope.isAdmin || (scope.teamId && debt.assessment_team_id === scope.teamId && debt.origin_team_id === scope.teamId)
     );
     if (!debtAllowed) throw new InputError("access_denied", "Dluh nepatří do oprávněného rozsahu a účtu.");
+    if (debt.cancelled_at) throw new InputError("cancelled", "Dluh byl zrušen, nelze k němu přiřadit pohyb.");
     const manualEvidence = await transaction.execute<{ pending_claim: boolean; active_manual_payment: boolean }>(sql`
       select exists(
                select 1 from payment_claims pc
@@ -931,7 +937,7 @@ export async function getBankReconciliationDashboard(userId: string, requestedSc
            a.title as assessment_title, r.amount_halere,
            coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere
       from receivables r join assessments a on a.id=r.assessment_id join athletes ath on ath.id=r.athlete_id
-     where ${condition} and r.bank_account_id in (${identifiers})
+     where ${condition} and r.cancelled_at is null and r.bank_account_id in (${identifiers})
       order by ath.full_name, a.created_at
   `);
   const manualEvents = await getDatabase().execute<{

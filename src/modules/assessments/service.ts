@@ -518,6 +518,7 @@ export async function getGuardianReceivables(userId: string) {
       teamName: teams.name,
       allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
       pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
+      cancelledAt: receivables.cancelledAt,
     })
     .from(receivables)
     .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
@@ -534,8 +535,50 @@ export async function getGuardianReceivables(userId: string) {
       allocatedHalere: row.allocatedHalere,
       dueDate: row.dueDate,
       hasPendingClaim: Boolean(row.pendingClaimId),
+      cancelled: Boolean(row.cancelledAt),
     }),
   }));
+}
+
+export async function getGuardianPaymentHistory(userId: string, teamId?: string) {
+  return getDatabase()
+    .select({
+      eventId: paymentEvents.id,
+      allocationId: paymentAllocations.id,
+      athleteName: athletes.fullName,
+      assessmentTitle: assessments.title,
+      clubName: clubs.name,
+      teamName: teams.name,
+      kind: paymentEvents.kind,
+      amountHalere: paymentAllocations.amountHalere,
+      occurredOn: paymentEvents.occurredOn,
+      recordedByName: users.displayName,
+      correctionReason: paymentEvents.correctionReason,
+      corrected: sql<boolean>`(${paymentEvents.kind} <> 'correction' and exists(select 1 from payment_events correction where correction.reverses_event_id=${paymentEvents.id}))`,
+    })
+    .from(paymentAllocations)
+    .innerJoin(
+      paymentEvents,
+      eq(paymentEvents.id, paymentAllocations.paymentEventId),
+    )
+    .leftJoin(users, eq(users.id, paymentEvents.recordedByUserId))
+    .innerJoin(
+      receivables,
+      eq(receivables.id, paymentAllocations.receivableId),
+    )
+    .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
+    .innerJoin(clubs, eq(clubs.id, assessments.clubId))
+    .innerJoin(athletes, eq(athletes.id, receivables.athleteId))
+    .innerJoin(
+      athleteGuardians,
+      and(
+        eq(athleteGuardians.athleteId, athletes.id),
+        eq(athleteGuardians.userId, userId),
+      ),
+    )
+    .leftJoin(teams, eq(teams.id, receivables.originTeamId))
+    .where(teamId ? eq(receivables.originTeamId, teamId) : undefined)
+    .orderBy(desc(paymentEvents.occurredOn), desc(paymentEvents.createdAt));
 }
 
 export async function getGuardianTeamFinance(userId: string, teamId: string) {
@@ -556,6 +599,7 @@ export async function getGuardianTeamFinance(userId: string, teamId: string) {
         dueDate: assessments.dueDate,
         allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
         pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
+      cancelledAt: receivables.cancelledAt,
       })
       .from(receivables)
       .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
@@ -569,35 +613,7 @@ export async function getGuardianTeamFinance(userId: string, teamId: string) {
       )
       .where(eq(receivables.originTeamId, teamId))
       .orderBy(asc(assessments.dueDate), desc(receivables.createdAt)),
-    database
-      .select({
-        eventId: paymentEvents.id,
-        athleteName: athletes.fullName,
-        assessmentTitle: assessments.title,
-        kind: paymentEvents.kind,
-        amountHalere: paymentAllocations.amountHalere,
-        occurredOn: paymentEvents.occurredOn,
-      })
-      .from(paymentAllocations)
-      .innerJoin(
-        paymentEvents,
-        eq(paymentEvents.id, paymentAllocations.paymentEventId),
-      )
-      .innerJoin(
-        receivables,
-        eq(receivables.id, paymentAllocations.receivableId),
-      )
-      .innerJoin(assessments, eq(assessments.id, receivables.assessmentId))
-      .innerJoin(athletes, eq(athletes.id, receivables.athleteId))
-      .innerJoin(
-        athleteGuardians,
-        and(
-          eq(athleteGuardians.athleteId, athletes.id),
-          eq(athleteGuardians.userId, userId),
-        ),
-      )
-      .where(eq(receivables.originTeamId, teamId))
-      .orderBy(desc(paymentEvents.occurredOn), desc(paymentEvents.createdAt)),
+    getGuardianPaymentHistory(userId, teamId),
   ]);
 
   return {
@@ -608,6 +624,7 @@ export async function getGuardianTeamFinance(userId: string, teamId: string) {
         allocatedHalere: row.allocatedHalere,
         dueDate: row.dueDate,
         hasPendingClaim: Boolean(row.pendingClaimId),
+      cancelled: Boolean(row.cancelledAt),
       }),
     })),
     history,
@@ -631,6 +648,7 @@ export async function getGuardianReceivable(userId: string, receivableId: string
       teamId: assessments.teamId,
       allocatedHalere: sql<number>`coalesce((select sum(${paymentAllocations.amountHalere}) from ${paymentAllocations} where ${paymentAllocations.receivableId}=${receivables.id}), 0)::int`,
       pendingClaimId: sql<string | null>`(select ${paymentClaims.id} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
+      cancelledAt: receivables.cancelledAt,
       pendingClaimAmountHalere: sql<number | null>`(select ${paymentClaims.amountHalere} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
       demoIntegrationEnabled: sql<boolean>`exists(select 1 from bank_integrations bi where bi.bank_account_id=${receivables.bankAccountId} and bi.enabled=true)`,
       fioIntegrationEnabled: sql<boolean>`exists(select 1 from fio_integrations fi where fi.bank_account_id=${receivables.bankAccountId} and fi.status='active')`,
@@ -675,6 +693,7 @@ export async function getGuardianReceivable(userId: string, receivableId: string
     allocatedHalere: row.allocatedHalere,
     dueDate: row.dueDate,
     hasPendingClaim: Boolean(row.pendingClaimId),
+    cancelled: Boolean(row.cancelledAt),
   });
   return {
     ...row,
@@ -722,6 +741,8 @@ export async function getAssessmentManagerView(userId: string, assessmentId: str
       id: receivables.id,
       athleteName: athletes.fullName,
       variableSymbol: receivables.variableSymbol,
+      cancelledAt: receivables.cancelledAt,
+      cancellationReason: receivables.cancellationReason,
       guardianEmail: users.email,
       deliveryStatus: notificationDeliveries.status,
       deliveryError: notificationDeliveries.errorCode,
@@ -809,6 +830,7 @@ export async function retryReceivableDelivery(input: {
       and(
         eq(receivables.id, input.receivableId),
         eq(receivables.assessmentId, assessment.id),
+        isNull(receivables.cancelledAt),
       ),
     )
     .limit(1);

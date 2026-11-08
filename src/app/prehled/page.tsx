@@ -1,17 +1,26 @@
+import { FileDown, QrCode } from "lucide-react";
 import Link from "next/link";
 
 import { switchCoachTeamAction } from "@/app/actions/clubs";
 import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
+import { IconLabel } from "@/components/icon-label";
 import { requireUser } from "@/modules/auth/service";
 import {
   getUserContexts,
   getUserTeamOverview,
 } from "@/modules/clubs/service";
 import { getGuardianMemberships } from "@/modules/memberships/service";
-import { getGuardianReceivables } from "@/modules/assessments/service";
+import {
+  getGuardianPaymentHistory,
+  getGuardianReceivables,
+} from "@/modules/assessments/service";
 import { formatCzk } from "@/modules/payments/qr";
-import { debtStatusLabel } from "@/modules/payments/status";
+import {
+  debtStatusLabel,
+  paymentConfirmedByLabel,
+  paymentMethodLabel,
+} from "@/modules/payments/status";
 
 function GettingStartedPanel({
   isAdditional,
@@ -156,11 +165,12 @@ export default async function DashboardPage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const user = await requireUser();
-  const [contexts, guardianMemberships, teamOverview, receivables, query] = await Promise.all([
+  const [contexts, guardianMemberships, teamOverview, receivables, paymentHistory, query] = await Promise.all([
     getUserContexts(user.id),
     getGuardianMemberships(user.id),
     getUserTeamOverview(user.id),
     getGuardianReceivables(user.id),
+    getGuardianPaymentHistory(user.id),
     searchParams,
   ]);
   const hasExistingSetup =
@@ -291,10 +301,33 @@ export default async function DashboardPage({
                     <span>{debt.clubName} · {debt.teamName ?? "celý klub"}</span>
                     <span>{formatCzk(debt.amountHalere)} · evidováno {formatCzk(debt.allocatedHalere)} · zbývá {formatCzk(debt.remainingHalere)}</span>
                     <span className={debt.status === "overdue" ? "status-overdue" : "status-open"}>{debtStatusLabel(debt.status)}</span>
-                    <Link className="button-link" href={`/dluhy/${debt.id}`}>Platební údaje a QR</Link>
+                    <Link className="button-link" href={`/dluhy/${debt.id}`}><IconLabel icon={QrCode}>Platební údaje a QR</IconLabel></Link>
                   </section>
                 );
               })}
+            </div>
+          </article>
+        ) : null}
+        {paymentHistory.length ? (
+          <article className="panel dashboard-section">
+            <h2>Historie plateb</h2>
+            <p>Úhrady evidované u vašich sportovců. Potvrzení dokládá pouze evidenci v aplikaci.</p>
+            <div className="list-stack">
+              {paymentHistory.map((event) => (
+                <section className="subcard" key={event.allocationId}>
+                  <strong>{event.assessmentTitle} · {formatCzk(event.amountHalere)}</strong>
+                  <span>{event.athleteName} · {event.clubName} · {event.teamName ?? "celý klub"}</span>
+                  <span>{event.occurredOn.split("-").reverse().join(". ")} · {paymentMethodLabel(event.kind)}</span>
+                  <span>{paymentConfirmedByLabel(event.kind, event.recordedByName)}</span>
+                  {event.corrected ? <span className="status-overdue">Opraveno protizápisem</span> : null}
+                  {event.correctionReason ? <span>Důvod opravy: {event.correctionReason}</span> : null}
+                  {event.kind !== "correction" && !event.corrected ? (
+                    <a className="button-link button-secondary" href={`/potvrzeni/${event.allocationId}`}>
+                      <IconLabel icon={FileDown}>Stáhnout potvrzení evidence</IconLabel>
+                    </a>
+                  ) : null}
+                </section>
+              ))}
             </div>
           </article>
         ) : null}

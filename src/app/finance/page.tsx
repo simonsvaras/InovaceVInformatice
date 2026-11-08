@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { Bell, Check, FilePlus, X } from "lucide-react";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -14,12 +16,13 @@ import {
   reviewPaymentClaimsAction,
   sendBulkRemindersAction,
 } from "@/app/actions/payments";
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import {
   MemberAssessmentLedger,
   type LedgerMember,
 } from "@/components/member-assessment-ledger";
 import { Message } from "@/components/message";
+import { IconLabel } from "@/components/icon-label";
 import { formatDateTimeInPrague, todayInPrague } from "@/lib/dates";
 import { requireUser } from "@/modules/auth/service";
 import { getBankReconciliationDashboard } from "@/modules/bank-simulator/service";
@@ -42,6 +45,7 @@ function reconciliationReason(code: string) {
     ambiguous_vs: "VS odpovídá více dluhům",
     amount_mismatch: "částka neodpovídá zbývající částce",
     already_paid: "dluh už je podle evidence uhrazen",
+    cancelled: "dluh byl zrušen",
     pending_claim: "čeká rodičovské hlášení",
     possible_manual_duplicate: "možná shoda s ručně evidovanou úhradou",
     reviewed_distinct: "oprávněná osoba potvrdila, že jde o další platbu",
@@ -122,6 +126,8 @@ export default async function FinancePage({
       hasPendingClaim: debt.has_pending_claim,
       lastReminderAt: debt.last_reminder_at,
       lastReminderStatus: debt.last_reminder_status,
+      cancelledAt: debt.cancelled_at,
+      cancellationReason: debt.cancellation_reason,
       events: debt.events.map((event) => ({
         id: event.id,
         kind: event.kind,
@@ -136,7 +142,6 @@ export default async function FinancePage({
   const scopeQuery = "teamId" in scope
     ? `teamId=${encodeURIComponent(scope.teamId!)}`
     : `clubId=${encodeURIComponent(scope.clubId!)}`;
-  const back = "teamId" in scope ? `/tymy/${scope.teamId!}` : `/kluby/${scope.clubId!}`;
   const today = todayInPrague();
   const assessmentMap = new Map<
     string,
@@ -150,6 +155,7 @@ export default async function FinancePage({
       collectedHalere: number;
       settledCount: number;
       recipientCount: number;
+      cancelledCount: number;
     }
   >();
 
@@ -164,13 +170,17 @@ export default async function FinancePage({
       collectedHalere: 0,
       settledCount: 0,
       recipientCount: 0,
+      cancelledCount: 0,
     };
+    if (debt.cancelled_at) current.cancelledCount += 1;
     if (debt.team_name) current.teamNames.add(debt.team_name);
-    current.amounts.add(debt.amount_halere);
-    current.expectedHalere += debt.amount_halere;
-    current.collectedHalere += debt.allocated_halere;
-    current.recipientCount += 1;
-    if (debt.remainingHalere <= 0) current.settledCount += 1;
+    if (!debt.cancelled_at) {
+      current.amounts.add(debt.amount_halere);
+      current.expectedHalere += debt.amount_halere;
+      current.collectedHalere += debt.allocated_halere;
+      current.recipientCount += 1;
+      if (debt.remainingHalere <= 0) current.settledCount += 1;
+    }
     assessmentMap.set(debt.assessment_id, current);
   }
 
@@ -184,24 +194,7 @@ export default async function FinancePage({
 
   return (
     <main className="dashboard-shell dashboard-home finance-admin-page">
-      <AppHeader
-        backLink={{ href: back, label: "Zpět" }}
-        context={{
-          kind: "teamId" in scope ? "Tým" : "Klub",
-          name: dashboard.name,
-          role: "Správa financí",
-          href: back,
-        }}
-        navigation={[
-          { href: back, label: "Přehled" },
-          { href: `/finance?${scopeQuery}`, label: "Finance", active: true },
-        ]}
-        primaryAction={{
-          href: `/predpisy/novy?${scopeQuery}`,
-          label: "Nový předpis",
-        }}
-        user={user}
-      />
+      <ManagementHeader active="finance" scope={scope} user={user} />
       <section className="content-stack finance-admin-content">
         <header className="finance-admin-hero">
           <div className="finance-admin-hero-main">
@@ -216,7 +209,7 @@ export default async function FinancePage({
               className="finance-admin-hero-action"
               href={`/predpisy/novy?${scopeQuery}`}
             >
-              Vytvořit předpis
+              <IconLabel icon={FilePlus}>Vytvořit předpis</IconLabel>
             </Link>
           </div>
 
@@ -280,16 +273,20 @@ export default async function FinancePage({
                 const perMember = assessment.amounts.size === 1
                   ? formatCzk(Array.from(assessment.amounts)[0])
                   : "Různé částky";
+                const allCancelled = assessment.recipientCount === 0 && assessment.cancelledCount > 0;
 
                 return (
                   <Link
-                    className="finance-assessment-row"
+                    className={`finance-assessment-row${allCancelled ? " is-cancelled" : ""}`}
                     href={`/predpisy/${assessment.id}`}
                     key={assessment.id}
                   >
                     <div className="finance-assessment-title">
                       <span>{teamLabel}</span>
-                      <strong>{assessment.title}</strong>
+                      <strong>
+                        {assessment.title}
+                        {allCancelled ? <em className="finance-cancelled-badge">Zrušeno</em> : null}
+                      </strong>
                     </div>
                     <div className="finance-assessment-date">
                       <span>Splatnost</span>
@@ -297,20 +294,30 @@ export default async function FinancePage({
                     </div>
                     <div className="finance-assessment-amount">
                       <span>Na člena</span>
-                      <strong>{perMember}</strong>
+                      <strong>{allCancelled ? "—" : perMember}</strong>
                     </div>
                     <div className="finance-assessment-progress">
-                      <div>
-                        <strong>
-                          {formatCzk(assessment.collectedHalere)} / {formatCzk(assessment.expectedHalere)}
-                        </strong>
-                        <span>
-                          {assessment.settledCount}/{assessment.recipientCount}
-                        </span>
-                      </div>
-                      <span className="finance-progress-track">
-                        <span style={{ width: `${progress}%` }} />
-                      </span>
+                      {allCancelled ? (
+                        <div>
+                          <strong>Všechny dluhy zrušeny</strong>
+                          <span>{assessment.cancelledCount}×</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <strong>
+                              {formatCzk(assessment.collectedHalere)} / {formatCzk(assessment.expectedHalere)}
+                            </strong>
+                            <span>
+                              {assessment.settledCount}/{assessment.recipientCount}
+                              {assessment.cancelledCount > 0 ? ` · zrušeno ${assessment.cancelledCount}` : ""}
+                            </span>
+                          </div>
+                          <span className="finance-progress-track">
+                            <span style={{ width: `${progress}%` }} />
+                          </span>
+                        </>
+                      )}
                     </div>
                     <span className="finance-assessment-open" aria-hidden="true">›</span>
                   </Link>
@@ -515,8 +522,8 @@ export default async function FinancePage({
               <div className="finance-claim-actions">
                 <label>Důvod zamítnutí<input maxLength={300} name="rejectionReason" placeholder="Doplňte pouze při zamítnutí" /></label>
                 <div>
-                <button name="decision" type="submit" value="approved">Potvrdit vybrané</button>
-                <button className="button-secondary" name="decision" type="submit" value="rejected">Zamítnout vybrané</button>
+                <button name="decision" type="submit" value="approved"><IconLabel icon={Check}>Potvrdit vybrané</IconLabel></button>
+                <button className="button-secondary" name="decision" type="submit" value="rejected"><IconLabel icon={X}>Zamítnout vybrané</IconLabel></button>
                 </div>
               </div>
             </form>
@@ -535,7 +542,7 @@ export default async function FinancePage({
           <form action={sendBulkRemindersAction}>
             <ScopeFields scope={scope} />
             <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-            <button type="submit">Odeslat hromadnou upomínku</button>
+            <button type="submit"><IconLabel icon={Bell}>Odeslat hromadnou upomínku</IconLabel></button>
           </form>
         </article>
           </div>

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 
 import { createAssessmentAction } from "@/app/actions/assessments";
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { todayInPrague } from "@/lib/dates";
@@ -26,26 +26,13 @@ export default async function NewAssessmentPage({
     : await getClubAssessmentForm(user.id, query.clubId!);
   const isTeam = Boolean(query.teamId);
   const today = todayInPrague();
-  const contextHref = isTeam ? `/tymy/${context.id}` : `/kluby/${context.id}`;
-  const financeHref = isTeam
-    ? `/finance?teamId=${context.id}`
-    : `/finance?clubId=${context.id}`;
 
   return (
     <main className="dashboard-shell">
-      <AppHeader
-        backLink={{ href: financeHref, label: "Finance" }}
-        context={{
-          kind: isTeam ? "Tým" : "Klub",
-          name: context.name,
-          role: "Správa předpisů",
-          href: contextHref,
-        }}
-        navigation={[
-          { href: contextHref, label: "Přehled" },
-          { href: financeHref, label: "Finance" },
-          { href: "#new-assessment", label: "Nový předpis", active: true },
-        ]}
+      <ManagementHeader
+        active="finance"
+        scope={isTeam ? { teamId: context.id } : { clubId: context.id }}
+        showPrimaryAction={false}
         user={user}
       />
       <section className="content-stack">

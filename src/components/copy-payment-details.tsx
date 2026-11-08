@@ -1,5 +1,6 @@
 "use client";
 
+import { Copy } from "lucide-react";
 import { useState } from "react";
 
 export function CopyPaymentDetails({
@@ -25,13 +26,13 @@ export function CopyPaymentDetails({
   return (
     <div className="copy-grid">
       <button className="button-secondary" onClick={() => copy("Účet", accountNumber)} type="button">
-        Kopírovat účet
+        <span className="icon-label"><Copy aria-hidden="true" size={15} />Kopírovat účet</span>
       </button>
       <button className="button-secondary" onClick={() => copy("Variabilní symbol", variableSymbol)} type="button">
-        Kopírovat VS
+        <span className="icon-label"><Copy aria-hidden="true" size={15} />Kopírovat VS</span>
       </button>
       <button className="button-secondary" onClick={() => copy("Částka", amount)} type="button">
-        Kopírovat částku
+        <span className="icon-label"><Copy aria-hidden="true" size={15} />Kopírovat částku</span>
       </button>
       <span aria-live="polite" className="copy-status">{status}</span>
     </div>

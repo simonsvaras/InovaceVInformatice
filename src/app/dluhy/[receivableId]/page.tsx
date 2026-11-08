@@ -1,3 +1,4 @@
+import { HandCoins } from "lucide-react";
 import Image from "next/image";
 
 import {
@@ -7,6 +8,7 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { CopyPaymentDetails } from "@/components/copy-payment-details";
 import { Message } from "@/components/message";
+import { IconLabel } from "@/components/icon-label";
 import { requireUser } from "@/modules/auth/service";
 import { getGuardianReceivable } from "@/modules/assessments/service";
 import {
@@ -97,11 +99,6 @@ export default async function ReceivablePage({
             <h2>Automatická kontrola banky</h2>
             <p>Část evidované úhrady byla načtena z Fio API a spárována podle účtu, variabilního symbolu a částky.</p>
           </article>
-        ) : debt.fioIntegrationEnabled && debt.remainingHalere > 0 ? (
-          <article className="panel">
-            <h2>Automatická kontrola banky</h2>
-            <p>Příchozí pohyby se průběžně kontrolují.</p>
-          </article>
         ) : null}
         {debt.pendingClaimId ? (
           <article className="panel">
@@ -113,6 +110,11 @@ export default async function ReceivablePage({
               <button className="button-secondary" type="submit">Odvolat hlášení</button>
             </form>
           </article>
+        ) : debt.remainingHalere > 0 && debt.fioIntegrationEnabled ? (
+          <article className="panel">
+            <h2>Platbu nemusíte hlásit</h2>
+            <p>Účet klubu je napojený na banku. Jakmile platba dorazí, spáruje se sama podle variabilního symbolu a částky a dluh se změní na zaplacený. Pošlete ji jen s údaji výše.</p>
+          </article>
         ) : debt.remainingHalere > 0 ? (
           <article className="panel">
             <h2>Zaplatil jsem</h2>
@@ -120,7 +122,7 @@ export default async function ReceivablePage({
             <form action={reportManualPaymentAction} className="form-stack inline-form">
               <input name="receivableId" type="hidden" value={debt.id} />
               <label>Částka v Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} min="0.01" name="amount" required step="0.01" type="number" /></label>
-              <button type="submit">Zaplatil jsem</button>
+              <button type="submit"><IconLabel icon={HandCoins}>Zaplatil jsem</IconLabel></button>
             </form>
           </article>
         ) : null}

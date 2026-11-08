@@ -271,3 +271,59 @@ Aktualizováno: 2026-11-06.
 - Read-only `code-reviewer` našel riziko dvou e-mailů při souběžném odeslání a nález byl zapracován uvedenou databázovou idempotencí. Závěrečná kontrola nenašla otevřený problém. Automatizované testy ani testovací soubory nevznikly.
 - Po opravě byly 7. listopadu 2026 v 15:14 a 15:15 Europe/Prague vytvořeny dvě členské pozvánky na univerzitní adresy. Resend oba požadavky přijal, vrátil provider ID a databáze neobsahuje chybový kód. API klíč je omezený pouze na odesílání, proto přes něj nelze načíst následný stav doručení; nepřítomnost zprávy ve schránce je nutné ověřit ve spamu/karanténě nebo v Resend dashboardu. Další změna odesílacího kódu nebyla provedena.
 
+
+# Ruční ověření opravy vstupu člena (2026-11-08)
+
+- Prostředí: dev server (`next dev`) proti lokálnímu Postgresu 17 mimo Docker (Docker Desktop byl nefunkční po zaplnění disku); migrace `0001`–`0021` doběhly na čisté DB. `npm run lint`, `npx tsc --noEmit` a `npm run build` prošly.
+- Ověřeno v prohlížeči a kontrolou DB: registrace; založení klubu s IČO a týmu; e-mailová pozvánka (maskovaný e-mail před přihlášením); vstup „za sebe“ vytvoří jediný profil `self` a rovnou aktivuje členství; přidání dítěte kódem bez roku narození vytvoří profil `child` a jen čekající žádost; schválení žádosti správcem; dvojklik na přidání dítěte vytvoří jediný profil a jedinou žádost; pozvánka s jiným e-mailem je odmítnuta; použitá pozvánka nejde použít podruhé; stejný `self` profil je použit v druhém týmu; podvržené ID cizího dítěte server odmítl hláškou o vlastním profilu; týmový předpis vytvořil tři dluhy s unikátními VS.
+- Neověřeno: migrace starých dat (na čisté DB nelze; zadavatel ji nepovažuje za potřebnou), rodičovský pohled na nové dluhy, skutečné doručení e-mailů.
+- Známé omezení: `0021` nemá Drizzle snapshot, takže `drizzle-kit generate` navrhne duplicitní migraci; neaplikovat a doplnit snapshot před další tvorbou migrací.
+- Nejbližší krok: M6.
+
+# Stav implementace a ověření M6 (2026-11-08)
+
+- M6 dodal: rodičovskou historii (přehled i týmová stránka) s datem, částkou, způsobem, osobou, opravou a stažením HTML potvrzení evidence; stránku Příchozí platby s filtry období/způsobu/stavu a součty; CSV export týmu i klubu se sloupcem Tým („Celý klub“); přehled stavu plateb týmů pro správce (K3) včetně řádků „Celý klub“ a „Archivované týmy“; audit prohlížení, exportu a stažení. Bez změny schématu a bez migrace; rozhodnutí v D-20.
+- Technické kontroly: `npm run lint`, `npx tsc --noEmit` a `npm run build` prošly. Dev server běžel proti lokálnímu Postgresu 17 mimo Docker (Docker Desktop je nefunkční po zaplnění disku), e-maily byly vypnuty prázdným `RESEND_API_KEY` v `.env.local`.
+- Ručně ověřeno nad syntetickými daty: hotovost, potvrzené hlášení, demo pohyb a oprava protizápisem se správně ukázaly v přehledu i CSV (součet 2 100 Kč, záporný protizápis, rozlišený způsob a původ, demo označení); filtr způsobu a období; klubový export s „Celý klub“; K3 včetně po splatnosti 300 Kč (1 dluh) po dočasném posunu splatnosti; rodič vidí jen vlastní platby a potvrzení včetně klubového předpisu; potvrzení opravené platby i protizápisu vrátí 409; cizí rodič a rodič bez správcovských práv dostanou na cizí ID, `/platby` i `/platby/export` 404; audit zapsal všechny nové události; mobilní vzhled stránky Příchozí platby.
+- Nezávislá read-only revize nenašla P1 ani P2. Nález P3 o archivovaných týmech byl přijat a opraven řádkem „Archivované týmy“ (ověřeno dočasnou archivací týmu, poté vráceno). Nález P3 o rozdílu přehledu a registru byl odmítnut: klubový dluh má podle D-03 vždy prázdný týmový původ.
+- Neověřeno: pohled trenéra (sdílí `authorizeManagerRead` s M4, ale nebyl samostatně procházen), tisk či otevření stažené přílohy v prohlížeči, PDF (odloženo), velké objemy dat.
+- Nejbližší krok: M7 (odchod, přesun, archivace, zrušení neuhrazeného dluhu).
+
+# Stav implementace a ověření M7 (2026-11-08)
+
+- M7 dodal: odchod dítěte rodičem s přehledem nezaplacených předpisů (C9), vyřazení členů trenérem či správcem s oznámením rodiči (T10), přesun člena mezi týmy správcem (K4), archivaci týmu včetně sekce archivovaných týmů a zachování plateb i exportu (K6) a zrušení neuhrazeného dluhu s povinným důvodem a auditem. Rozhodnutí je v D-21.
+- Schéma: migrace `0028` (sloupce `receivables.cancelled_*`, `memberships.ended_reason`, omezení) a `0029` (DB pojistky proti úhradě zrušeného dluhu a proti vrácení zrušení, značka `M7-0029`). Po sloučení s `origin/main` (Fio, migrace `0022`–`0027`) navazují na jejich snapshot `0027`; `drizzle-kit generate` hlásí „No schema changes“.
+- Technické kontroly: `npm run lint`, `npx tsc --noEmit`, `npm run build` a `drizzle-kit generate` prošly; Docker Desktop zůstává nefunkční, ověření běželo proti lokálnímu Postgresu 17 a dev serveru, e-maily vypnuty prázdným `RESEND_API_KEY`.
+- Ručně ověřeno nad syntetickými daty: trenér zrušil týmový dluh; stejný trenér byl při pokusu o zrušení klubového dluhu odmítnut; zrušení částečně uhrazeného dluhu a zápis hotovosti na zrušený dluh selhaly srozumitelnou hláškou; DB triggery odmítly vrácení zrušení i kladnou alokaci; vyřazení trenérem ponechalo všechny dluhy, vytvořilo oznámení (`failed/email_not_configured`) a nový předpis bývalému členu nevznikl; přesun správcem ukončil staré a založil nové členství, staré dluhy zůstaly u původního týmu; trenér nevidí přesun ani klubovou stránku; rodič odhlásil dítě s upozorněním a pak dál vidí dluhy i historii; podvržené ID cizího profilu bylo odmítnuto; archivace odhlásila členy, zachovala `/finance`, `/platby` i CSV export a server odmítl nový předpis pro archivovaný tým; K3 ukazuje řádek „Archivované týmy“. Pohled trenéra na `/platby` (z M6) byl při tom také ověřen.
+- Nezávislá read-only revize nenašla P1. Přijato a opraveno: P2 správce nemohl po archivaci vyřizovat dluhy a hlášení (nyní smí), P2 ruční přiřazení pohybu na zrušený dluh (přidána kontrola i vyloučení ze seznamu), P3 opakování upomínky a e-mailu o předpisu u zrušeného dluhu, P3 kontrola zrušení po zámku při automatickém párování. Odmítnuto: oznámení druhému opatrovníkovi, protože podle D-06 a unikátního indexu má sportovce jediný spravující účet.
+- Neověřeno: trenérské nebo cizí volání akce přesunu/archivace mimo UI (server kontroluje roli, ale akce nebyla podvržena), oznámení o zrušení dluhu rodiči (není v rozsahu), skutečné doručení e-mailů.
+- Nejbližší krok: M8 (předání dema, návod, záloha, závěrečný průchod).
+
+# Sloučení `origin/main` do `feature/m6-m7` (2026-11-08)
+
+- Na `origin/main` přibylo 10 commitů (Fio synchronizace, veřejný QR tok, úpravy pozvánek a financí). M6 ani M7 tam nebyly; ověřeno chybějícími soubory a stavem dokumentů. Sloučení proběhlo lokálně, na GitHub se nepushovalo.
+- Konflikty: dokumenty, `finance/page.tsx` (matice přesunuta do `MemberAssessmentLedger`), `tymy/[teamId]/page.tsx` (nový layout správy týmu), `kluby/[clubId]/page.tsx`, `predpisy/[assessmentId]/page.tsx` a služby plateb, simulátoru a předpisů. Rozhodnutí M6/M7 byla přečíslována na D-20 a D-21, protože D-18 a D-19 už patří QR a Fio.
+- Migrace M7 jsou nově `0028` (sloupce a omezení, snapshot navazuje na jejich `0027`) a `0029` (DB pojistky, značka `M7-0029`). Existující vývojová databáze s dřívějším číslováním M7 není s novým řetězcem kompatibilní, proto se ověřovalo na čisté databázi.
+- Nový druh platby `fio` (bez uživatele u události) je zahrnut v M6: historie, přehled plateb, CSV i potvrzení používají `left join` na uživatele a zobrazují „Načteno z Fio API“ či „systém“. Fio párování nepřiřadí platbu ke zrušenému dluhu (stav `cancelled`).
+- Ověřeno na čisté DB po sloučení: migrace (30 záznamů, `M7-0029`), `npm run lint`, `npx tsc --noEmit`, `npm run build`, `drizzle-kit generate` bez změn; ručně registrace, založení klubu, předpis, hotovost, zrušení dluhu (nabídka jen u dluhu bez úhrady), přehled plateb a CSV včetně události bez uživatele, přehled týmů, vyřazení člena, archivace týmu a audit.
+- Neověřeno: skutečné spojení s Fio API, veřejný QR tok a e-maily.
+
+# Export do Excelu a oprava stránky Příchozí platby (2026-11-08)
+
+- Stránka `/platby` používá sdílenou `AppHeader`, hero se souhrnem jako finance a opravené rozložení filtrů.
+- Tlačítko **Export** je rozbalovací nabídka s volbou CSV a Excel (.xlsx). Route `/platby/export?format=csv|xlsx` (neznámý formát vrací 400). Soubor .xlsx byl ověřen načtením v `openpyxl` (platný ZIP, číselné částky, filtr, ukotvení, diakritika, text začínající `=` zůstává textem). Otevření ve skutečném Excelu ani Numbers nebylo provedeno.
+
+# Obnova archivovaného týmu (2026-11-08)
+
+- Správce klubu může v sekci **Archivované týmy** na stránce klubu tým obnovit (`restoreTeam`). Obnoví se jen členství ukončená touto archivací; pozvánky a týmový kód se nevracejí. Audit `team.restored`.
+- Ověřeno ručně: obnovení týmu s jedním členem odhlášeným archivací (obnoven) a jedním dříve vyřazeným (zůstal vyřazen), zápis auditu, tým se vrátil mezi aktivní. `npm run lint`, `npx tsc --noEmit` a build prošly. Oprávnění stejné jako u archivace (kontrola správce klubu na serveru); podvržení trenérem nebylo zkoušeno.
+- Obnova týmu má podřízenou volbu „Obnovit i členy“: bez ní se tým vrátí prázdný. Ověřeno obě varianty a že se obnoví jen členství z poslední archivace. Při testu se našly a opravily dvě chyby: počet obnovitelných členů ve výpisu (Drizzle bez názvu tabulky) a odškrtnutý checkbox, který formulář nepošle.
+
+# Potvrzení evidence jako PDF (2026-11-08)
+
+- Potvrzení pro rodiče se nově stahuje jako PDF (dříve HTML). Ověřeno vykreslením v macOS QuickLook včetně české diakritiky a speciálních znaků a stažením skutečné trasy `/potvrzeni/<id>` (typ `application/pdf`). Otevření v Acrobat Readeru nebylo zkoušeno.
+
+# Ikony v rozhraní (2026-11-08, větev design-fix)
+
+- Přidána knihovna `lucide-react` (1.70.0, tree-shaking). `package-lock.json` obsahuje jen záznam této knihovny (výchozí `npm install` v tomto prostředí smazal řádky pro jiné platformy, proto byl lock upraven ručně).
+- Ikony jsou v hlavičce (záložky, Nový předpis, Odhlásit, zpět), exportu, filtrech, správě týmu a členů, financích (hotovost, zrušení dluhu, oprava, upomínka, potvrzení hlášení), historii a platebních detailech. Společná komponenta `IconLabel`; ikony jsou jen dekorace (`aria-hidden`), význam nese text.

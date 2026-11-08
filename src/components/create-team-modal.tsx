@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { useRef } from "react";
 
 import { createTeamAction } from "@/app/actions/clubs";
@@ -18,7 +19,7 @@ export function CreateTeamModal({ clubId }: { clubId: string }) {
   return (
     <>
       <button className="club-primary-action" onClick={openDialog} type="button">
-        Přidat tým
+        <span className="icon-label"><Plus aria-hidden="true" size={16} />Přidat tým</span>
       </button>
 
       <dialog className="club-team-dialog" ref={dialogRef}>

@@ -6,7 +6,7 @@ import {
   retryReceivableDeliveryAction,
   sendAssessmentReminderAction,
 } from "@/app/actions/assessments";
-import { AppHeader } from "@/components/app-header";
+import { ManagementHeader } from "@/components/management-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getAssessmentManagerView } from "@/modules/assessments/service";
@@ -79,24 +79,14 @@ export default async function AssessmentPage({
   const paidRate = assessment.debts.length
     ? Math.round((paidCount / assessment.debts.length) * 100)
     : 0;
-  const totalExpectedHalere = assessment.amountHalere * assessment.debts.length;
+  const activeDebtCount = assessment.debts.filter((debt) => !debt.cancelledAt).length;
+  const totalExpectedHalere = assessment.amountHalere * activeDebtCount;
 
   return (
     <main className="dashboard-shell dashboard-home assessment-detail-page">
-      <AppHeader
-        backLink={{ href: financeHref, label: "Všechny předpisy" }}
-        context={{
-          kind: assessment.teamId ? "Tým" : "Klub",
-          name: assessment.teamName ?? assessment.clubName,
-          role: "Správa předpisu",
-          href: assessment.teamId
-            ? `/tymy/${assessment.teamId}`
-            : `/kluby/${assessment.clubId}`,
-        }}
-        navigation={[
-          { href: financeHref, label: "Finance" },
-          { href: `/predpisy/${assessment.id}`, label: "Detail předpisu", active: true },
-        ]}
+      <ManagementHeader
+        active="finance"
+        scope={assessment.teamId ? { teamId: assessment.teamId } : { clubId: assessment.clubId }}
         user={user}
       />
 
@@ -130,7 +120,7 @@ export default async function AssessmentPage({
             <span>Celkem očekáváno</span>
             <strong>{formatCzk(totalExpectedHalere)}</strong>
             <small>
-              {assessment.debts.length} × {formatCzk(assessment.amountHalere)}
+              {activeDebtCount} × {formatCzk(assessment.amountHalere)}
             </small>
           </article>
           <article>
@@ -206,13 +196,26 @@ export default async function AssessmentPage({
                     <strong>{debt.variableSymbol}</strong>
                   </div>
                   <div className="assessment-member-delivery">
-                    <span className={delivery.className}>{delivery.label}</span>
-                    {debt.deliveryError ? <small>{debt.deliveryError}</small> : null}
+                    {debt.cancelledAt ? (
+                      <>
+                        <span className="finance-cancelled-badge">Zrušeno</span>
+                        <small>{debt.cancellationReason}</small>
+                      </>
+                    ) : (
+                      <>
+                        <span className={delivery.className}>{delivery.label}</span>
+                        {debt.deliveryError ? <small>{debt.deliveryError}</small> : null}
+                      </>
+                    )}
                   </div>
                   <div className="assessment-member-status">
-                    <span className={isPaid ? "is-paid" : "is-unpaid"}>
-                      {isPaid ? "Zaplaceno" : "Nezaplaceno"}
-                    </span>
+                    {debt.cancelledAt ? (
+                      <span className="finance-cancelled-badge">Zrušeno</span>
+                    ) : (
+                      <span className={isPaid ? "is-paid" : "is-unpaid"}>
+                        {isPaid ? "Zaplaceno" : "Nezaplaceno"}
+                      </span>
+                    )}
                   </div>
                   <time
                     className="assessment-member-reminder"
@@ -221,10 +224,10 @@ export default async function AssessmentPage({
                     {formatReminderDate(debt.lastReminderAt)}
                   </time>
                   <strong className="assessment-member-amount">
-                    {formatCzk(assessment.amountHalere)}
+                    {debt.cancelledAt ? "—" : formatCzk(assessment.amountHalere)}
                   </strong>
                   <div className="assessment-member-action">
-                    {!isPaid ? (
+                    {!isPaid && !debt.cancelledAt ? (
                       <form action={sendAssessmentReminderAction}>
                         <input name="assessmentId" type="hidden" value={assessment.id} />
                         <input name="receivableId" type="hidden" value={debt.id} />
@@ -239,7 +242,7 @@ export default async function AssessmentPage({
                         </button>
                       </form>
                     ) : null}
-                    {debt.deliveryStatus !== "sent" ? (
+                    {!debt.cancelledAt && debt.deliveryStatus !== "sent" ? (
                       <form action={retryReceivableDeliveryAction}>
                         <input name="assessmentId" type="hidden" value={assessment.id} />
                         <input name="receivableId" type="hidden" value={debt.id} />
@@ -247,7 +250,7 @@ export default async function AssessmentPage({
                           Zkusit znovu
                         </button>
                       </form>
-                    ) : isPaid ? (
+                    ) : isPaid || debt.cancelledAt ? (
                       <span aria-label="Bez dostupné akce">—</span>
                     ) : null}
                   </div>

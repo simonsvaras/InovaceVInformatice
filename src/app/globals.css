@@ -474,6 +474,9 @@ button,
 }
 
 .app-header-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   align-self: center;
   border-radius: 0.58rem;
   padding: 0.62rem 0.78rem;
@@ -513,19 +516,6 @@ button,
   text-decoration: none;
 }
 
-.dashboard-brand-mark {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 0.55rem;
-  background: var(--dashboard-blue);
-  color: var(--dashboard-white);
-  font-size: 0.98rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
-}
-
 .dashboard-account {
   display: flex;
   align-items: center;
@@ -553,7 +543,7 @@ button.dashboard-logout {
 .dashboard-home .dashboard-content {
   width: min(100% - 3rem, 76rem);
   gap: 1.25rem;
-  padding: clamp(3.5rem, 8vw, 6.5rem) 0 5rem;
+  padding: clamp(1.75rem, 4vw, 3rem) 0 5rem;
 }
 
 .dashboard-welcome {
@@ -1071,7 +1061,7 @@ button.dashboard-team-switch:disabled {
   width: min(100% - 3rem, 76rem);
   gap: 1.25rem;
   margin: 0 auto;
-  padding: clamp(2.5rem, 6vw, 4.5rem) 0 5rem;
+  padding: clamp(1.25rem, 3vw, 2rem) 0 5rem;
 }
 
 .member-team-hero {
@@ -1410,7 +1400,7 @@ button.dashboard-team-switch:disabled {
   width: min(100% - 3rem, 76rem);
   gap: 1.25rem;
   margin: 0 auto;
-  padding: clamp(2.5rem, 6vw, 4.5rem) 0 5rem;
+  padding: clamp(1.25rem, 3vw, 2rem) 0 5rem;
 }
 
 .team-admin-hero {
@@ -2033,7 +2023,7 @@ button.dashboard-team-switch:disabled {
   width: min(100% - 3rem, 76rem);
   gap: 2rem;
   margin: 0 auto;
-  padding: clamp(3.5rem, 7vw, 6rem) 0 5rem;
+  padding: clamp(1.25rem, 3vw, 2rem) 0 5rem;
 }
 
 .club-topbar-link {
@@ -2429,7 +2419,7 @@ button.club-dialog-close {
   width: min(100% - 3rem, 76rem);
   gap: 1.5rem;
   margin: 0 auto;
-  padding: clamp(3.5rem, 7vw, 6rem) 0 5rem;
+  padding: clamp(1.25rem, 3vw, 2rem) 0 5rem;
 }
 
 .finance-admin-hero {
@@ -3905,7 +3895,7 @@ button.fio-dialog-close {
 
 .finance-reminder form {
   margin: 0;
-  padding: 0 1.25rem;
+  padding: 0 1.25rem 1.25rem;
 }
 
 .finance-reminder form button {
@@ -3926,7 +3916,7 @@ button.fio-dialog-close {
   width: min(100% - 3rem, 76rem);
   gap: 1.5rem;
   margin: 0 auto;
-  padding: 2.5rem 0 5rem;
+  padding: clamp(1.25rem, 3vw, 2rem) 0 5rem;
 }
 
 .assessment-back-link {
@@ -4980,15 +4970,23 @@ h3 {
 
 .checkbox-label {
   display: flex !important;
-  grid-template-columns: auto 1fr;
   align-items: flex-start;
+  gap: 0.6rem;
   font-size: 0.9rem;
   font-weight: 400 !important;
+  line-height: 1.4;
 }
 
-.checkbox-label input {
-  width: auto;
-  margin-top: 0.2rem;
+input[type="checkbox"] {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  /* první řádek textu má výšku 1.26rem, zaškrtávátko se vystředí vůči němu */
+  margin-top: 0.08rem;
 }
 
 .share-code {
@@ -5273,19 +5271,6 @@ main.home-shell {
   font-weight: 750;
   letter-spacing: -0.02em;
   text-decoration: none;
-}
-
-.home-brand-mark {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 0.55rem;
-  background: var(--home-blue);
-  color: var(--home-white);
-  font-size: 0.98rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
 }
 
 .home-demo-label {
@@ -5833,4 +5818,510 @@ button.home-header-action {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+.payments-filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 1rem;
+  background: var(--dashboard-white);
+}
+
+.payments-filter label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--dashboard-muted);
+  font-size: 0.78rem;
+}
+
+.payments-filter input,
+.payments-filter select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.6rem;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.7rem;
+  background: #fff;
+  color: var(--dashboard-ink);
+}
+
+.payments-overview {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payments-overview-methods dd {
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 42rem) {
+  .payments-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .payments-overview > div,
+  .payments-overview > div:nth-child(2n),
+  .payments-overview > div:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 16%);
+  }
+
+  .payments-overview > div:last-child {
+    border-bottom: 0;
+  }
+}
+
+.payments-register {
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 1rem;
+  background: var(--dashboard-white);
+}
+
+.payments-register-row {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--dashboard-line);
+}
+
+.payments-register-row > span,
+.payments-register-row small {
+  color: var(--dashboard-muted);
+  font-size: 0.75rem;
+}
+
+.payments-register-row > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.payments-register-row > div strong {
+  color: var(--dashboard-ink);
+  font-size: 0.88rem;
+}
+
+.payments-register-row > strong {
+  color: #23794f;
+  font-size: 0.92rem;
+}
+
+.payments-register-row .is-correction,
+.member-team-history-row .is-correction-note {
+  color: #b33d46;
+}
+
+.member-team-history-download {
+  width: fit-content;
+  color: var(--dashboard-blue-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.club-finance-table {
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 1rem;
+  background: var(--dashboard-white);
+}
+
+.club-finance-table-head,
+.club-finance-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)) 5rem;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+}
+
+.club-finance-table-head {
+  color: var(--dashboard-muted);
+  font-size: 0.75rem;
+}
+
+.club-finance-table-row {
+  border-top: 1px solid var(--dashboard-line);
+  font-size: 0.88rem;
+}
+
+.club-finance-table-row .is-overdue {
+  color: #b33d46;
+  font-weight: 700;
+}
+
+@media (max-width: 42rem) {
+  .payments-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .payments-register-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .club-finance-table-head {
+    display: none;
+  }
+
+  .club-finance-table-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 1rem;
+  }
+}
+
+.club-archived-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+  border-top: 1px solid var(--dashboard-line);
+  font-size: 0.88rem;
+}
+
+.club-archived-row:first-child {
+  border-top: 0;
+}
+
+.club-archive,
+.member-team-leave {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.club-archive summary,
+.member-team-leave summary {
+  cursor: pointer;
+  color: var(--dashboard-blue-dark);
+  font-weight: 700;
+}
+
+.finance-assessment-row.is-cancelled {
+  opacity: 0.6;
+}
+
+.finance-cancelled-badge {
+  margin-left: 0.6rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  background: #eef0f4;
+  color: var(--dashboard-muted);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.team-admin-player-lifecycle {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--dashboard-muted);
+}
+
+.team-admin-player-lifecycle details {
+  font-size: 0.85rem;
+}
+
+.team-admin-player-lifecycle summary {
+  cursor: pointer;
+  color: var(--dashboard-blue-dark);
+  font-weight: 700;
+}
+
+.export-menu {
+  position: relative;
+}
+
+.export-menu-button {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.export-menu-list {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 11rem;
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 0.75rem 2rem rgb(21 32 51 / 18%);
+}
+
+.export-menu-list a {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  color: var(--dashboard-ink);
+  font-size: 0.88rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.export-menu-list a + a {
+  border-top: 1px solid var(--dashboard-line);
+}
+
+.export-menu-list a:hover {
+  background: #f1f5ff;
+}
+
+.export-menu-list small {
+  color: var(--dashboard-muted);
+  font-weight: 500;
+}
+
+.club-restore {
+  margin-top: 0;
+  flex-basis: 100%;
+}
+
+.restore-sub-option {
+  margin-left: 1.5rem;
+}
+
+.restore-sub-option.is-disabled {
+  opacity: 0.5;
+}
+
+.restore-sub-note {
+  margin: 0;
+  color: var(--dashboard-muted);
+  font-size: 0.8rem;
+}
+
+.team-admin-invite-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--dashboard-line);
+}
+
+.team-admin-invite-layout .team-admin-invite-body {
+  border-top: 0;
+}
+
+.team-admin-invite-layout .team-admin-invite textarea,
+.team-admin-invite textarea {
+  min-height: 7.5rem;
+}
+
+.team-admin-invite-layout .team-admin-invitation-list {
+  border-top: 1px solid var(--dashboard-line);
+}
+
+@media (min-width: 56rem) {
+  .team-admin-invite-layout.has-invitations {
+    grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
+  }
+
+  .team-admin-invite-layout.has-invitations .team-admin-invitation-list {
+    border-top: 0;
+    border-left: 1px solid var(--dashboard-line);
+  }
+
+  .team-admin-invite button[type="submit"] {
+    width: fit-content;
+    min-width: 16rem;
+  }
+}
+
+.icon-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+
+.icon-label svg {
+  flex: none;
+}
+
+.app-header-nav a .icon-label {
+  gap: 0.4rem;
+}
+
+.export-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.team-admin-hero-actions a,
+.finance-admin-hero-action,
+.club-finance-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Lišta se záložkami se na užších oknech rozdělí na dva řádky: nahoře kontext a hlavní akce, pod nimi záložky. */
+@media (max-width: 72rem) {
+  .app-header.has-navigation .app-header-context-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 1rem;
+  }
+
+  .app-header.has-navigation .app-header-context-start {
+    min-height: 3.8rem;
+  }
+
+  .app-header.has-navigation .app-header-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    overflow-x: auto;
+    border-top: 1px solid #e3e8f1;
+    scrollbar-width: none;
+  }
+
+  .app-header.has-navigation .app-header-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-header.has-navigation .app-header-nav a {
+    min-height: 3rem;
+    padding: 0 0.8rem;
+  }
+
+  /* Automatické okraje vycentrují záložky; když se nevejdou, okraje zmizí a záložky se posouvají. */
+  .app-header.has-navigation .app-header-nav > a:first-child {
+    margin-left: auto;
+  }
+
+  .app-header.has-navigation .app-header-nav > a:last-child {
+    margin-right: auto;
+  }
+}
+
+/* Rozbalovače akcí vypadají jako tlačítka: rámeček, ikona, šipka a barevné odlišení rizikových akcí. */
+.action-disclosure {
+  margin-top: 0;
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 0.7rem;
+  background: #fff;
+  font-size: 0.8rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.action-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.62rem 0.8rem;
+  color: var(--dashboard-blue-dark);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  list-style: none;
+  user-select: none;
+}
+
+.action-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-disclosure > summary::after {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: none;
+  border-right: 2px solid currentcolor;
+  border-bottom: 2px solid currentcolor;
+  content: "";
+  opacity: 0.7;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.action-disclosure[open] > summary::after {
+  transform: translateY(1px) rotate(-135deg);
+}
+
+.action-disclosure:hover {
+  border-color: #b9c8ec;
+}
+
+.action-disclosure > summary:hover {
+  background: #f1f5ff;
+}
+
+.action-disclosure[open] {
+  border-color: #b9c8ec;
+}
+
+.action-disclosure[open] > summary {
+  border-bottom: 1px solid var(--dashboard-line);
+  background: #eef3ff;
+}
+
+.action-disclosure > form,
+.action-disclosure > div {
+  padding: 0.8rem;
+}
+
+.action-disclosure.is-danger > summary {
+  color: #b33d46;
+}
+
+.action-disclosure.is-danger:hover,
+.action-disclosure.is-danger[open] {
+  border-color: #efc4c8;
+}
+
+.action-disclosure.is-danger > summary:hover {
+  background: #fff4f4;
+}
+
+.action-disclosure.is-danger[open] > summary {
+  background: #fff1f1;
+}
+
+.team-admin-player-lifecycle {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.action-disclosure > form,
+.action-disclosure > .form-stack {
+  margin-top: 0;
+}
+
+button:disabled,
+.button-link[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.club-team-card > .club-archive {
+  margin: 0 1.4rem 1.4rem;
+}
+
+.member-team-roster > .member-team-leave {
+  margin: 0.85rem 1.2rem 1.2rem;
+}
+
+.member-team-roster > .member-team-leave + .member-team-leave {
+  margin-top: 0;
 }

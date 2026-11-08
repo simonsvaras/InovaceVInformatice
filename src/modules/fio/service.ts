@@ -674,8 +674,9 @@ async function autoAllocateFioMovement(
     assessment_title: string;
     club_name: string;
     team_name: string | null;
+    cancelled_at: Date | null;
   }>(sql`
-    select r.id, a.club_id, a.team_id as assessment_team_id, r.amount_halere,
+    select r.id, a.club_id, a.team_id as assessment_team_id, r.amount_halere, r.cancelled_at,
            ath.full_name as athlete_name, a.title as assessment_title,
            c.name as club_name, t.name as team_name
       from receivables r
@@ -688,6 +689,7 @@ async function autoAllocateFioMovement(
   `);
   const candidate = candidates[0];
   if (!candidate) return { status: "unmatched", reasonCode: "unknown_vs", deliveries: [] as FioDelivery[] };
+  if (candidate.cancelled_at) return { status: "unmatched", reasonCode: "cancelled", deliveries: [] as FioDelivery[] };
   const stateRows = await transaction.execute<{
     allocated_halere: number;
     pending_claim: boolean;

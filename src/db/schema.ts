@@ -526,8 +526,13 @@ export const memberships = pgTable(
       .defaultNow()
       .notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
+    endedReason: varchar("ended_reason", { length: 20 }),
   },
   (table) => [
+    check(
+      "memberships_ended_reason_valid",
+      sql`${table.endedReason} is null or ${table.endedReason} in ('left', 'removed', 'moved', 'archived')`,
+    ),
     uniqueIndex("memberships_one_active_team_athlete_idx")
       .on(table.teamId, table.athleteId)
       .where(sql`${table.endedAt} is null`),
@@ -652,11 +657,21 @@ export const receivables = pgTable(
       .references(() => bankAccounts.id, { onDelete: "restrict" }),
     amountHalere: integer("amount_halere").notNull(),
     variableSymbol: varchar("variable_symbol", { length: 10 }).notNull(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledByUserId: uuid("cancelled_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    cancellationReason: varchar("cancellation_reason", { length: 300 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => [
+    check(
+      "receivables_cancellation_complete",
+      sql`(${table.cancelledAt} is null and ${table.cancelledByUserId} is null and ${table.cancellationReason} is null)
+        or (${table.cancelledAt} is not null and ${table.cancelledByUserId} is not null and ${table.cancellationReason} is not null)`,
+    ),
     uniqueIndex("receivables_assessment_athlete_idx").on(
       table.assessmentId,
       table.athleteId,

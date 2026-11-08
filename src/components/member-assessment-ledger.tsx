@@ -1,8 +1,12 @@
+import { Ban, Banknote, Check, History, Undo2 } from "lucide-react";
 import { randomUUID } from "node:crypto";
 
+import { IconLabel } from "@/components/icon-label";
+import { ConfirmForm } from "@/components/confirm-form";
 import Link from "next/link";
 
 import {
+  cancelReceivableAction,
   recordCashPaymentAction,
   reversePaymentEventAction,
 } from "@/app/actions/payments";
@@ -33,6 +37,8 @@ export type LedgerAssessment = {
   hasPendingClaim: boolean;
   lastReminderAt: Date | string | null;
   lastReminderStatus: string | null;
+  cancelledAt: Date | string | null;
+  cancellationReason: string | null;
   events: LedgerPaymentEvent[];
 };
 
@@ -160,9 +166,16 @@ function AssessmentCard({
         </div>
       ) : null}
 
+      {assessment.cancelledAt ? (
+        <div className="member-ledger-notices">
+          <span>Dluh byl zrušen. Důvod: {assessment.cancellationReason}</span>
+        </div>
+      ) : null}
+
+      {assessment.cancelledAt ? null : (
       <div className="member-ledger-tools">
         <details className="member-ledger-tool">
-          <summary>Zapsat hotovost</summary>
+          <summary><IconLabel icon={Banknote} size={15}>Zapsat hotovost</IconLabel></summary>
           <form action={recordCashPaymentAction} className="member-ledger-form">
             <ScopeFields scope={scope} />
             <input name="receivableId" type="hidden" value={assessment.id} />
@@ -179,12 +192,33 @@ function AssessmentCard({
               Datum
               <input defaultValue={today} max={today} name="occurredOn" required type="date" />
             </label>
-            <button type="submit">Uložit hotovost</button>
+            <button type="submit"><IconLabel icon={Check} size={15}>Uložit hotovost</IconLabel></button>
           </form>
         </details>
 
+        {assessment.allocatedHalere === 0 && !assessment.hasPendingClaim ? (
+          <details className="member-ledger-tool">
+            <summary><IconLabel icon={Ban} size={15}>Zrušit dluh</IconLabel></summary>
+            <ConfirmForm
+              action={cancelReceivableAction}
+              className="member-ledger-form"
+              confirmLabel="Potvrzuji zrušení dluhu"
+              submit={<IconLabel icon={Ban} size={15}>Zrušit dluh</IconLabel>}
+              submitClassName="button-secondary"
+            >
+              <ScopeFields scope={scope} />
+              <input name="receivableId" type="hidden" value={assessment.id} />
+              <p>Dluh se nesmaže, jen přestane být očekávaný. Historie a audit zůstanou.</p>
+              <label>
+                Důvod zrušení
+                <input maxLength={300} name="reason" required />
+              </label>
+            </ConfirmForm>
+          </details>
+        ) : null}
+
         <details className="member-ledger-tool">
-          <summary>Historie evidence <span>{events.length}</span></summary>
+          <summary><IconLabel icon={History} size={15}>Historie evidence</IconLabel> <span>{events.length}</span></summary>
           {events.length ? (
             <div className="member-ledger-event-list">
               {events.map((event) => (
@@ -198,7 +232,7 @@ function AssessmentCard({
                   </strong>
                   {!event.reversed ? (
                     <details>
-                      <summary>Zapsat opravu</summary>
+                      <summary><IconLabel icon={Undo2} size={14}>Zapsat opravu</IconLabel></summary>
                       <form action={reversePaymentEventAction} className="member-ledger-form">
                         <ScopeFields scope={scope} />
                         <input name="paymentEventId" type="hidden" value={event.id} />
@@ -219,6 +253,7 @@ function AssessmentCard({
           )}
         </details>
       </div>
+      )}
     </article>
   );
 }

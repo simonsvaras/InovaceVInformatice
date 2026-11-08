@@ -10,6 +10,7 @@ import {
   setActiveCoachTeam,
 } from "@/modules/clubs/service";
 import { requireUser } from "@/modules/auth/service";
+import { archiveTeam, restoreTeam } from "@/modules/memberships/lifecycle";
 import {
   formText,
   InputError,
@@ -17,6 +18,7 @@ import {
   normalizeEmail,
   validateEntityName,
   validateIco,
+  validateUuid,
 } from "@/lib/validation";
 
 function message(error: unknown) {
@@ -113,4 +115,48 @@ export async function switchCoachTeamAction(formData: FormData) {
   const teamId = formText(formData, "teamId");
   await setActiveCoachTeam(user.id, teamId);
   redirect(`/tymy/${teamId}`);
+}
+
+export async function archiveTeamAction(formData: FormData) {
+  const user = await requireUser();
+  const clubId = validateUuid(formText(formData, "clubId"), "Klub");
+  let success: string;
+  try {
+    if (formText(formData, "confirm") !== "yes") {
+      throw new InputError("confirm_required", "Potvrďte archivaci týmu.");
+    }
+    const result = await archiveTeam({
+      actorUserId: user.id,
+      clubId,
+      teamId: validateUuid(formText(formData, "teamId"), "Tým"),
+    });
+    success = `Tým ${result.name} byl archivován. Finanční historie a export zůstaly dostupné.`;
+  } catch (error) {
+    redirect(`/kluby/${clubId}?error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(`/kluby/${clubId}?success=${encodeURIComponent(success)}`);
+}
+
+export async function restoreTeamAction(formData: FormData) {
+  const user = await requireUser();
+  const clubId = validateUuid(formText(formData, "clubId"), "Klub");
+  let success: string;
+  try {
+    if (formText(formData, "confirm") !== "yes") {
+      throw new InputError("confirm_required", "Potvrďte obnovení týmu.");
+    }
+    const result = await restoreTeam({
+      actorUserId: user.id,
+      clubId,
+      teamId: validateUuid(formText(formData, "teamId"), "Tým"),
+      // Odškrtnutý checkbox se v odeslaném formuláři vůbec neobjeví.
+      restoreMembers: formData.get("restoreMembers") === "yes",
+    });
+    success = result.restoreMembers
+      ? `Tým ${result.name} byl obnoven. Obnovených členství: ${result.restoredMemberships}. Pozvánky a týmový kód vytvořte znovu.`
+      : `Tým ${result.name} byl obnoven bez členů. Členy přidejte znovu pozvánkou nebo kódem.`;
+  } catch (error) {
+    redirect(`/kluby/${clubId}?error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(`/kluby/${clubId}?success=${encodeURIComponent(success)}`);
 }

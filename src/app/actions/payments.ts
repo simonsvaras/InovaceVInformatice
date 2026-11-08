@@ -12,6 +12,7 @@ import {
   validateUuid,
 } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
+import { cancelReceivable } from "@/modules/payments/cancellation";
 import {
   recordCashPayment,
   reportManualPayment,
@@ -170,4 +171,25 @@ export async function sendBulkRemindersAction(formData: FormData) {
     ? `Neutrální upomínka byla připravena pro ${recipientCount} dluhů.`
     : "Tento požadavek na upomínky už byl zpracován.";
   redirect(`${returnPath}&success=${encodeURIComponent(success)}`);
+}
+
+export async function cancelReceivableAction(formData: FormData) {
+  const user = await requireUser();
+  const scope = paymentScope(formData);
+  const returnPath = financePath(scope);
+  try {
+    if (formText(formData, "confirm") !== "yes") {
+      throw new InputError("confirm_required", "Potvrďte, že chcete dluh zrušit.");
+    }
+    await cancelReceivable({
+      actorUserId: user.id,
+      receivableId: validateUuid(formText(formData, "receivableId"), "Dluh"),
+      reason: validateReason(formText(formData, "reason"), "Důvod zrušení"),
+    });
+  } catch (error) {
+    redirect(`${returnPath}&error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(
+    `${returnPath}&success=${encodeURIComponent("Dluh byl zrušen. Historie a auditní záznam zůstaly zachovány.")}`,
+  );
 }

@@ -1,6 +1,6 @@
 # Plán realizace školního demo MVP
 
-Stav: aktualizováno po dokončení M5 dne 2026-11-05. Milníky M0–M5 jsou implementované; nejbližší samostatný milník je M6. Každý milník končí ručním průchodem scénářů a zápisem výsledku do `docs/current-state.md`. **Automatizované testy se nikdy nepíší.** Build, lint a kontrola migrací jsou technické kontroly, nikoli testovací kód.
+Stav: aktualizováno po dokončení M7 dne 2026-11-08. Milníky M0–M7 jsou implementované; nejbližší samostatný milník je M8. Každý milník končí ručním průchodem scénářů a zápisem výsledku do `docs/current-state.md`. **Automatizované testy se nikdy nepíší.** Build, lint a kontrola migrací jsou technické kontroly, nikoli testovací kód.
 
 | Milník | Rozsah | Akceptační kritéria | Ruční ověření |
 | --- | --- | --- | --- |
