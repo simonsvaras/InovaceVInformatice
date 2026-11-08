@@ -6220,4 +6220,13 @@ button.home-header-action {
     min-height: 3rem;
     padding: 0 0.8rem;
   }
+
+  /* Automatické okraje vycentrují záložky; když se nevejdou, okraje zmizí a záložky se posouvají. */
+  .app-header.has-navigation .app-header-nav > a:first-child {
+    margin-left: auto;
+  }
+
+  .app-header.has-navigation .app-header-nav > a:last-child {
+    margin-right: auto;
+  }
 }
