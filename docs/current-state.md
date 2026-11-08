@@ -307,3 +307,8 @@ Aktualizováno: 2026-11-06.
 - Nový druh platby `fio` (bez uživatele u události) je zahrnut v M6: historie, přehled plateb, CSV i potvrzení používají `left join` na uživatele a zobrazují „Načteno z Fio API“ či „systém“. Fio párování nepřiřadí platbu ke zrušenému dluhu (stav `cancelled`).
 - Ověřeno na čisté DB po sloučení: migrace (30 záznamů, `M7-0029`), `npm run lint`, `npx tsc --noEmit`, `npm run build`, `drizzle-kit generate` bez změn; ručně registrace, založení klubu, předpis, hotovost, zrušení dluhu (nabídka jen u dluhu bez úhrady), přehled plateb a CSV včetně události bez uživatele, přehled týmů, vyřazení člena, archivace týmu a audit.
 - Neověřeno: skutečné spojení s Fio API, veřejný QR tok a e-maily.
+
+# Export do Excelu a oprava stránky Příchozí platby (2026-11-08)
+
+- Stránka `/platby` používá sdílenou `AppHeader`, hero se souhrnem jako finance a opravené rozložení filtrů.
+- Tlačítko **Export** je rozbalovací nabídka s volbou CSV a Excel (.xlsx). Route `/platby/export?format=csv|xlsx` (neznámý formát vrací 400). Soubor .xlsx byl ověřen načtením v `openpyxl` (platný ZIP, číselné částky, filtr, ukotvení, diakritika, text začínající `=` zůstává textem). Otevření ve skutečném Excelu ani Numbers nebylo provedeno.

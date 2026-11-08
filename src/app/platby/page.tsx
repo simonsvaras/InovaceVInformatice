@@ -77,7 +77,8 @@ export default async function PaymentRegisterPage({
   if (filters.to) filterQuery.set("to", filters.to);
   if (filters.method) filterQuery.set("method", filters.method);
   if (filters.state !== "all") filterQuery.set("state", filters.state);
-  const exportHref = `/platby/export?${scopeQuery}${filterQuery.size ? `&${filterQuery}` : ""}`;
+  const exportHref = (format: "csv" | "xlsx") =>
+    `/platby/export?${scopeQuery}${filterQuery.size ? `&${filterQuery}` : ""}&format=${format}`;
   const back = scope.teamId ? `/tymy/${scope.teamId}` : `/kluby/${scope.clubId!}`;
 
   return (
@@ -114,7 +115,13 @@ export default async function PaymentRegisterPage({
                 potvrzení nejsou bankovně ověřené převody.
               </p>
             </div>
-            <a className="finance-admin-hero-action" href={exportHref}>Export CSV</a>
+            <details className="export-menu">
+              <summary className="finance-admin-hero-action">Export <span aria-hidden="true">▾</span></summary>
+              <div className="export-menu-list">
+                <a href={exportHref("csv")}>CSV <small>.csv</small></a>
+                <a href={exportHref("xlsx")}>Excel <small>.xlsx</small></a>
+              </div>
+            </details>
           </div>
 
           <dl className="finance-overview payments-overview" aria-label="Souhrn plateb">

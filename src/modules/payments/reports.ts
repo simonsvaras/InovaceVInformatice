@@ -4,6 +4,7 @@ import { getDatabase } from "@/db/client";
 import { auditEvents, teams } from "@/db/schema";
 import { todayInPrague } from "@/lib/dates";
 import { buildCsv } from "@/lib/csv";
+import { buildXlsx } from "@/lib/xlsx";
 import { InputError, validateDueDate } from "@/lib/validation";
 import { requireClubAdminAccess } from "@/modules/authorization/service";
 import {
@@ -166,10 +167,22 @@ function recordState(row: RegisterRow) {
   return row.corrected ? "Opraveno protizápisem" : "Platný záznam";
 }
 
-export async function exportPaymentRegisterCsv(
+export const exportFormats = ["csv", "xlsx"] as const;
+export type ExportFormat = (typeof exportFormats)[number];
+
+export function parseExportFormat(value: string | null): ExportFormat {
+  if (!value) return "csv";
+  if (!exportFormats.includes(value as ExportFormat)) {
+    throw new InputError("invalid_format", "Neznámý formát exportu.");
+  }
+  return value as ExportFormat;
+}
+
+export async function exportPaymentRegister(
   userId: string,
   requestedScope: PaymentScope,
   filters: RegisterFilters,
+  format: ExportFormat,
 ) {
   const scope = await authorizeManagerRead(userId, requestedScope);
   const rows = await loadRegister(scope, filters);
@@ -180,44 +193,53 @@ export async function exportPaymentRegisterCsv(
     eventType: "payments.exported",
     targetType: scope.teamId ? "team" : "club",
     targetId: scope.teamId ?? scope.clubId,
-    details: { ...filterDetails(filters), rows: rows.length, format: "csv" },
+    details: { ...filterDetails(filters), rows: rows.length, format },
   });
-  const csv = buildCsv(
-    [
-      "Datum úhrady",
-      "Tým",
-      "Sportovec",
-      "Předpis",
-      "Částka (Kč)",
-      "Způsob",
-      "Původ záznamu",
-      "Zapsal / potvrdil",
-      "Variabilní symbol",
-      "Účet",
-      "Stav záznamu",
-      "Důvod opravy",
-    ],
-    rows.map((row) => [
-      row.occurred_on,
-      row.team_name ?? "Celý klub",
-      row.athlete_name,
-      row.assessment_title,
-      { halere: row.amount_halere },
-      paymentMethodLabel(row.kind),
-      recordSource(row),
-      row.kind === "simulated"
-        ? "Demo simulace"
-        : row.kind === "fio"
-          ? "Fio API"
-          : row.actor_name,
-      row.variable_symbol,
-      row.account_number,
-      recordState(row),
-      row.correction_reason,
-    ]),
-  );
-  const scopeLabel = scope.teamId ? "tym" : "klub";
-  return { csv, filename: `platby-${scopeLabel}-${todayInPrague()}.csv` };
+  const header = [
+    "Datum úhrady",
+    "Tým",
+    "Sportovec",
+    "Předpis",
+    "Částka (Kč)",
+    "Způsob",
+    "Původ záznamu",
+    "Zapsal / potvrdil",
+    "Variabilní symbol",
+    "Účet",
+    "Stav záznamu",
+    "Důvod opravy",
+  ];
+  const table = rows.map((row) => [
+    row.occurred_on,
+    row.team_name ?? "Celý klub",
+    row.athlete_name,
+    row.assessment_title,
+    { halere: row.amount_halere },
+    paymentMethodLabel(row.kind),
+    recordSource(row),
+    row.kind === "simulated"
+      ? "Demo simulace"
+      : row.kind === "fio"
+        ? "Fio API"
+        : row.actor_name,
+    row.variable_symbol,
+    row.account_number,
+    recordState(row),
+    row.correction_reason,
+  ]);
+  const baseName = `platby-${scope.teamId ? "tym" : "klub"}-${todayInPrague()}`;
+  if (format === "xlsx") {
+    return {
+      body: buildXlsx("Platby", header, table),
+      filename: `${baseName}.xlsx`,
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+  }
+  return {
+    body: buildCsv(header, table),
+    filename: `${baseName}.csv`,
+    contentType: "text/csv; charset=utf-8",
+  };
 }
 
 export async function getClubTeamFinanceOverview(userId: string, clubId: string) {

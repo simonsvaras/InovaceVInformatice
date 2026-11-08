@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { InputError, validateUuid } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
 import {
-  exportPaymentRegisterCsv,
+  exportPaymentRegister,
+  parseExportFormat,
   parseRegisterFilters,
 } from "@/modules/payments/reports";
 import type { PaymentScope } from "@/modules/payments/service";
@@ -27,10 +28,11 @@ export async function GET(request: Request) {
       method: params.get("method") ?? undefined,
       state: params.get("state") ?? undefined,
     });
-    const { csv, filename } = await exportPaymentRegisterCsv(user.id, scope, filters);
-    return new NextResponse(csv, {
+    const format = parseExportFormat(params.get("format"));
+    const { body, filename, contentType } = await exportPaymentRegister(user.id, scope, filters, format);
+    return new NextResponse(typeof body === "string" ? body : new Uint8Array(body), {
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
