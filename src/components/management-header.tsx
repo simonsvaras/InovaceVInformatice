@@ -1,3 +1,12 @@
+import {
+  LayoutDashboard,
+  Plus,
+  Receipt,
+  Settings,
+  Users,
+  Wallet,
+} from "lucide-react";
+
 import { AppHeader } from "@/components/app-header";
 import {
   requireClubAdminAccess,
@@ -53,17 +62,17 @@ export async function ManagementHeader({
 
   const items = teamId
     ? [
-        { key: "overview", href: home, label: "Přehled týmu" },
-        { key: "roster", href: `${home}#manager-roster-title`, label: "Hráči" },
-        { key: "settings", href: `${home}#team-tools-title`, label: "Nastavení" },
-        { key: "finance", href: `/finance?${query}`, label: "Finance" },
-        { key: "payments", href: `/platby?${query}`, label: "Příchozí platby" },
+        { key: "overview", href: home, label: "Přehled týmu", icon: LayoutDashboard },
+        { key: "roster", href: `${home}#manager-roster-title`, label: "Hráči", icon: Users },
+        { key: "settings", href: `${home}#team-tools-title`, label: "Nastavení", icon: Settings },
+        { key: "finance", href: `/finance?${query}`, label: "Finance", icon: Wallet },
+        { key: "payments", href: `/platby?${query}`, label: "Příchozí platby", icon: Receipt },
       ]
     : [
-        { key: "overview", href: home, label: "Přehled klubu" },
-        { key: "roster", href: `${home}#teams-title`, label: "Týmy" },
-        { key: "finance", href: `/finance?${query}`, label: "Finance" },
-        { key: "payments", href: `/platby?${query}`, label: "Příchozí platby" },
+        { key: "overview", href: home, label: "Přehled klubu", icon: LayoutDashboard },
+        { key: "roster", href: `${home}#teams-title`, label: "Týmy", icon: Users },
+        { key: "finance", href: `/finance?${query}`, label: "Finance", icon: Wallet },
+        { key: "payments", href: `/platby?${query}`, label: "Příchozí platby", icon: Receipt },
       ];
 
   return (
@@ -73,11 +82,12 @@ export async function ManagementHeader({
       navigation={items.map((item) => ({
         href: item.href,
         label: item.label,
+        icon: item.icon,
         active: item.key === active,
       }))}
       primaryAction={
         showPrimaryAction
-          ? { href: `/predpisy/novy?${query}`, label: "Nový předpis" }
+          ? { href: `/predpisy/novy?${query}`, label: "Nový předpis", icon: Plus }
           : undefined
       }
       user={user}

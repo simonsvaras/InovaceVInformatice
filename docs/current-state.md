@@ -322,3 +322,8 @@ Aktualizováno: 2026-11-06.
 # Potvrzení evidence jako PDF (2026-11-08)
 
 - Potvrzení pro rodiče se nově stahuje jako PDF (dříve HTML). Ověřeno vykreslením v macOS QuickLook včetně české diakritiky a speciálních znaků a stažením skutečné trasy `/potvrzeni/<id>` (typ `application/pdf`). Otevření v Acrobat Readeru nebylo zkoušeno.
+
+# Ikony v rozhraní (2026-11-08, větev design-fix)
+
+- Přidána knihovna `lucide-react` (1.70.0, tree-shaking). `package-lock.json` obsahuje jen záznam této knihovny (výchozí `npm install` v tomto prostředí smazal řádky pro jiné platformy, proto byl lock upraven ručně).
+- Ikony jsou v hlavičce (záložky, Nový předpis, Odhlásit, zpět), exportu, filtrech, správě týmu a členů, financích (hotovost, zrušení dluhu, oprava, upomínka, potvrzení hlášení), historii a platebních detailech. Společná komponenta `IconLabel`; ikony jsou jen dekorace (`aria-hidden`), význam nese text.

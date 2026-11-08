@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { Bell, Check, X } from "lucide-react";
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -20,6 +22,7 @@ import {
   type LedgerMember,
 } from "@/components/member-assessment-ledger";
 import { Message } from "@/components/message";
+import { IconLabel } from "@/components/icon-label";
 import { formatDateTimeInPrague, todayInPrague } from "@/lib/dates";
 import { requireUser } from "@/modules/auth/service";
 import { getBankReconciliationDashboard } from "@/modules/bank-simulator/service";
@@ -519,8 +522,8 @@ export default async function FinancePage({
               <div className="finance-claim-actions">
                 <label>Důvod zamítnutí<input maxLength={300} name="rejectionReason" placeholder="Doplňte pouze při zamítnutí" /></label>
                 <div>
-                <button name="decision" type="submit" value="approved">Potvrdit vybrané</button>
-                <button className="button-secondary" name="decision" type="submit" value="rejected">Zamítnout vybrané</button>
+                <button name="decision" type="submit" value="approved"><IconLabel icon={Check}>Potvrdit vybrané</IconLabel></button>
+                <button className="button-secondary" name="decision" type="submit" value="rejected"><IconLabel icon={X}>Zamítnout vybrané</IconLabel></button>
                 </div>
               </div>
             </form>
@@ -539,7 +542,7 @@ export default async function FinancePage({
           <form action={sendBulkRemindersAction}>
             <ScopeFields scope={scope} />
             <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-            <button type="submit">Odeslat hromadnou upomínku</button>
+            <button type="submit"><IconLabel icon={Bell}>Odeslat hromadnou upomínku</IconLabel></button>
           </form>
         </article>
           </div>

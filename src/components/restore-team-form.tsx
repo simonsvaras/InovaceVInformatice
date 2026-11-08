@@ -1,5 +1,6 @@
 "use client";
 
+import { ArchiveRestore } from "lucide-react";
 import { useState } from "react";
 
 export function RestoreTeamForm({
@@ -51,7 +52,7 @@ export function RestoreTeamForm({
         <p className="restore-sub-note">Archivací nebyl odhlášen žádný člen, který by šel obnovit.</p>
       )}
       <button className="club-secondary-action" type="submit">
-        {confirmed && restorableMembers > 0 && !withMembers ? "Obnovit tým bez členů" : "Obnovit tým"}
+        <span className="icon-label"><ArchiveRestore aria-hidden="true" size={16} />{confirmed && restorableMembers > 0 && !withMembers ? "Obnovit tým bez členů" : "Obnovit tým"}</span>
       </button>
     </form>
   );

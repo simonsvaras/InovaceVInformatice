@@ -6157,3 +6157,24 @@ button.home-header-action {
     min-width: 16rem;
   }
 }
+
+.icon-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.icon-label svg {
+  flex: none;
+}
+
+.app-header-nav a .icon-label {
+  gap: 0.4rem;
+}
+
+.export-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}

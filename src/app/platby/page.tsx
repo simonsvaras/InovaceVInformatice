@@ -1,7 +1,9 @@
+import { ListFilter } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { ManagementHeader } from "@/components/management-header";
 import { ExportMenu } from "@/components/export-menu";
+import { IconLabel } from "@/components/icon-label";
 import { Message } from "@/components/message";
 import { InputError, validateUuid } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
@@ -150,7 +152,7 @@ export default async function PaymentRegisterPage({
               ))}
             </select>
           </label>
-          <button type="submit">Filtrovat</button>
+          <button type="submit"><IconLabel icon={ListFilter}>Filtrovat</IconLabel></button>
         </form>
 
         <section className="payments-register" aria-labelledby="register-title">

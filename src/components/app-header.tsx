@@ -1,6 +1,8 @@
+import { ChevronLeft, LogOut, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { logoutAction } from "@/app/actions/auth";
+import { IconLabel } from "@/components/icon-label";
 
 type HeaderUser = {
   displayName: string;
@@ -18,6 +20,7 @@ type HeaderLink = {
   href: string;
   label: string;
   active?: boolean;
+  icon?: LucideIcon;
 };
 
 export function AppHeader({
@@ -65,7 +68,7 @@ export function AppHeader({
               <small>{user.email}</small>
             </span>
             <form action={logoutAction}>
-              <button type="submit">Odhlásit se</button>
+              <button type="submit"><IconLabel icon={LogOut} size={15}>Odhlásit se</IconLabel></button>
             </form>
           </div>
         ) : (
@@ -81,7 +84,7 @@ export function AppHeader({
             <div className="app-header-context-start">
               {backLink ? (
                 <Link className="app-header-back" href={backLink.href}>
-                  <span aria-hidden="true">‹</span>{backLink.label}
+                  <ChevronLeft aria-hidden="true" size={16} strokeWidth={2.2} />{backLink.label}
                 </Link>
               ) : null}
 
@@ -111,7 +114,7 @@ export function AppHeader({
                     href={item.href}
                     key={`${item.href}-${item.label}`}
                   >
-                    {item.label}
+                    {item.icon ? <IconLabel icon={item.icon} size={15}>{item.label}</IconLabel> : item.label}
                   </Link>
                 ))}
               </nav>
@@ -119,7 +122,9 @@ export function AppHeader({
 
             {primaryAction ? (
               <Link className="app-header-primary" href={primaryAction.href}>
-                {primaryAction.label}
+                {primaryAction.icon ? (
+                  <IconLabel icon={primaryAction.icon}>{primaryAction.label}</IconLabel>
+                ) : primaryAction.label}
               </Link>
             ) : null}
           </div>

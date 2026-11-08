@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export function ExportMenu({
@@ -41,15 +42,17 @@ export function ExportMenu({
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        Export <span aria-hidden="true">▾</span>
+        <Download aria-hidden="true" size={16} />
+        Export
+        <ChevronDown aria-hidden="true" size={15} />
       </button>
       {open ? (
         <div className="export-menu-list" role="menu">
           <a href={csvHref} onClick={() => setOpen(false)} role="menuitem">
-            CSV <small>.csv</small>
+            <span className="export-menu-item"><FileText aria-hidden="true" size={16} />CSV</span> <small>.csv</small>
           </a>
           <a href={xlsxHref} onClick={() => setOpen(false)} role="menuitem">
-            Excel <small>.xlsx</small>
+            <span className="export-menu-item"><FileSpreadsheet aria-hidden="true" size={16} />Excel</span> <small>.xlsx</small>
           </a>
         </div>
       ) : null}

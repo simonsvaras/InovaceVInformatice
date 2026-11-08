@@ -1,5 +1,6 @@
 "use client";
 
+import { Send } from "lucide-react";
 import { useActionState } from "react";
 
 import { inviteMembersAction } from "@/app/actions/memberships";
@@ -30,7 +31,7 @@ export function MemberInviteForm({
           <small>Oddělte adresy mezerou, čárkou, středníkem nebo novým řádkem. Nejvýše 50.</small>
         </label>
         <button disabled={pending} type="submit">
-          {pending ? "Vytvářím pozvánky…" : "Vytvořit e-mailové pozvánky"}
+          <span className="icon-label"><Send aria-hidden="true" size={16} />{pending ? "Vytvářím pozvánky…" : "Vytvořit e-mailové pozvánky"}</span>
         </button>
       </form>
       {state.error ? <p className="message message-error" role="alert">{state.error}</p> : null}

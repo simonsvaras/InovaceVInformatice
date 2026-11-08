@@ -1,3 +1,4 @@
+import { HandCoins } from "lucide-react";
 import Image from "next/image";
 
 import {
@@ -7,6 +8,7 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { CopyPaymentDetails } from "@/components/copy-payment-details";
 import { Message } from "@/components/message";
+import { IconLabel } from "@/components/icon-label";
 import { requireUser } from "@/modules/auth/service";
 import { getGuardianReceivable } from "@/modules/assessments/service";
 import {
@@ -120,7 +122,7 @@ export default async function ReceivablePage({
             <form action={reportManualPaymentAction} className="form-stack inline-form">
               <input name="receivableId" type="hidden" value={debt.id} />
               <label>Částka v Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} min="0.01" name="amount" required step="0.01" type="number" /></label>
-              <button type="submit">Zaplatil jsem</button>
+              <button type="submit"><IconLabel icon={HandCoins}>Zaplatil jsem</IconLabel></button>
             </form>
           </article>
         ) : null}

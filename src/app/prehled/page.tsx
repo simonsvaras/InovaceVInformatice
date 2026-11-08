@@ -1,8 +1,10 @@
+import { FileDown, QrCode } from "lucide-react";
 import Link from "next/link";
 
 import { switchCoachTeamAction } from "@/app/actions/clubs";
 import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
+import { IconLabel } from "@/components/icon-label";
 import { requireUser } from "@/modules/auth/service";
 import {
   getUserContexts,
@@ -299,7 +301,7 @@ export default async function DashboardPage({
                     <span>{debt.clubName} · {debt.teamName ?? "celý klub"}</span>
                     <span>{formatCzk(debt.amountHalere)} · evidováno {formatCzk(debt.allocatedHalere)} · zbývá {formatCzk(debt.remainingHalere)}</span>
                     <span className={debt.status === "overdue" ? "status-overdue" : "status-open"}>{debtStatusLabel(debt.status)}</span>
-                    <Link className="button-link" href={`/dluhy/${debt.id}`}>Platební údaje a QR</Link>
+                    <Link className="button-link" href={`/dluhy/${debt.id}`}><IconLabel icon={QrCode}>Platební údaje a QR</IconLabel></Link>
                   </section>
                 );
               })}
@@ -321,7 +323,7 @@ export default async function DashboardPage({
                   {event.correctionReason ? <span>Důvod opravy: {event.correctionReason}</span> : null}
                   {event.kind !== "correction" && !event.corrected ? (
                     <a className="button-link button-secondary" href={`/potvrzeni/${event.allocationId}`}>
-                      Stáhnout potvrzení evidence
+                      <IconLabel icon={FileDown}>Stáhnout potvrzení evidence</IconLabel>
                     </a>
                   ) : null}
                 </section>

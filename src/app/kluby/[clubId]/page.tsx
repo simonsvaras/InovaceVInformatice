@@ -1,3 +1,4 @@
+import { Archive, ArchiveRestore, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -8,6 +9,7 @@ import {
 import { ManagementHeader } from "@/components/management-header";
 import { CreateTeamModal } from "@/components/create-team-modal";
 import { RestoreTeamForm } from "@/components/restore-team-form";
+import { IconLabel } from "@/components/icon-label";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getClubAdminDashboard } from "@/modules/clubs/service";
@@ -235,12 +237,14 @@ export default async function ClubPage({
                     </label>
                   ) : null}
                   <button type="submit">
-                    {team.coachName ? "Pozvat nového trenéra" : "Pozvat trenéra"}
+                    <IconLabel icon={UserPlus}>
+                      {team.coachName ? "Pozvat nového trenéra" : "Pozvat trenéra"}
+                    </IconLabel>
                   </button>
                 </form>
 
                 <details className="club-archive">
-                  <summary>Archivovat tým</summary>
+                  <summary><IconLabel icon={Archive}>Archivovat tým</IconLabel></summary>
                   <form action={archiveTeamAction} className="club-coach-form">
                     <input name="clubId" type="hidden" value={club.id} />
                     <input name="teamId" type="hidden" value={team.id} />
@@ -253,7 +257,7 @@ export default async function ClubPage({
                       <input name="confirm" required type="checkbox" value="yes" />
                       Potvrzuji archivaci týmu
                     </label>
-                    <button className="club-secondary-action" type="submit">Archivovat tým</button>
+                    <button className="club-secondary-action" type="submit"><IconLabel icon={Archive}>Archivovat tým</IconLabel></button>
                   </form>
                 </details>
               </article>
@@ -277,7 +281,7 @@ export default async function ClubPage({
                   <Link href={`/finance?teamId=${team.id}`}>Platby</Link>
                   <Link href={`/platby?teamId=${team.id}`}>Příchozí platby a export</Link>
                   <details className="club-archive club-restore">
-                    <summary>Obnovit tým</summary>
+                    <summary><IconLabel icon={ArchiveRestore}>Obnovit tým</IconLabel></summary>
                     <RestoreTeamForm
                       action={restoreTeamAction}
                       clubId={club.id}
