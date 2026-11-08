@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Bell, Check, X } from "lucide-react";
+import { Bell, Check, FilePlus, X } from "lucide-react";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -209,7 +209,7 @@ export default async function FinancePage({
               className="finance-admin-hero-action"
               href={`/predpisy/novy?${scopeQuery}`}
             >
-              Vytvořit předpis
+              <IconLabel icon={FilePlus}>Vytvořit předpis</IconLabel>
             </Link>
           </div>
 

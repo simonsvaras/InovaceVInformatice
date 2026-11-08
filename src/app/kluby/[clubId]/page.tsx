@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, UserPlus } from "lucide-react";
+import { Archive, ArchiveRestore, FilePlus, Receipt, UserPlus, Wallet } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -93,19 +93,19 @@ export default async function ClubPage({
               className="club-secondary-action"
               href={`/finance?clubId=${club.id}`}
             >
-              Zobrazit platby
+              <IconLabel icon={Wallet}>Zobrazit platby</IconLabel>
             </Link>
             <Link
               className="club-secondary-action"
               href={`/platby?clubId=${club.id}`}
             >
-              Příchozí platby a export
+              <IconLabel icon={Receipt}>Příchozí platby a export</IconLabel>
             </Link>
             <Link
               className="club-primary-action"
               href={`/predpisy/novy?clubId=${club.id}`}
             >
-              Nový předpis
+              <IconLabel icon={FilePlus}>Nový předpis</IconLabel>
             </Link>
           </div>
         </nav>
@@ -279,7 +279,7 @@ export default async function ClubPage({
                 <div className="club-archived-row" key={team.id}>
                   <strong>{team.name}</strong>
                   <Link href={`/finance?teamId=${team.id}`}>Platby</Link>
-                  <Link href={`/platby?teamId=${team.id}`}>Příchozí platby a export</Link>
+                  <Link href={`/platby?teamId=${team.id}`}><IconLabel icon={Receipt} size={14}>Příchozí platby a export</IconLabel></Link>
                   <details className="club-archive club-restore">
                     <summary><IconLabel icon={ArchiveRestore}>Obnovit tým</IconLabel></summary>
                     <RestoreTeamForm

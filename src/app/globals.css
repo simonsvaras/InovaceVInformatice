@@ -6178,3 +6178,11 @@ button.home-header-action {
   align-items: center;
   gap: 0.5rem;
 }
+
+.team-admin-hero-actions a,
+.finance-admin-hero-action,
+.club-finance-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

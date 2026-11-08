@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Check, FileDown, LogOut, UserMinus, X } from "lucide-react";
+import { ArrowRightLeft, Check, FileDown, FilePlus, LogOut, Receipt, UserMinus, Wallet, X } from "lucide-react";
 import { randomUUID } from "node:crypto";
 
 import Link from "next/link";
@@ -325,9 +325,9 @@ function ManagerTeamView({
               <span>{team.accessRole === "admin" ? "Správa klubu a týmu" : "Trenérský přehled"}</span>
             </div>
             <div className="team-admin-hero-actions">
-              <Link href={`/predpisy/novy?teamId=${team.id}`}>Vytvořit předpis</Link>
-              <Link href={`/finance?teamId=${team.id}`}>Otevřít finance</Link>
-              <Link href={`/platby?teamId=${team.id}`}>Příchozí platby a export</Link>
+              <Link href={`/predpisy/novy?teamId=${team.id}`}><IconLabel icon={FilePlus}>Vytvořit předpis</IconLabel></Link>
+              <Link href={`/finance?teamId=${team.id}`}><IconLabel icon={Wallet}>Otevřít finance</IconLabel></Link>
+              <Link href={`/platby?teamId=${team.id}`}><IconLabel icon={Receipt}>Příchozí platby a export</IconLabel></Link>
             </div>
           </div>
 
