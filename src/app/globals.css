@@ -2431,7 +2431,7 @@ button.club-dialog-close {
 .finance-admin-hero {
   overflow: hidden;
   border-radius: 1.2rem;
-  background: #173b78;
+  background: var(--dashboard-blue);
   color: #fff;
 }
 
@@ -2476,7 +2476,7 @@ button.club-dialog-close {
   border-radius: 0.65rem;
   padding: 0.7rem 1rem;
   background: #fff;
-  color: #173b78;
+  color: var(--dashboard-blue-dark);
   font-size: 0.82rem;
   text-decoration: none;
 }
@@ -3948,7 +3948,7 @@ button.fio-dialog-close {
   gap: 2rem;
   border-radius: 1.2rem;
   padding: clamp(1.75rem, 4vw, 2.5rem);
-  background: #173b78;
+  background: var(--dashboard-blue);
   color: #fff;
 }
 
@@ -3998,7 +3998,7 @@ button.fio-dialog-close {
   border-radius: 0.65rem;
   padding: 0.75rem 1rem;
   background: #fff;
-  color: #173b78;
+  color: var(--dashboard-blue-dark);
   font-size: 0.86rem;
   font-weight: 720;
   text-decoration: none;
