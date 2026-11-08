@@ -1,6 +1,6 @@
 # Aktuální stav projektu
 
-Aktualizováno: 2026-11-05.
+Aktualizováno: 2026-11-06.
 
 ## Hotovo
 
@@ -19,7 +19,7 @@ Aktualizováno: 2026-11-05.
 - Trenérské i členské e-mailové pozvánky jsou jednorázové, zrušitelné, platí 48 hodin a vyžadují shodný normalizovaný e-mail. Týmový kód platí 30 dní, nový ruší starý a vždy vytváří pouze žádost ke schválení.
 - Účet uživatele je oddělený od sportovce. Rodič může spravovat více sportovců, ale ve vstupu přes pozvánku či kód může vybrat pouze vlastní ID nebo založit nový záznam; aplikace nikdy nepřiřazuje sportovce podle shody jména.
 - M3 dodal týmové i celoklubové předpisy, samostatný neměnný dluh pro každého unikátního sportovce, transakční VS jedinečný na cílovém účtu a ochranu formuláře proti dvojkliku náhodným idempotency klíčem a otiskem vstupu.
-- Rodičovský přehled řadí otevřené dluhy podle splatnosti v `Europe/Prague`. Detail ukazuje Kč, splatnost, domácí účet, odvozený český IBAN, VS a zprávu, umožňuje kopírování a generuje standardní SPD 1.0 QR Platbu pro skutečný převod přímo na klubový či týmový účet.
+- Rodičovský přehled řadí otevřené dluhy podle splatnosti v `Europe/Prague`. Detail ukazuje Kč, splatnost, domácí účet, odvozený český IBAN, VS a zprávu, umožňuje kopírování a podle D-18 generuje jediný QR veřejné simulované platební stránky.
 - E-mail s platebními údaji a vloženým QR připravuje stávající Resend adaptér. `pending` doručení vzniká ve stejné transakci jako dluh, fyzické odeslání proběhne až po commitu a stav `failed`/zastaralý `sending` lze autorizovaně zopakovat se stejným Resend idempotency klíčem bez nového předpisu.
 - M4 dodal rodičovské ruční hlášení a odvolání do potvrzení, hromadné potvrzení či zamítnutí s důvodem, datovanou hotovost, částečné úhrady, nedestruktivní opravu protizápisem a matici člen × předpis se součty a filtrem nezaplacených.
 - Stav dluhu se v M4 odvozuje výhradně ze součtu append-only alokací. Potvrzení hlášení, hotovost a protizápis zamknou dluh, následným dotazem načtou aktuální součet alokací a hodnotu před operací uloží do auditu. Zdroj hlášení, idempotency klíč hotovosti a vazba opravy na původní událost jsou databázově unikátní; opakovaná ani souběžná stejná operace tak nemůže zaúčtovat tutéž událost podruhé.
@@ -68,8 +68,8 @@ Aktualizováno: 2026-11-05.
 - `npm run lint`, `npx tsc --noEmit`, čistý `npm run build` a `npm run db:generate` prošly. Drizzle po migracích `0006` až `0010` nehlásí další změnu schématu a PostgreSQL eviduje 11 aplikovaných migrací. Produkční Docker image se sestavil, aplikace i PostgreSQL jsou zdravé a `/api/health` vrací `schemaVersion: M3-0010`.
 - V syntetickém klubu byly ručně vystaveny týmový předpis pro dva členy na týmový účet `27/0100` a celoklubový předpis na výchozí účet `19/0100`. Sportovec s aktivním členstvím ve dvou týmech dostal v celoklubovém předpisu právě jeden dluh: oba předpisy mají po dvou dluzích a počty dluhů a unikátních sportovců se shodují.
 - Dvojklik na celoklubový formulář vrátil původní předpis se zprávou, že další dluhy nevznikly. DB po dvojkliku obsahovala dva předpisy a čtyři dluhy; na každém cílovém účtu byly dva různé VS `1000000001` a `1000000002`.
-- Rodičovský přehled zobrazil nejprve splatnost `2026-11-20`, potom `2026-12-01`, správné částky v Kč a oba sportovce. Detail dluhu zobrazil a zkopíroval účet a vykreslil QR s řetězcem `SPD*1.0*ACC:CZ7301000000000000000019*AM:800.00*CC:CZK*X-VS:1000000001*MSG:Prispevek M3 klub`; nejde o URL simulátoru.
-- Ruční výpis připraveného e-mailu obsahoval sportovce, klub/rozsah, částku, splatnost, účet, VS, zprávu, odkaz na autorizovaný detail, stejný SPD řetězec a vloženou PNG přílohu s CID. Bez Resend klíče vznikly čtyři stavy `failed/email_not_configured`, vždy jeden na dluh a až po commitu finanční transakce.
+- Historické ověření před D-18: rodičovský přehled zobrazil nejprve splatnost `2026-11-20`, potom `2026-12-01`, správné částky v Kč a oba sportovce. Tehdejší detail vykreslil SPD QR; tento formát byl následně požadavkem D-18 nahrazen veřejnou URL a po změně nebyl znovu spuštěn.
+- Historické ověření před D-18: připravený e-mail obsahoval tehdejší SPD QR přílohu. D-18 ji nahradil QR veřejného odkazu; nové sestavení e-mailu nebylo podle pokynu zadavatele spuštěno.
 - Autorizované opakování jednoho selhaného doručení ponechalo stav selhání kvůli chybějícímu klíči, ale počet zůstal dva předpisy, čtyři dluhy a čtyři delivery reference. Pokus měl neprázdný čas i unikátní token a zapsal audit retry. Zobrazení rodičovského i manažerského finančního detailu zapsalo audit s aktérem a cílem bez platebních údajů v detailech.
 - Rodič otevřením manažerského URL a cizí účet otevřením rodičovského dluhu dostali 404. Správce ani cizí účet nezískali detail dluhu rodiče. Serverové dotazy nadále filtrují klub/tým/sportovce, nikoli jen viditelnost ovládacích prvků.
 - Po `docker compose restart app` se migrace znovu dokončily idempotentně, health se obnovil a v pojmenovaném volume zůstaly dva předpisy, čtyři dluhy i marker `M3-0010`. Syntetická ověřovací data zůstávají pouze v lokálním Docker volume; nový deployment s čistým volume je neobsahuje.
@@ -117,7 +117,7 @@ Aktualizováno: 2026-11-05.
 
 - Produkční Docker build prošel a Compose aplikoval 21 verzovaných migrací. Oba kontejnery byly zdravé a `/api/health` vrátil `database: connected`, `schemaVersion: M5-0020`. `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm run db:generate` a `git diff --check` byly součástí závěrečné kontroly; automatizované testy ani testovací soubory nevznikly.
 - Správce v UI aktivoval demo synchronizaci sdíleného účtu `19/0100` i výhradního týmového účtu `27/0100`. Obrazovka ukázala pražský čas posledního nově přijatého pohybu a výslovně uvedla, že technická konfigurace nevypíná ruční evidenci a nepoužívá Fio.
-- Rodičovský detail starého dluhu současně zobrazil standardní QR řetězec `SPD*1.0*ACC:CZ7301000000000000000019*AM:600.00*CC:CZK*X-VS:1000000001*MSG:Prispevek M3 klub`, oddělené tlačítko „Simulovat platbu (DEMO)“ a stále dostupné „Zaplatil jsem“. QR neobsahoval URL simulátoru.
+- Historické ověření před D-18: detail starého dluhu zobrazoval SPD QR a oddělené demo tlačítko. D-18 obojí nahradil jediným QR veřejného odkazu; „Zaplatil jsem“ zůstává samostatným rodičovským hlášením.
 - Pohyb 600 Kč s možnou shodou na dřívější ruční úhradě skončil ve frontě. Opakované odeslání stejného source ID oznámilo, že druhý pohyb ani alokace nevznikly. Správce jej s důvodem označil jako samostatnou platbu a rozdělil 300 + 300 Kč mezi dva dluhy; DB obsahovala právě dvě samostatné `simulated` události, součet pohybu 600 Kč a nulovou volnou část.
 - Jiný pohyb 200 Kč byl spojen s existující ruční událostí stejné částky. DB obsahovala aktivní evidence link, stav `linked` a nulovou alokaci tohoto pohybu; součet dluhu se spojením nezměnil.
 - Jednoznačný týmový pohyb 1 200,50 Kč se automaticky přiřadil k dluhu se zbývající částkou 1 200,50 Kč a UI jej označilo `Demo pohyb (simulated)`. Následný protizápis vytvořil zápornou korekci −1 200,50 Kč, zachoval původní událost a vrátil pohyb s čistou alokací nula do fronty.
@@ -160,6 +160,117 @@ Aktualizováno: 2026-11-05.
 - Stav migrace existujících dat je pouze připravený, nikoli aplikovaný: jméno se při aplikaci nedestruktivně naplní z dosavadních sloupců, ID sportovců a všechny cizí klíče zůstanou zachované. Před nasazením zbývá aplikovat migraci a ověřit scénáře dospělého, jednoho i více dětí, pozvánky/kódu, dvojkliku, cizího profilu, jiného e-mailu, starých dluhů a adresátů e-mailů.
 - Známé omezení: kvůli zákazu spouštění nebyl vygenerován Drizzle snapshot k ručně připravené strukturální migraci; před další automatickou tvorbou migrací je nutné snapshot bezpečně doplnit nebo migraci vygenerovat standardním nástrojem bez změny jejího významu.
 
+# Implementována veřejná QR platba (2026-11-06, neověřeno spuštěním)
+
+- Formulář založení klubu nově rozbaluje databázovou chybu Drizzle až k PostgreSQL constraintu a místo obecného selhání rozlišuje již použité IČO a bankovní účet. Databázové unikátní invarianty zůstávají zachované; tato úprava nebyla podle pokynu zadavatele spuštěna.
+- Veřejná stránka byla následně vizuálně přepracována do mobilního bankovního stylu `Klubio Pay`: tmavomodrá hlavička, dominantní částka, uzamčené platební údaje a jedno potvrzovací tlačítko. Viditelný text „Školní simulace“ byl odstraněn; stavové zprávy nadále pravdivě mluví o platebním požadavku a netvrdí bankovní ověření převodu. Tato čistě prezentační úprava nebyla podle pokynu zadavatele spuštěna ani ručně prohlédnuta.
+- Jediný QR na detailu dluhu i v e-mailu nyní obsahuje stejnou veřejnou HTTPS adresu. Původní SPD QR, jeho technický řetězec a oddělené tlačítko starého simulátoru byly z detailu odstraněny.
+- Přidána veřejná mobilní stránka bez session, která zobrazuje pouze účet, aktuální zbývající částku, VS a zprávu. Neobsahuje jméno sportovce, rodiče, e-mail ani ID dluhu a je označena proti indexaci.
+- Připravena ruční verzovaná migrace `0022_public_qr_payments.sql`: přidává revokovatelná a jednorázově spotřebovaná vydání odkazu, nullable aktéra anonymní finanční operace a dohledatelný původ `public_qr`. Pohyb a platební událost nadále nesou `simulated`.
+- Token se odvozuje z UUID vydání pomocí samostatného `PUBLIC_QR_TOKEN_SECRET`; databáze drží jen hash. `PUBLIC_QR_BASE_URL` má požadovanou výchozí ngrok adresu a kód odmítne ne-HTTPS či localhost URL. Konfigurace je v `.env.example`, Compose a README.
+- Veřejné potvrzení má adresní i odkazový rate-limit, pracuje jen s dluhem tokenu, zamyká dluh i odkaz, znovu načte účet, VS, alokace a ruční kolize a při změně zůstatku vyžádá nové potvrzení. První výsledek odkaz spotřebuje; dvojklik a opakování vrací uložený pohyb bez druhé alokace nebo e-mailu.
+- Přesná a nekolidující částka se zpracuje stávajícím automatickým párováním. Čekající rodičovské hlášení, ruční úhrada nebo jiná nejasnost ponechá simulovaný pohyb ve frontě a veřejná stránka to označí jako čekající vyřešení, nikoli zaplacení.
+- Odkaz lze z autorizovaného detailu zrušit a znovu vydat. Nové dluhy jej dostanou transakčně při vytvoření; existující otevřené dluhy při autorizovaném detailu nebo retry e-mailu. Veřejný GET žádnou integraci ani pohyb nevytváří.
+- E-mail po nové automatické alokaci se připraví v transakci a odešle po commitu; jeho obsah rozlišuje vstup přes veřejné QR. Selhání zůstává v existující evidenci delivery.
+- Podle výslovného pokynu zadavatele nebyli použiti žádní agenti a nebyly spuštěny lint, typová kontrola, build, migrace, aplikace ani ruční scénáře. Automatizované testy ani testovací soubory nevznikly. Migrace `0021` a `0022` jsou připravené, ale v tomto úkolu nebyly aplikované; Drizzle snapshot k ručně psaným strukturálním migracím zůstává k doplnění před další automatickou generací.
+- Zbývající omezení: výchozí ngrok doména musí být provozně dostupná a směrovat na tuto instanci; změna `PUBLIC_QR_TOKEN_SECRET` zneplatní všechna dosavadní vydání. Skutečná banka, Fio token a reálný převod zůstávají mimo školní simulaci.
+
+# Jednotné aplikační záhlaví (2026-11-06, neověřeno spuštěním)
+
+- Přidáno společné dvouúrovňové záhlaví pro veřejnou domovskou stránku, autentizační toky i všechny přihlášené klubové, týmové a finanční obrazovky. Horní řádek drží značku a účet; kontextový řádek nese objekt, roli, lokální navigaci a nejvýše jednu hlavní akci.
+- Týmový kontext se skládá serverově podle již ověřeného přístupu. Trenér a správce vidí hráče, finance, nastavení a nový předpis; člen nebo rodič vidí přehled týmu, vlastní platby a vlastní historii. Manažerský odkaz se členskému pohledu přidá jen tehdy, pokud server potvrdil `canManage`.
+- Přihlášení, registrace, založení klubu, vstup kódem a pozvánka používají stejnou značku a chování účtu. Návratová URL pozvánky i autentizačních toků zůstává zachovaná. Veřejná QR platební stránka zůstává záměrně bez navigace účtu.
+- Read-only `code-reviewer` nenašel únik správní cesty ani osobních údajů. Jeho dva nálezy byly přijaty: záhlaví má explicitní plnou šířku i ve starším gridovém layoutu a na telefonu se u jednoduchého toku bez náhradní navigace neskrývá jediná cesta zpět.
+- Podle pokynu zadavatele nebyly spuštěny lint, typová kontrola, build, aplikace ani ruční vizuální ověření. Automatizované testy ani testovací soubory nevznikly.
+
+# Produkční úprava manažerských financí (2026-11-06, neověřeno spuštěním)
+
+- Manažerské finance týmu i klubu byly sjednoceny s vizuální hierarchií detailu týmu. Nový modrý banner spojuje identitu rozsahu, vytvoření předpisu a čtyřdílný finanční souhrn včetně průběhu evidence.
+- Sekce „Rozšířená správa“ byla nahrazena pracovním prostorem finančních operací. Synchronizace, demo fronta, matice, platební hlášení a upomínky mají rozdílnou hierarchii podle významu místo série stejně velkých obecných panelů.
+- Čekající hlášení jsou kompaktní řádky s osobou, kontaktem, předpisem, časem a částkou. Prázdné fronty používají krátký pozitivní stav. Všechny původní serverové akce, idempotency klíče, finanční upozornění a oprávnění zůstaly zachované.
+- Read-only `code-reviewer` potvrdil zachování scope, cílových ID, idempotency klíčů, autorizace a pravdivého označení demo zdrojů. Jeho jediný nález byl přijat: textové procento evidence se při přeplatku neomezuje na 100 %, ale ukáže skutečný poměr a štítek „přeplatek“; pouze šířka grafického pruhu zůstává omezena rozměrem komponenty.
+- Automatizované testy ani testovací soubory nevznikly. Build, lint, spuštění aplikace a ruční vizuální ověření nebyly v tomto kroku provedeny.
+
+# Produkční úprava přehledu klubů a týmů (2026-11-06, neověřeno spuštěním)
+
+- `/prehled` nově používá vyvážené uvítání se souhrnem klubů a týmů. Původní vysoký modrý klubový sloupec byl nahrazen kompaktním klubovým záhlavím, které neodsouvá obsah týmů a zachovává přímou cestu do správy klubu.
+- Týmové dlaždice jsou samostatně skenovatelné: zobrazují název, všechny vztahy účtu, počet členů, trenéra, případný stav aktivního týmu a jednu hlavní akci. Manažerský a členský pohled zůstávají oddělené podle již serverově vrácených vztahů.
+- Rozložení používá adaptivní mřížku pro více týmů a na telefonu přechází do jednoho sloupce. Aktivní tým je označen textem i zeleným stavem, nikoli pouze barvou.
+- Read-only `code-reviewer` nenašel únik správy ani osobních údajů. Jeho dvě nízké připomínky byly přijaty: štítek aktivního týmu vyžaduje vedle uložené preference také aktuální trenérskou roli a počty týmů používají správné české tvary pro 0, 1, 2–4 a 5 a více.
+- Automatizované testy ani testovací soubory nevznikly. Build, lint, aplikace a ruční vizuální ověření nebyly v tomto kroku spuštěny.
+
+# Nová komponenta přehledu členů a předpisů (2026-11-07, neověřeno spuštěním)
+
+- Tabulka „Člen × předpis“ na manažerských financích byla nahrazena samostatnou serverovou komponentou `MemberAssessmentLedger`. Data se seskupují po členu a každý existující dluh má vlastní responzivní kartu bez prázdných buněk a bez nutnosti horizontálního posouvání.
+- Komponenta zobrazuje stav, splatnost, předepsanou, evidovanou a zbývající částku nebo přeplatek, textově popsaný průběh, čekající hlášení a poslední upomínku. Člen je nově jeden kompaktní nativní rozbalovací řádek: ukazuje jméno, celkový počet předpisů, počet k vyřízení a zbývající částku; jednotlivé předpisy otevře až akce „Zobrazit předpisy“.
+- Filtr „Jen nezaplacené“ skrývá vyřízené detailní karty, ale souhrnný počet „Celkem předpisů“ dál vychází ze všech předpisů člena a neztrácí kontext.
+- Filtr nezaplacených, zápis hotovosti, scope klubu/týmu, idempotency klíč, historie původu finančních událostí a nedestruktivní oprava protizápisem zůstaly zachované. Ovládání je přesunuto do rozbalovacích nástrojů konkrétního předpisu.
+- Read-only `code-reviewer` nenašel konkrétní problém v zachování scope, cílových ID, idempotency klíčů, akcí ani rozlišení `cash`, `manual_claim`, `simulated` a `fio`. Zbytkem zůstává pouze neprovedené spuštění a vizuální kontrola rozbalených formulářů na úzkém telefonu.
+- Následná read-only revize rozbalovacího řádku potvrdila konzistenci souhrnných počtů, filtru i zachování finančních akcí. Nenašla konkrétní problém; neověřeným zbytkem zůstává vykreslení nativního `<details>/<summary>` v cílových prohlížečích.
+- Automatizované testy ani testovací soubory nevznikly. Build, lint, aplikace a ruční vizuální ověření nebyly v tomto kroku spuštěny.
+
+# Skutečná Fio synchronizace a návrat standardního SPD QR (2026-11-06)
+
+## Implementace
+
+- D-19 nahrazuje veřejný simulovaný QR tok a staré odložení Fio. Detail dluhu i platební e-mail používají jediný standardní řetězec `SPD*1.0` s historicky přiřazeným účtem dluhu, aktuální zbývající částkou, VS a zprávou. „Kopírovat údaje“ zůstává. Veřejná route, serverové akce a služba byly odstraněny; `PUBLIC_QR_*` už není runtime konfigurace.
+- Dopředná migrace `0023_lyrical_beyonder.sql` zneplatnila aktivní veřejné odkazy, ale zachovala tabulku, již vzniklý pohyb, alokaci a audit s původem `public_qr`/`simulated`. Již aplikované migrace `0021` a `0022` nebyly změněny. Marker `0024` a dopředná oprava guardu `0025` posouvají health verzi na `FIO-0025`.
+- Fio integrace je samostatná od historické demo integrace. Aktivace serverově ověřuje uživatele a rozsah, banku 2010, čitelnost periodického výpisu, shodu účtu/IBANu a CZK. Token je uložen AES-256-GCM se samostatným `FIO_TOKEN_ENCRYPTION_KEY`; HMAC otisk slouží jen pro společný 30sekundový limit. Token se nevrací klientovi, auditu ani e-mailu a odchozí URL s tokenem se neloguje.
+- Finance obsahují modál „Aktivovat automatickou synchronizaci“, bezpečný návod, stav a časy posledního pokusu/úspěchu/nového pohybu, ruční zařazení kontroly, výměnu tokenu a vypnutí s odstraněním šifrovaného tokenu. UI výslovně ponechává ruční evidenci a „Zaplatil jsem“ dostupné.
+- Samostatný `fio-worker` v Docker Compose zpracovává plánované i ručně vyžádané kontroly. Používá integrační lease, per-token lease, periodický endpoint s dvoudenním překryvem a idempotenci `(bank_account_id, source, source_transaction_id)`. Ruční požadavek ve stavu `processing` se po expiraci lease vrátí do `pending`, takže pád workeru trvale nezablokuje další kontrolu.
+- Sedmidenní počáteční import jde pouze do fronty. Nový kladný CZK příjem se automaticky alokuje jen při jedinečném účtu a VS, přesné zbývající částce a bez čekajícího hlášení či neopravované ruční úhrady. Záporné, cizoměnové a nejasné pohyby zůstávají k ručnímu rozhodnutí. Fio událost má `kind=fio`, původ `fio_sync` a žádného smyšleného uživatelského aktéra.
+- Příjem, případná alokace, audit, delivery a posun kurzoru jsou transakční; Resend se volá až po commitu. E-mail má vlastní text pro Fio. Opakované odeslání původního platebního e-mailu nyní vytváří QR z aktuálního kladného zůstatku a u uhrazeného či přeplaceného dluhu nový QR odmítne.
+- Migrace `0025_fio_source_guard.sql` zpřesňuje databázový invariant: platební událost navázaná na bankovní pohyb musí mít stejný druh jako zdroj `fio`/`simulated`, s výjimkou auditované korekce. Historické záznamy se nemění.
+
+## Skutečně provedené ověření
+
+- `npm run lint`, `npx tsc --noEmit`, `git diff --check` a `npm run db:generate` prošly; Drizzle po snapshotu `0023` nehlásí další strukturální změnu. Produkční `docker compose up --build -d` prošel po zapracování revize včetně Next.js buildu a typové kontroly.
+- Docker automaticky aplikoval migrace až po `0025`; PostgreSQL eviduje 26 migrací a `/api/health` vrací `200`, připojenou databázi a `schemaVersion: FIO-0025`. Aplikace, databáze a `fio-worker` běží; po společném restartu se health obnovil a worker zůstal spuštěný bez původní chyby „Top-level await is currently not supported with cjs output format“.
+- Databázová kontrola po migraci našla 6 historických veřejných vydání, 0 aktivních a 1 s vazbou na zachovaný pohyb. Historie stále obsahuje právě původní `simulated/public_qr` pohyb; žádný záznam nebyl přepsán na Fio.
+- Ruční sestavení vzorové platby vytvořilo `SPD*1.0*ACC:CZ8920100000000123456789*AM:1250.50*CC:CZK*MSG:PRISPEVEK PODZIM*X-VS:1000000001`. QR nebyl potvrzením skutečné platby a žádný převod nebyl odeslán.
+- Guard `0025` byl ověřen v PostgreSQL: pokus vložit `manual_claim` s bankovním pohybem skončil očekávanou chybou `payment event kind must match bank transaction source`; korekční událost nad stejným pohybem prošla a byla vrácena rollbackem.
+- `architecture-reviewer` doporučil jeden autoritativní feed fyzického účtu, globální limit podle otisku tokenu, dvoufázovou aktivaci bez DB zámku během sítě, review-only počáteční import, přímý worker, atomický kurzor a konzervativní záporné pohyby. Připomínky byly přijaty a zapracovány. `code-reviewer` našel obnovu zaseklého ručního požadavku, ochranu jeho stavu proti doběhnutí starého workeru, chybnou částku retry QR a neúplný DB guard; všechny nálezy byly zapracovány a závěrečná read-only kontrola obou oprav nenašla otevřený problém.
+- Nevznikly automatizované testy ani testovací soubory.
+
+## Známá omezení a další krok
+
+- V dostupném prostředí nebyl úspěšně uložen žádný skutečný Fio token ani reálný Fio pohyb. Proto nebyly pravdivě provedeny scénáře správného a cizího účtu, neplatného či čerstvého tokenu, reálného opakovaného Fio ID, souběhu síťových kontrol, výměny tokenu, záporného pohybu ani dekódování QR v konkrétní bankovní aplikaci. Implementace, build, migrace, oprávnění a databázové invarianty jsou ověřené; tyto integrační scénáře vyžadují platný testovací Fio účet/token.
+- Obnova `processing` požadavku po pádu workeru a retry QR po částečné úhradě byly po opravě ověřeny čtením diffu, lintem, typovou kontrolou a produkčním buildem, nikoli cíleným uživatelským průchodem s živým tokenem a e-mailovou schránkou.
+- Fio periodický výpis nepotvrzuje přesný rozsah oprávnění tokenu. UI proto pouze instruuje vytvořit token „Sledování účtu“ a netvrdí, že read-only rozsah technicky prokázalo. Dlouhý výpadek nad bezpečně dostupnou historii přepne integraci do stavu vyžadujícího zásah místo tichého přeskočení.
+- Další produktový milník zůstává M6. Pracovní strom je po dokončení kontrol a revizí připravený k lokálnímu uložení do Gitu; push se neprovádí.
+
+## Oprava aktivace Fio po prvním reálném pokusu
+
+- Reálná odpověď Fio ukázala, že `column0` vrací účetní datum jako text (`YYYY-MM-DD...`), zatímco první parser očekával pouze číselný timestamp. Parser nyní přijímá textové Fio datum i timestamp a u pohybu bez vlastní měny použije měnu účtu z hlavičky výpisu.
+- Chyby čekacího intervalu a odpovědi Fio se nově rozpoznávají i tehdy, když je produkční runtime obalí přes hranici databázové transakce. UI tak místo obecné věty zobrazí konkrétní bezpečné sdělení, například nutnost vyčkat 30 sekund.
+- Další opakované pokusy odhalily, že raw SQL vrací `timestamptz` lease jako text. Kontrola volající `.getTime()` proto po prvním pokusu spadla ještě před sítí. Čekací interval se nyní vyhodnocuje přímo v PostgreSQL a ostatní časové hodnoty procházejí tolerantním převodem.
+- Poskytnutý skutečný token byl ověřen přímo proti Fio: API vrátilo HTTP 200, správný účet `2903642978/2010`, banku 2010, CZK a jeden pohyb. Opravená aplikační služba následně integraci aktivovala a uložila jeden pohyb sedmidenního počátečního importu do fronty s důvodem `initial_import_review`.
+- Ruční požadavek synchronizace byl zařazen a worker jej během několika sekund změnil z `pending` přes `processing` na `completed`. Integrace zůstala `active`, aktualizoval se poslední pokus i úspěch a nevznikla druhá kopie stejného Fio pohybu.
+- Po aktivaci se klubové finance poprvé pokusily vykreslit neprázdné Fio časy a skončily HTTP 500, protože stránka volala `.toISOString()` přímo nad textem z raw SQL. Všechny tři časové hodnoty nyní procházejí společným tolerantním převodem na ISO; produkční build po opravě prošel.
+- Vypnutá integrace nyní v UI nabízí opětovnou aktivaci. Obnova původně selhávala ještě před API, protože `updated_at` existující integrace šel jako text do Drizzle timestamp encoderu. Po explicitním převodu na `Date` byla reaktivace stejným skutečným tokenem úspěšně ověřena (`replaced=true`) a počáteční import nevytvořil duplicitní pohyb.
+- E-mailové pozvánky, reset hesla, upomínky a odkazy na dluh používají povinnou konfiguraci `PUBLIC_APP_URL`. Produkční Compose už nemá tichý fallback na localhost a produkční builder localhost odmítne. Lokální prostředí bylo nastaveno na veřejnou ngrok adresu; přímá kontrola v kontejneru sestavila pozvánku jako `https://rhinencephalic-offenselessly-serenity.ngrok-free.dev/pozvanka/example-token`.
+- Oprava prošla lintem, typovou kontrolou a produkčním Docker buildem; aplikace, databáze i worker jsou zdravé.
+
+# Detail předpisu a úklid technických mikrotextů (2026-11-07)
+
+- Detail předpisu nově zobrazuje u každého člena stav `Zaplaceno`/`Nezaplaceno`, čas posledního úspěšně odeslaného upozornění v `Europe/Prague` a u nezaplaceného dluhu akci „Odeslat oznámení“. Stav se odvozuje z finančních alokací; částečně uhrazený dluh zůstává nezaplacený.
+- Souhrnná dlaždice úspěšnosti doručení byla nahrazena poměrem zaplacených a nezaplacených dluhů s děleným barevným pruhem a počty obou stavů.
+- Řádkové oznámení používá existující neutrální upomínku omezenou serverem na konkrétní předpis a dluh. Zachovává autorizaci klubu/týmu, audit a idempotenci; opakovaný požadavek nevytvoří druhou dávku.
+- Z uživatelských komponent byly odstraněny technické vysvětlivky o MVP, auditu, bankovním ověření, interním původu historických simulací a dalších implementačních detailech. Funkční zdrojové štítky, stavy, chyby a potřebné pokyny zůstaly zachované; backendová pravidla a historie se neměnily.
+- Read-only `code-reviewer` našel, že první návrh zobrazoval vytvoření upomínky i po neúspěšném doručení. Nález byl přijat: datum se nyní bere výhradně z `notification_deliveries.sent_at` se stavem `sent`. Jiný problém v oprávnění, cílení, idempotenci, auditu ani hromadných upomínkách reviewer nenašel.
+- Nevznikly automatizované testy ani testovací soubory. Lint, typová kontrola, produkční Next.js build i finální Docker build prošly po dokončení změn.
+- V nasazené aplikaci byl ručně otevřen týmový předpis se dvěma dluhy: souhrn ukázal `50 %`, jeden řádek `Zaplaceno`, druhý `Nezaplaceno` a tlačítko „Odeslat oznámení“ bylo pouze u nezaplaceného dluhu. Datum bez úspěšné upomínky zobrazilo pomlčku. Odeslání e-mailu nebylo při této vizuální kontrole spuštěno. Na finanční stránce byly zároveň ověřeny odstraněné technické vysvětlivky.
+
+# Oprava e-mailových pozvánek členů (2026-11-07)
+
+- Příčinou obecné chyby byla lokální produkční konfigurace `PUBLIC_APP_URL=http://localhost:3000`. Server odmítl sestavit produkční odkaz po commitu databázové pozvánky, takže nevznikl ani záznam doručení. Ignorovaný lokální `.env` byl vrácen na veřejnou ngrok HTTPS adresu.
+- Veřejná URL se nyní ověří ještě před databázovou transakcí. Selhání poskytovatele e-mailu už nezakryje vytvořenou pozvánku: formulář zobrazí konkrétní varování a ponechá jednorázový odkaz ke zkopírování. Doručení je navázané na ID pozvánky.
+- Migrace `0026_invitation_delivery_idempotency.sql` přidává idempotency klíč dávky pozvánek, unikátní ochranu dávka × e-mail a samostatnou unikátní ochranu anonymního doručení podle typu a reference. Token členské pozvánky je pro stejný požadavek deterministicky odvozený HMAC; souběžný dvojklik pod zámkem týmu vrátí původní aktivní pozvánku a nevytvoří druhý e-mail.
+- Před migrací nebyly v zachované databázi nalezeny kolidující anonymní delivery záznamy. Docker migraci aplikoval, `schema_version` je `INVITE-0026`, oba nové indexy i sloupec jsou přítomné a aplikační kontejner je zdravý. Uvnitř kontejneru je potvrzena správná veřejná ngrok URL.
+- Lint, typová kontrola, produkční build a Docker build prošly. Formulář byl po nasazení ručně otevřen s aktivní pozvánkou. Nový e-mail nebyl bez výběru adresáta odeslán; existující databáze potvrzuje, že stejná konfigurace Resendu před chybnou změnou URL úspěšně doručovala.
+- Read-only `code-reviewer` našel riziko dvou e-mailů při souběžném odeslání a nález byl zapracován uvedenou databázovou idempotencí. Závěrečná kontrola nenašla otevřený problém. Automatizované testy ani testovací soubory nevznikly.
+- Po opravě byly 7. listopadu 2026 v 15:14 a 15:15 Europe/Prague vytvořeny dvě členské pozvánky na univerzitní adresy. Resend oba požadavky přijal, vrátil provider ID a databáze neobsahuje chybový kód. API klíč je omezený pouze na odesílání, proto přes něj nelze načíst následný stav doručení; nepřítomnost zprávy ve schránce je nutné ověřit ve spamu/karanténě nebo v Resend dashboardu. Další změna odesílacího kódu nebyla provedena.
+
 
 # Ruční ověření opravy vstupu člena (2026-11-08)
 
@@ -171,7 +282,7 @@ Aktualizováno: 2026-11-05.
 
 # Stav implementace a ověření M6 (2026-11-08)
 
-- M6 dodal: rodičovskou historii (přehled i týmová stránka) s datem, částkou, způsobem, osobou, opravou a stažením HTML potvrzení evidence; stránku Příchozí platby s filtry období/způsobu/stavu a součty; CSV export týmu i klubu se sloupcem Tým („Celý klub“); přehled stavu plateb týmů pro správce (K3) včetně řádků „Celý klub“ a „Archivované týmy“; audit prohlížení, exportu a stažení. Bez změny schématu a bez migrace; rozhodnutí v D-18.
+- M6 dodal: rodičovskou historii (přehled i týmová stránka) s datem, částkou, způsobem, osobou, opravou a stažením HTML potvrzení evidence; stránku Příchozí platby s filtry období/způsobu/stavu a součty; CSV export týmu i klubu se sloupcem Tým („Celý klub“); přehled stavu plateb týmů pro správce (K3) včetně řádků „Celý klub“ a „Archivované týmy“; audit prohlížení, exportu a stažení. Bez změny schématu a bez migrace; rozhodnutí v D-20.
 - Technické kontroly: `npm run lint`, `npx tsc --noEmit` a `npm run build` prošly. Dev server běžel proti lokálnímu Postgresu 17 mimo Docker (Docker Desktop je nefunkční po zaplnění disku), e-maily byly vypnuty prázdným `RESEND_API_KEY` v `.env.local`.
 - Ručně ověřeno nad syntetickými daty: hotovost, potvrzené hlášení, demo pohyb a oprava protizápisem se správně ukázaly v přehledu i CSV (součet 2 100 Kč, záporný protizápis, rozlišený způsob a původ, demo označení); filtr způsobu a období; klubový export s „Celý klub“; K3 včetně po splatnosti 300 Kč (1 dluh) po dočasném posunu splatnosti; rodič vidí jen vlastní platby a potvrzení včetně klubového předpisu; potvrzení opravené platby i protizápisu vrátí 409; cizí rodič a rodič bez správcovských práv dostanou na cizí ID, `/platby` i `/platby/export` 404; audit zapsal všechny nové události; mobilní vzhled stránky Příchozí platby.
 - Nezávislá read-only revize nenašla P1 ani P2. Nález P3 o archivovaných týmech byl přijat a opraven řádkem „Archivované týmy“ (ověřeno dočasnou archivací týmu, poté vráceno). Nález P3 o rozdílu přehledu a registru byl odmítnut: klubový dluh má podle D-03 vždy prázdný týmový původ.
@@ -180,10 +291,19 @@ Aktualizováno: 2026-11-05.
 
 # Stav implementace a ověření M7 (2026-11-08)
 
-- M7 dodal: odchod dítěte rodičem s přehledem nezaplacených předpisů (C9), vyřazení členů trenérem či správcem s oznámením rodiči (T10), přesun člena mezi týmy správcem (K4), archivaci týmu včetně sekce archivovaných týmů a zachování plateb i exportu (K6) a zrušení neuhrazeného dluhu s povinným důvodem a auditem. Rozhodnutí je v D-19.
-- Schéma: migrace `0022` (sloupce `receivables.cancelled_*`, `memberships.ended_reason`, omezení; snapshot nově zahrnuje i dříve ručně psanou `0021`, takže `drizzle-kit generate` hlásí „No schema changes“) a `0023` (DB pojistky proti úhradě zrušeného dluhu a proti vrácení zrušení, značka `M7-0023`). Health vrací `schemaVersion: M7-0023`.
+- M7 dodal: odchod dítěte rodičem s přehledem nezaplacených předpisů (C9), vyřazení členů trenérem či správcem s oznámením rodiči (T10), přesun člena mezi týmy správcem (K4), archivaci týmu včetně sekce archivovaných týmů a zachování plateb i exportu (K6) a zrušení neuhrazeného dluhu s povinným důvodem a auditem. Rozhodnutí je v D-21.
+- Schéma: migrace `0028` (sloupce `receivables.cancelled_*`, `memberships.ended_reason`, omezení) a `0029` (DB pojistky proti úhradě zrušeného dluhu a proti vrácení zrušení, značka `M7-0029`). Po sloučení s `origin/main` (Fio, migrace `0022`–`0027`) navazují na jejich snapshot `0027`; `drizzle-kit generate` hlásí „No schema changes“.
 - Technické kontroly: `npm run lint`, `npx tsc --noEmit`, `npm run build` a `drizzle-kit generate` prošly; Docker Desktop zůstává nefunkční, ověření běželo proti lokálnímu Postgresu 17 a dev serveru, e-maily vypnuty prázdným `RESEND_API_KEY`.
 - Ručně ověřeno nad syntetickými daty: trenér zrušil týmový dluh; stejný trenér byl při pokusu o zrušení klubového dluhu odmítnut; zrušení částečně uhrazeného dluhu a zápis hotovosti na zrušený dluh selhaly srozumitelnou hláškou; DB triggery odmítly vrácení zrušení i kladnou alokaci; vyřazení trenérem ponechalo všechny dluhy, vytvořilo oznámení (`failed/email_not_configured`) a nový předpis bývalému členu nevznikl; přesun správcem ukončil staré a založil nové členství, staré dluhy zůstaly u původního týmu; trenér nevidí přesun ani klubovou stránku; rodič odhlásil dítě s upozorněním a pak dál vidí dluhy i historii; podvržené ID cizího profilu bylo odmítnuto; archivace odhlásila členy, zachovala `/finance`, `/platby` i CSV export a server odmítl nový předpis pro archivovaný tým; K3 ukazuje řádek „Archivované týmy“. Pohled trenéra na `/platby` (z M6) byl při tom také ověřen.
 - Nezávislá read-only revize nenašla P1. Přijato a opraveno: P2 správce nemohl po archivaci vyřizovat dluhy a hlášení (nyní smí), P2 ruční přiřazení pohybu na zrušený dluh (přidána kontrola i vyloučení ze seznamu), P3 opakování upomínky a e-mailu o předpisu u zrušeného dluhu, P3 kontrola zrušení po zámku při automatickém párování. Odmítnuto: oznámení druhému opatrovníkovi, protože podle D-06 a unikátního indexu má sportovce jediný spravující účet.
 - Neověřeno: trenérské nebo cizí volání akce přesunu/archivace mimo UI (server kontroluje roli, ale akce nebyla podvržena), oznámení o zrušení dluhu rodiči (není v rozsahu), skutečné doručení e-mailů.
 - Nejbližší krok: M8 (předání dema, návod, záloha, závěrečný průchod).
+
+# Sloučení `origin/main` do `feature/m6-m7` (2026-11-08)
+
+- Na `origin/main` přibylo 10 commitů (Fio synchronizace, veřejný QR tok, úpravy pozvánek a financí). M6 ani M7 tam nebyly; ověřeno chybějícími soubory a stavem dokumentů. Sloučení proběhlo lokálně, na GitHub se nepushovalo.
+- Konflikty: dokumenty, `finance/page.tsx` (matice přesunuta do `MemberAssessmentLedger`), `tymy/[teamId]/page.tsx` (nový layout správy týmu), `kluby/[clubId]/page.tsx`, `predpisy/[assessmentId]/page.tsx` a služby plateb, simulátoru a předpisů. Rozhodnutí M6/M7 byla přečíslována na D-20 a D-21, protože D-18 a D-19 už patří QR a Fio.
+- Migrace M7 jsou nově `0028` (sloupce a omezení, snapshot navazuje na jejich `0027`) a `0029` (DB pojistky, značka `M7-0029`). Existující vývojová databáze s dřívějším číslováním M7 není s novým řetězcem kompatibilní, proto se ověřovalo na čisté databázi.
+- Nový druh platby `fio` (bez uživatele u události) je zahrnut v M6: historie, přehled plateb, CSV i potvrzení používají `left join` na uživatele a zobrazují „Načteno z Fio API“ či „systém“. Fio párování nepřiřadí platbu ke zrušenému dluhu (stav `cancelled`).
+- Ověřeno na čisté DB po sloučení: migrace (30 záznamů, `M7-0029`), `npm run lint`, `npx tsc --noEmit`, `npm run build`, `drizzle-kit generate` bez změn; ručně registrace, založení klubu, předpis, hotovost, zrušení dluhu (nabídka jen u dluhu bez úhrady), přehled plateb a CSV včetně události bez uživatele, přehled týmů, vyřazení člena, archivace týmu a audit.
+- Neověřeno: skutečné spojení s Fio API, veřejný QR tok a e-maily.

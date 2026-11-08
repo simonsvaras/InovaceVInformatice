@@ -4,26 +4,27 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
-  activateDemoIntegrationAction,
   allocateSimulatedTransactionAction,
   ignoreSimulatedTransactionAction,
   linkSimulatedTransactionAction,
   markSimulatedTransactionDifferentAction,
 } from "@/app/actions/bank-simulator";
+import { FioSyncAccount } from "@/app/finance/fio-sync-account";
 import {
-  cancelReceivableAction,
-  recordCashPaymentAction,
-  reversePaymentEventAction,
   reviewPaymentClaimsAction,
   sendBulkRemindersAction,
 } from "@/app/actions/payments";
+import { AppHeader } from "@/components/app-header";
+import {
+  MemberAssessmentLedger,
+  type LedgerMember,
+} from "@/components/member-assessment-ledger";
 import { Message } from "@/components/message";
 import { formatDateTimeInPrague, todayInPrague } from "@/lib/dates";
 import { requireUser } from "@/modules/auth/service";
 import { getBankReconciliationDashboard } from "@/modules/bank-simulator/service";
 import { formatCzk } from "@/modules/payments/qr";
 import { getManagerFinanceDashboard, type PaymentScope } from "@/modules/payments/service";
-import { debtStatusLabel } from "@/modules/payments/status";
 
 function ScopeFields({ scope }: { scope: PaymentScope }) {
   return (
@@ -38,6 +39,7 @@ function reconciliationReason(code: string) {
   return ({
     invalid_vs: "chybí platný VS",
     unknown_vs: "VS nepatří jednoznačně oprávněnému dluhu",
+    ambiguous_vs: "VS odpovídá více dluhům",
     amount_mismatch: "částka neodpovídá zbývající částce",
     already_paid: "dluh už je podle evidence uhrazen",
     cancelled: "dluh byl zrušen",
@@ -47,13 +49,11 @@ function reconciliationReason(code: string) {
     manager_allocated: "část pohybu byla ručně přiřazena",
     allocation_corrected: "původní demo přiřazení bylo opraveno protizápisem",
     linked_event_corrected: "spojená ruční událost byla opravena protizápisem",
+    initial_import_review: "počáteční sedmidenní import čeká na kontrolu",
+    negative_transaction: "záporný nebo opravný pohyb vyžaduje ruční kontrolu",
+    negative_possible_reversal: "možné storno dříve přiřazeného pohybu",
+    non_czk: "pohyb není v CZK",
   } as Record<string, string>)[code] ?? code;
-}
-
-function paymentEventLabel(kind: string) {
-  if (kind === "cash") return "Hotovost";
-  if (kind === "simulated") return "Demo pohyb (simulated)";
-  return "Potvrzené hlášení";
 }
 
 function formatDueDate(value: string) {
@@ -64,6 +64,21 @@ function formatDueDate(value: string) {
     year: "numeric",
     timeZone: "Europe/Prague",
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function isoTimestamp(value: Date | string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toLocaleUpperCase("cs"))
+    .join("");
 }
 
 export default async function FinancePage({
@@ -88,25 +103,39 @@ export default async function FinancePage({
     getBankReconciliationDashboard(user.id, scope),
   ]);
   const onlyUnpaid = query.unpaid === "1";
-  const visibleDebts = onlyUnpaid
-    ? dashboard.debts.filter((debt) => debt.remainingHalere > 0)
-    : dashboard.debts;
-  const assessments = Array.from(
-    new Map(
-      visibleDebts.map((debt) => [
-        debt.assessment_id,
-        { id: debt.assessment_id, title: debt.assessment_title },
-      ]),
-    ).values(),
-  );
-  const athletes = Array.from(
-    new Map(
-      visibleDebts.map((debt) => [
-        debt.athlete_id,
-        { id: debt.athlete_id, name: debt.athlete_name },
-      ]),
-    ).values(),
-  );
+  const ledgerMemberMap = new Map<string, LedgerMember>();
+
+  for (const debt of dashboard.debts) {
+    const member = ledgerMemberMap.get(debt.athlete_id) ?? {
+      id: debt.athlete_id,
+      name: debt.athlete_name,
+      assessments: [],
+    };
+    member.assessments.push({
+      id: debt.id,
+      title: debt.assessment_title,
+      dueDate: debt.due_date,
+      amountHalere: debt.amount_halere,
+      allocatedHalere: debt.allocated_halere,
+      remainingHalere: debt.remainingHalere,
+      overpaidHalere: debt.overpaidHalere,
+      status: debt.status,
+      hasPendingClaim: debt.has_pending_claim,
+      lastReminderAt: debt.last_reminder_at,
+      lastReminderStatus: debt.last_reminder_status,
+      cancelledAt: debt.cancelled_at,
+      cancellationReason: debt.cancellation_reason,
+      events: debt.events.map((event) => ({
+        id: event.id,
+        kind: event.kind,
+        amountHalere: event.amount_halere,
+        occurredOn: event.occurred_on,
+        reversed: event.reversed,
+      })),
+    });
+    ledgerMemberMap.set(debt.athlete_id, member);
+  }
+  const ledgerMembers = [...ledgerMemberMap.values()];
   const scopeQuery = "teamId" in scope
     ? `teamId=${encodeURIComponent(scope.teamId!)}`
     : `clubId=${encodeURIComponent(scope.clubId!)}`;
@@ -156,52 +185,72 @@ export default async function FinancePage({
   const assessmentRows = Array.from(assessmentMap.values()).sort((left, right) =>
     left.dueDate.localeCompare(right.dueDate),
   );
+  const collectionPercentage = dashboard.totals.expectedHalere > 0
+    ? (dashboard.totals.collectedHalere / dashboard.totals.expectedHalere) * 100
+    : 0;
+  const collectionRate = Math.min(100, Math.max(0, collectionPercentage));
 
   return (
     <main className="dashboard-shell dashboard-home finance-admin-page">
-      <header className="dashboard-topbar">
-        <Link
-          className="dashboard-brand"
-          href="/prehled"
-          aria-label="Klubio – přehled"
-        >
-          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
-          <span>Klubio</span>
-        </Link>
-        <Link className="club-topbar-link" href={back}>Zpět</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: back, label: "Zpět" }}
+        context={{
+          kind: "teamId" in scope ? "Tým" : "Klub",
+          name: dashboard.name,
+          role: "Správa financí",
+          href: back,
+        }}
+        navigation={[
+          { href: back, label: "Přehled" },
+          { href: `/finance?${scopeQuery}`, label: "Finance", active: true },
+        ]}
+        primaryAction={{
+          href: `/predpisy/novy?${scopeQuery}`,
+          label: "Nový předpis",
+        }}
+        user={user}
+      />
       <section className="content-stack finance-admin-content">
         <header className="finance-admin-hero">
-          <div>
-            <p className="finance-admin-role">Správa financí</p>
-            <h1>Klubové finance</h1>
-            <p>
-              {dashboard.name}. Přehled předpisů a úhrad evidovaných v aplikaci.
-            </p>
+          <div className="finance-admin-hero-main">
+            <div>
+              <p className="finance-admin-role">
+                {"teamId" in scope ? "Finance týmu" : "Finance klubu"}
+              </p>
+              <h1>{dashboard.name}</h1>
+              <p>Předpisy, úhrady a otevřené finanční úkoly na jednom místě.</p>
+            </div>
+            <Link
+              className="finance-admin-hero-action"
+              href={`/predpisy/novy?${scopeQuery}`}
+            >
+              Vytvořit předpis
+            </Link>
           </div>
-          <Link
-            className="club-primary-action"
-            href={`/predpisy/novy?${scopeQuery}`}
-          >
-            Nový předpis
-          </Link>
+
+          <dl className="finance-overview" aria-label="Souhrn financí">
+            <div>
+              <dt>Předepsáno</dt>
+              <dd>{formatCzk(dashboard.totals.expectedHalere)}</dd>
+            </div>
+            <div>
+              <dt>Evidováno</dt>
+              <dd>{formatCzk(dashboard.totals.collectedHalere)}</dd>
+            </div>
+            <div>
+              <dt>Zbývá</dt>
+              <dd>{formatCzk(dashboard.totals.remainingHalere)}</dd>
+            </div>
+            <div className="finance-overview-progress">
+              <dt>
+                {Math.round(collectionPercentage)} % evidováno
+                {collectionPercentage > 100 ? " · přeplatek" : ""}
+              </dt>
+              <dd aria-hidden="true"><span style={{ width: `${collectionRate}%` }} /></dd>
+            </div>
+          </dl>
         </header>
         <Message error={query.error} success={query.success} />
-
-        <section className="finance-overview" aria-label="Souhrn financí">
-          <div>
-            <span>Předepsáno</span>
-            <strong>{formatCzk(dashboard.totals.expectedHalere)}</strong>
-          </div>
-          <div>
-            <span>Evidováno</span>
-            <strong>{formatCzk(dashboard.totals.collectedHalere)}</strong>
-          </div>
-          <div>
-            <span>Zbývá</span>
-            <strong>{formatCzk(dashboard.totals.remainingHalere)}</strong>
-          </div>
-        </section>
 
         <section className="finance-assessments" aria-labelledby="assessments-title">
           <header className="finance-assessments-header">
@@ -298,72 +347,64 @@ export default async function FinancePage({
           )}
         </section>
 
-        <div className="finance-advanced-heading">
-          <h2>Rozšířená správa</h2>
-          <p>Hlášení, ruční evidence, demo banka a upomínky.</p>
-        </div>
+        <section className="finance-workspace" aria-labelledby="finance-workspace-title">
+          <header className="finance-advanced-heading">
+            <div>
+              <h2 id="finance-workspace-title">Finanční operace</h2>
+              <p>Úkoly, které vyžadují rozhodnutí, a podpůrné nástroje pro správu plateb.</p>
+            </div>
+            <span>
+              {dashboard.pendingClaims.length + bankDashboard.movements.length} k vyřízení
+            </span>
+          </header>
 
+          <div className="finance-workspace-grid">
         <article className="panel finance-sync-settings">
           <header className="finance-sync-header">
             <div>
-              <h2>Nastavení automatické synchronizace účtu</h2>
+              <h2>Synchronizace účtu</h2>
               <p>
-                Zapněte pravidelné načítání nových pohybů a zrychlete jejich
-                párování s platbami členů. Ruční evidence i hlášení rodičů
-                zůstávají vždy dostupné.
+                Automatické načítání nových pohybů pro rychlejší párování plateb.
               </p>
             </div>
-            <span>Demo zdroj</span>
+            <span>Fio API</span>
           </header>
-          <p className="finance-sync-notice">
-            V této verzi se načítají pouze simulované pohyby. Skutečné bankovní
-            API ani přístupový token nejsou připojené.
-          </p>
           <div className="finance-sync-accounts">
             {bankDashboard.accounts.map((account) => (
-              <div className="finance-sync-account" key={account.id}>
-                <div className="finance-sync-account-copy">
-                  <div className="finance-sync-account-title">
-                    <strong>{account.account_number}</strong>
-                    <span className={account.integration_id ? "is-active" : ""}>
-                      {account.integration_id ? "Synchronizace aktivní" : "Synchronizace vypnutá"}
-                    </span>
-                  </div>
-                  <p>
-                    {account.is_default
-                      ? "Výchozí sdílený účet klubu"
-                      : account.exclusive_team_id
-                        ? "Výhradní týmový účet"
-                        : "Sdílený klubový účet"}
-                  </p>
-                  <p className="finance-sync-last-run">
-                    Poslední načtený pohyb: {account.last_processed_at
-                      ? formatDateTimeInPrague(account.last_processed_at)
-                      : "zatím žádný"}
-                  </p>
-                </div>
-                {!account.integration_id && account.canConfigure ? (
-                  <form action={activateDemoIntegrationAction} className="finance-sync-action">
-                    <ScopeFields scope={scope} />
-                    <input name="bankAccountId" type="hidden" value={account.id} />
-                    <button type="submit">Zapnout automatickou synchronizaci</button>
-                  </form>
-                ) : null}
-                {!account.canReadRaw && account.integration_id ? (
-                  <p className="finance-sync-access-note">
-                    Detail pohybů sdíleného účtu může zobrazit pouze správce klubu.
-                  </p>
-                ) : null}
-              </div>
+              <FioSyncAccount
+                account={{
+                  id: account.id,
+                  accountNumber: account.account_number,
+                  isDefault: account.is_default,
+                  exclusiveTeamId: account.exclusive_team_id,
+                  canConfigure: account.canConfigure,
+                  canReadRaw: account.canReadRaw,
+                  fioIntegrationId: account.fio_integration_id,
+                  fioStatus: account.fio_status,
+                  lastAttemptAt: isoTimestamp(account.fio_last_attempt_at),
+                  lastSuccessAt: isoTimestamp(account.fio_last_success_at),
+                  lastNewMovementAt: isoTimestamp(account.fio_last_new_movement_at),
+                  lastErrorCode: account.fio_last_error_code,
+                  lastErrorMessage: account.fio_last_error_message,
+                }}
+                key={account.id}
+                scope={scope}
+              />
             ))}
           </div>
         </article>
-        {bankDashboard.accounts.some((account) => account.canReadRaw && account.integration_id) ? (
-          <article className="panel">
-            <h2>Fronta smíření demo pohybů ({bankDashboard.movements.length})</h2>
-            <p>Všechny položky mají neměnný původ <code>simulated</code>. Nejsou bankovně ověřeným převodem. Spojení s ruční událostí nevytváří novou alokaci.</p>
+        {bankDashboard.accounts.some((account) => account.canReadRaw && (account.integration_id || account.fio_integration_id)) ? (
+          <article className="panel finance-reconciliation">
+            <header className="finance-panel-heading">
+              <span className="finance-panel-icon" aria-hidden="true">↔</span>
+              <div>
+                <h2>Bankovní pohyby k přiřazení</h2>
+                <p>Počáteční, nejasné a opravné pohyby zůstávají zde, dokud je oprávněná osoba nevyřeší.</p>
+              </div>
+              <span className="finance-panel-count">{bankDashboard.movements.length}</span>
+            </header>
             {bankDashboard.movements.length ? (
-              <div className="list-stack">
+              <div className="finance-reconciliation-list">
                 {bankDashboard.movements.map((movement) => {
                   const available = movement.amount_halere - movement.allocated_halere;
                   const debts = bankDashboard.debts.filter((debt) => debt.bank_account_id === movement.bank_account_id);
@@ -371,9 +412,14 @@ export default async function FinancePage({
                     (event) => event.bank_account_id === movement.bank_account_id && event.amount_halere === movement.amount_halere,
                   );
                   return (
-                    <div className="subcard" key={movement.id}>
-                      <p><strong>DEMO {formatCzk(movement.amount_halere)}</strong> · účet {movement.account_number} · VS {movement.variable_symbol ?? "neuveden"}</p>
+                    <div className="finance-reconciliation-item" key={movement.id}>
+                      <p><strong>{movement.source === "fio" ? "FIO" : "DEMO"} {formatCzk(movement.amount_halere)}</strong> · účet {movement.account_number} · VS {movement.variable_symbol ?? "neuveden"}</p>
                       <p>Přijato {formatDateTimeInPrague(movement.received_at)} · důvod fronty: {reconciliationReason(movement.reason_code)}</p>
+                      <p>Zdroj: {movement.source === "fio" ? "Fio API" : movement.ingestion_origin === "public_qr" ? "historická veřejná simulace" : "demo simulátor"}{movement.initial_import ? " · počáteční import" : ""}</p>
+                      {movement.source === "fio" && (movement.counterparty_name || movement.recipient_message || movement.transaction_type) ? (
+                        <p>{movement.counterparty_name ?? "Neznámý plátce"}{movement.recipient_message ? ` · ${movement.recipient_message}` : ""}{movement.transaction_type ? ` · ${movement.transaction_type}` : ""}</p>
+                      ) : null}
+                      {movement.related_transaction_id ? <p className="fio-sync-error"><strong>Možná shoda s dříve přiřazenou úhradou.</strong></p> : null}
                       <p>Přiřazeno {formatCzk(movement.allocated_halere)}, volné {formatCzk(available)} · zdrojové ID <code>{movement.source_transaction_id}</code></p>
                       {movement.resolution_reason ? <p>Poslední rozhodnutí: {movement.resolution_reason}</p> : null}
                       {manualEvents.length && movement.allocated_halere === 0 ? (
@@ -429,137 +475,93 @@ export default async function FinancePage({
                           ) : null}
                         </>
                       ) : null}
+                      {movement.amount_halere < 0 && movement.allocated_halere === 0 ? (
+                        <details>
+                          <summary>Uzavřít opravný pohyb po ručním posouzení</summary>
+                          <form action={ignoreSimulatedTransactionAction} className="form-stack compact-form">
+                            <ScopeFields scope={scope} />
+                            <input name="bankTransactionId" type="hidden" value={movement.id} />
+                            <label>Odůvodnění<input maxLength={300} name="reason" required /></label>
+                            <button className="button-secondary" type="submit">Uložit rozhodnutí bez změny alokací</button>
+                          </form>
+                        </details>
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
-            ) : <p>Žádné demo pohyby nečekají na rozhodnutí.</p>}
+            ) : (
+              <div className="finance-operation-empty">
+                <span aria-hidden="true">✓</span>
+                <div><strong>Fronta je prázdná</strong><small>Žádný pohyb nečeká na rozhodnutí.</small></div>
+              </div>
+            )}
           </article>
         ) : null}
-        <article className="panel">
-          <div className="section-heading">
-            <div><h2>Člen × předpis</h2><p>Stav je odvozený z evidovaných platebních událostí a alokací.</p></div>
-            <Link className="button-link button-secondary" href={`/finance?${scopeQuery}${onlyUnpaid ? "" : "&unpaid=1"}`}>
-              {onlyUnpaid ? "Zobrazit všechny" : "Jen nezaplacené"}
-            </Link>
-          </div>
-          {visibleDebts.length ? (
-            <div className="table-scroll">
-              <table className="finance-matrix">
-                <thead><tr><th>Člen</th>{assessments.map((assessment) => <th key={assessment.id}>{assessment.title}</th>)}</tr></thead>
-                <tbody>
-                  {athletes.map((athlete) => (
-                    <tr key={athlete.id}>
-                      <th>{athlete.name}</th>
-                      {assessments.map((assessment) => {
-                        const debt = visibleDebts.find(
-                          (item) => item.athlete_id === athlete.id && item.assessment_id === assessment.id,
-                        );
-                        if (!debt) return <td key={assessment.id}>—</td>;
-                        return (
-                          <td key={assessment.id}>
-                            <div className="matrix-cell">
-                              <strong>{debtStatusLabel(debt.status)}</strong>
-                              <span>{formatCzk(debt.allocated_halere)} / {formatCzk(debt.amount_halere)}</span>
-                              {debt.has_pending_claim ? <span>Čeká hlášení rodiče</span> : null}
-                              {debt.last_reminder_at ? (
-                                <span>
-                                  {debt.last_reminder_status === "sent"
-                                    ? "Upomínka odeslána"
-                                    : debt.last_reminder_status === "failed"
-                                      ? "Pokus o upomínku selhal"
-                                      : "Upomínka čeká na odeslání"}
-                                  {": "}
-                                  {new Intl.DateTimeFormat("cs-CZ", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Prague" }).format(new Date(debt.last_reminder_at))}
-                                </span>
-                              ) : null}
-                              {debt.cancelled_at ? (
-                                <span>Důvod zrušení: {debt.cancellation_reason}</span>
-                              ) : (
-                                <>
-                                  <details>
-                                    <summary>Zapsat hotovost</summary>
-                                    <form action={recordCashPaymentAction} className="form-stack compact-form">
-                                      <ScopeFields scope={scope} />
-                                      <input name="receivableId" type="hidden" value={debt.id} />
-                                      <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-                                      <label>Částka Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} name="amount" required /></label>
-                                      <label>Datum<input defaultValue={today} max={today} name="occurredOn" required type="date" /></label>
-                                      <button type="submit">Zaplaceno hotově</button>
-                                    </form>
-                                  </details>
-                                  {debt.allocated_halere === 0 && !debt.has_pending_claim ? (
-                                    <details>
-                                      <summary>Zrušit dluh</summary>
-                                      <form action={cancelReceivableAction} className="form-stack compact-form">
-                                        <ScopeFields scope={scope} />
-                                        <input name="receivableId" type="hidden" value={debt.id} />
-                                        <p>Dluh se nesmaže, jen přestane být očekávaný. Historie a audit zůstanou.</p>
-                                        <label>Důvod zrušení<input maxLength={300} name="reason" required /></label>
-                                        <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji zrušení dluhu</label>
-                                        <button className="button-secondary" type="submit">Zrušit dluh</button>
-                                      </form>
-                                    </details>
-                                  ) : null}
-                                </>
-                              )}
-                              {debt.events.filter((event) => event.kind !== "correction").map((event) => (
-                                <details key={event.id}>
-                                  <summary>{paymentEventLabel(event.kind)}: {formatCzk(event.amount_halere)}</summary>
-                                  <p>{event.occurred_on}{event.reversed ? " · opraveno protizápisem" : ""}</p>
-                                  {!event.reversed ? (
-                                    <form action={reversePaymentEventAction} className="form-stack compact-form">
-                                      <ScopeFields scope={scope} />
-                                      <input name="paymentEventId" type="hidden" value={event.id} />
-                                      <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-                                      <label>Důvod opravy<input maxLength={300} name="reason" required /></label>
-                                      <button className="button-secondary" type="submit">Zapsat opravu</button>
-                                    </form>
-                                  ) : null}
-                                </details>
-                              ))}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <MemberAssessmentLedger
+          members={ledgerMembers}
+          onlyUnpaid={onlyUnpaid}
+          scope={scope}
+          scopeQuery={scopeQuery}
+          today={today}
+        />
+        <article className="panel finance-claims">
+          <header className="finance-panel-heading">
+            <span className="finance-panel-icon is-attention" aria-hidden="true">✓</span>
+            <div>
+              <h2>Platební hlášení</h2>
+              <p>Hlášení členů, která čekají na vaše potvrzení nebo zamítnutí.</p>
             </div>
-          ) : <p>V tomto filtru nejsou žádné dluhy.</p>}
-        </article>
-        <article className="panel">
-          <h2>K potvrzení ({dashboard.pendingClaims.length})</h2>
-          <p>Hlášení rodiče není bankovně ověřený převod. Potvrzení pouze vytvoří auditovanou evidenci v aplikaci.</p>
+            <span className="finance-panel-count is-attention">{dashboard.pendingClaims.length}</span>
+          </header>
           {dashboard.pendingClaims.length ? (
-            <form action={reviewPaymentClaimsAction} className="form-stack">
+            <form action={reviewPaymentClaimsAction} className="finance-claim-form">
               <ScopeFields scope={scope} />
-              <div className="list-stack">
+              <div className="finance-claim-list">
                 {dashboard.pendingClaims.map((claim) => (
-                  <label className="subcard checkbox-label" key={claim.id}>
+                  <label className="finance-claim-row" key={claim.id}>
                     <input name="claimId" type="checkbox" value={claim.id} />
-                    <span><strong>{claim.athlete_name}</strong><br />{claim.assessment_title} · {formatCzk(claim.amount_halere)} · {claim.guardian_email}<br />Nahlášeno {formatDateTimeInPrague(claim.created_at)}</span>
+                    <span className="finance-claim-avatar" aria-hidden="true">{initials(claim.athlete_name)}</span>
+                    <span className="finance-claim-person">
+                      <strong>{claim.athlete_name}</strong>
+                      <small>{claim.guardian_email}</small>
+                    </span>
+                    <span className="finance-claim-assessment">
+                      <strong>{claim.assessment_title}</strong>
+                      <small>Nahlášeno {formatDateTimeInPrague(claim.created_at)}</small>
+                    </span>
+                    <strong className="finance-claim-amount">{formatCzk(claim.amount_halere)}</strong>
                   </label>
                 ))}
               </div>
-              <label>Důvod zamítnutí<input maxLength={300} name="rejectionReason" placeholder="Povinný jen při zamítnutí" /></label>
-              <div className="button-row">
+              <div className="finance-claim-actions">
+                <label>Důvod zamítnutí<input maxLength={300} name="rejectionReason" placeholder="Doplňte pouze při zamítnutí" /></label>
+                <div>
                 <button name="decision" type="submit" value="approved">Potvrdit vybrané</button>
                 <button className="button-secondary" name="decision" type="submit" value="rejected">Zamítnout vybrané</button>
+                </div>
               </div>
             </form>
-          ) : <p>Žádná hlášení nečekají.</p>}
+          ) : (
+            <div className="finance-operation-empty">
+              <span aria-hidden="true">✓</span>
+              <div><strong>Všechna hlášení jsou vyřízená</strong><small>Nová hlášení členů se zobrazí na tomto místě.</small></div>
+            </div>
+          )}
         </article>
-        <article className="panel">
-          <h2>Neutrální hromadná upomínka</h2>
-          <p>Automatický e-mail dostanou pouze aktuálně nezaplacené dluhy v tomto rozsahu. Odeslání nemění stav dluhu.</p>
+        <article className="panel finance-reminder">
+          <header className="finance-panel-heading">
+            <span className="finance-panel-icon" aria-hidden="true">✉</span>
+            <div><h2>Připomenout nezaplacené</h2><p>Jedna neutrální zpráva všem aktuálně nezaplaceným členům.</p></div>
+          </header>
           <form action={sendBulkRemindersAction}>
             <ScopeFields scope={scope} />
             <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-            <button type="submit">Připomenout všem nezaplaceným</button>
+            <button type="submit">Odeslat hromadnou upomínku</button>
           </form>
         </article>
+          </div>
+        </section>
       </section>
     </main>
   );

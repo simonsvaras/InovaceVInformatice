@@ -50,7 +50,6 @@ export function CreateClubForm() {
             required
             value={accountNumber}
           />
-          <small>Peníze směřují přímo na tento účet; aplikace je nepřijímá.</small>
         </label>
         <label>
           Název prvního týmu

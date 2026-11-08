@@ -1,16 +1,15 @@
 import Image from "next/image";
-import Link from "next/link";
 
 import {
   reportManualPaymentAction,
   withdrawManualPaymentAction,
 } from "@/app/actions/payments";
+import { AppHeader } from "@/components/app-header";
 import { CopyPaymentDetails } from "@/components/copy-payment-details";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getGuardianReceivable } from "@/modules/assessments/service";
 import {
-  buildCzechPaymentDescriptor,
   domesticAccountToIban,
   formatCzk,
   paymentQrDataUrl,
@@ -28,26 +27,34 @@ export default async function ReceivablePage({
   const { receivableId } = await params;
   const query = await searchParams;
   const debt = await getGuardianReceivable(user.id, receivableId);
-  const payment = {
-    accountNumber: debt.accountNumber,
-    amountHalere: debt.remainingHalere,
-    variableSymbol: debt.variableSymbol,
-    message: debt.paymentMessage,
-  };
-  const [qr, descriptor] = debt.remainingHalere > 0
-    ? await Promise.all([
-        paymentQrDataUrl(payment),
-        Promise.resolve(buildCzechPaymentDescriptor(payment)),
-      ])
-    : [null, null];
+  const qr = debt.remainingHalere > 0
+    ? await paymentQrDataUrl({
+        accountNumber: debt.accountNumber,
+        amountHalere: debt.remainingHalere,
+        variableSymbol: debt.variableSymbol,
+        message: debt.paymentMessage,
+      })
+    : null;
   const amount = formatCzk(debt.amountHalere);
 
   return (
     <main className="dashboard-shell">
-      <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubio</Link>
-        <Link href="/prehled">Zpět na přehled</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: "/prehled", label: "Přehled" }}
+        context={{
+          kind: debt.teamName ? "Tým" : "Klub",
+          name: debt.teamName ?? debt.clubName,
+          role: "Člen / rodič",
+          href: debt.teamId ? `/tymy/${debt.teamId}?view=member` : "/prehled",
+        }}
+        navigation={[
+          ...(debt.teamId
+            ? [{ href: `/tymy/${debt.teamId}?view=member`, label: "Přehled týmu" }]
+            : [{ href: "/prehled", label: "Moje kluby" }]),
+          { href: `/dluhy/${debt.id}`, label: "Platební údaje", active: true },
+        ]}
+        user={user}
+      />
       <section className="content-stack">
         <Message error={query.error} success={query.success} />
         <div><p className="eyebrow">Detail dluhu</p><h1>{debt.title}</h1></div>
@@ -73,31 +80,33 @@ export default async function ReceivablePage({
           <div className="qr-panel">
             {qr ? (
               <>
-                <Image alt="QR Platba" height={320} priority src={qr} unoptimized width={320} />
-                <p>Naskenujte bankovní aplikací. Platba zbývající částky směřuje přímo na uvedený účet.</p>
+                <Image alt="Standardní česká QR Platba s účtem, částkou a variabilním symbolem" height={320} priority src={qr} unoptimized width={320} />
+                <p>Naskenujte QR v bankovní aplikaci. Obsahuje účet, aktuální zbývající částku, variabilní symbol a zprávu.</p>
               </>
             ) : <p>Dluh je podle evidovaných platebních událostí uhrazen.</p>}
-            {debt.demoIntegrationEnabled && debt.remainingHalere > 0 ? (
-              <div className="demo-simulator-entry">
-                <p><strong>Školní demo automatické kontroly</strong></p>
-                <p>Jde o oddělenou simulaci. Nevytváří skutečný převod, nemění QR a není spojením s Fio.</p>
-                <Link className="button-link button-secondary" href={`/demo-banka/${debt.id}`}>Simulovat platbu (DEMO)</Link>
-              </div>
-            ) : debt.remainingHalere > 0 ? (
-              <p>Ruční hlášení „Zaplatil jsem“ zůstává dostupné nezávisle na technické konfiguraci demo kontroly.</p>
-            ) : null}
           </div>
         </article>
         {debt.hasSimulatedPayment ? (
           <article className="panel">
-            <h2>Demo automatická kontrola</h2>
-            <p>Část evidované úhrady pochází ze simulovaného pohybu (<code>simulated</code>). Nejde o potvrzení skutečného ani bankovně ověřeného převodu a aplikace není spojena s Fio.</p>
+            <h2>Zdroj úhrady</h2>
+            <p>Simulovaný pohyb</p>
+          </article>
+        ) : null}
+        {debt.hasFioPayment ? (
+          <article className="panel">
+            <h2>Automatická kontrola banky</h2>
+            <p>Část evidované úhrady byla načtena z Fio API a spárována podle účtu, variabilního symbolu a částky.</p>
+          </article>
+        ) : debt.fioIntegrationEnabled && debt.remainingHalere > 0 ? (
+          <article className="panel">
+            <h2>Automatická kontrola banky</h2>
+            <p>Příchozí pohyby se průběžně kontrolují.</p>
           </article>
         ) : null}
         {debt.pendingClaimId ? (
           <article className="panel">
             <h2>Hlášení o odeslané platbě</h2>
-            <p><strong>{formatCzk(debt.pendingClaimAmountHalere ?? 0)}</strong> čeká na potvrzení. Jde pouze o vaše hlášení, nikoli bankovně ověřený převod.</p>
+            <p><strong>{formatCzk(debt.pendingClaimAmountHalere ?? 0)}</strong> čeká na potvrzení.</p>
             <form action={withdrawManualPaymentAction}>
               <input name="receivableId" type="hidden" value={debt.id} />
               <input name="claimId" type="hidden" value={debt.pendingClaimId} />
@@ -107,19 +116,13 @@ export default async function ReceivablePage({
         ) : debt.remainingHalere > 0 ? (
           <article className="panel">
             <h2>Zaplatil jsem</h2>
-            <p>Nahlaste částku, kterou jste odeslali. Hlášení čeká na vyřízení trenérem či správcem; samo nepotvrzuje, že klub peníze přijal, a není bankovně ověřeným převodem.</p>
+            <p>Nahlaste částku, kterou jste odeslali.</p>
             <form action={reportManualPaymentAction} className="form-stack inline-form">
               <input name="receivableId" type="hidden" value={debt.id} />
               <label>Částka v Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} min="0.01" name="amount" required step="0.01" type="number" /></label>
               <button type="submit">Zaplatil jsem</button>
             </form>
           </article>
-        ) : null}
-        {descriptor ? (
-          <details className="panel technical-details">
-            <summary>Technické údaje QR Platby</summary>
-            <code>{descriptor}</code>
-          </details>
         ) : null}
       </section>
     </main>

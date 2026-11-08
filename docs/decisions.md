@@ -7,7 +7,7 @@ Stav k 2026-11-05. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 | ID | Stav | Rozhodnutí |
 | --- | --- | --- |
 | A-01 | Schváleno zadavatelem | TypeScript, Next.js, PostgreSQL a Docker; modulární monolit bez dalších aplikačních služeb. |
-| A-02 | Pracovní pravidlo | Doménová logika mimo UI a HTTP handlery; bankovní adaptér za rozhraním. E-mail odeslat přes Resend po DB zápisu, chybu doručení uložit pro ruční opakování. Bez fronty a samostatného workeru v demo MVP. |
+| A-02 | Pracovní pravidlo | Doménová logika mimo UI a HTTP handlery; bankovní adaptér za rozhraním. E-mail odeslat přes Resend po DB zápisu, chybu doručení uložit pro ruční opakování. Fio synchronizaci provádí samostatný Compose worker nad databázovou frontou požadavků a leasem integrace; ruční akce banku nevolá paralelně z HTTP procesu. |
 | A-03 | Schváleno zadavatelem | Nasazení: stáhnout repozitář na vlastní server a spustit přes Docker Compose. ECS, RDS a další spravované AWS služby nejsou součástí projektu. |
 | A-04 | Schváleno zadavatelem | Lead Agent vždy navrhuje, implementuje, sjednocuje a dokumentuje. Subagenti pouze nezávisle kontrolují; soubory neupravují. Nikdy nepsat automatizované testy. Ověření je ruční průchod scénářů a kontrola build/lint/migrací. |
 | A-05 | Pracovní pravidlo | Typovaný přístup k PostgreSQL zajišťuje Drizzle ORM nad `postgres.js`; Drizzle Kit generuje verzované SQL migrace. V Docker Compose čeká aplikace na zdravou DB, provede čekající migrace a až potom spustí Next.js. Health endpoint ověřuje spojení i marker verze schématu. PostgreSQL používá pojmenované volume a nemá publikovaný hostitelský port. |
@@ -15,13 +15,14 @@ Stav k 2026-11-05. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 | A-07 | Pracovní pravidlo | M3 vystaví předpis, všechny individuální dluhy, VS, audit a `pending` delivery/outbox v jedné DB transakci. Každý formulář nese náhodný idempotency klíč svázaný s otiskem vstupu; opakování vrátí původní předpis. E-maily se vytvářejí a odesílají až po commitu a jeden záznam doručení na dluh brání opakovanému odeslání. Retry používá stabilní Resend idempotency klíč a krátký lease s unikátním tokenem pokusu; konečný stav smí zapsat jen držitel tokenu. Selhání QR/Resendu se uloží, ale nevrací finanční transakci. |
 | A-08 | Pracovní pravidlo | M4 odvozuje stav dluhu ze součtu append-only `payment_allocations`. Potvrzení hlášení, hotovost i korekční protizápis nejprve zamknou příslušný řádek `receivables`, následným dotazem znovu načtou aktuální součet alokací a v téže transakci vytvoří událost, alokaci a audit se součtem před operací. Aktuální součet neomezuje kladnou částku zbývajícím dluhem, protože D-05 povoluje přeplatek. Proti opakování stejné operace chrání unikátní zdroj hlášení, idempotency klíč hotovosti nebo jediná vazba protizápisu na původní událost. M5 používá před každým přiřazením demo pohybu stejný zámek dluhu a následné načtení alokací; při ručním smíření navíc nejprve zamyká pohyb. Chybný zápis se nemaže ani nepřepisuje, ale opraví protizápisem s důvodem. |
 | A-09 | Pracovní pravidlo | M5 ukládá technickou demo konfiguraci odděleně od bankovního účtu a každý pohyb jednou pod unikátní dvojicí účet + stabilní ID zdroje. Původní atributy pohybu včetně `source=simulated` chrání databázový trigger proti změně. Každé jednotlivé přiřazení pohybu jednomu dluhu vytváří samostatnou `payment_event`, aby ji šlo opravit jediným protizápisem podle A-08; volná část pohybu je čistý součet jeho kladných a korekčních alokací pod zámkem pohybu. Aktivní důkazní vazba je vzájemně výlučná s demo alokací a může mířit jen na částkou i účtem shodnou, neopravovanou `manual_claim`; její pozdější oprava vazbu auditovaně zneplatní a vrátí pohyb do fronty. Výhradní týmový účet je explicitně svázán s jedním týmem technické integrace; výchozí, historicky sdílený nebo nejednoznačný účet zůstává jen správci klubu. `last_processed_at` se posune pouze při prvním přijetí nového source ID, ne při replay. |
+| A-10 | Pracovní pravidlo | Fio integrace je další nedestruktivní zdroj fyzického účtu vedle historické demo integrace. Token se ukládá AES-256-GCM se samostatným klíčem prostředí; pro globální 30sekundový limit se používá pouze HMAC otisk tokenu. Ověření má dvě fáze bez držení DB zámku během sítě. Worker používá krátký lease, periodický endpoint s překryvem a atomicky ukládá pohyby i posun kurzoru. Počátečních sedm dní je `initial_import` bez automatické alokace. Zdroj `fio`, Fio ID, účet, částka, VS a čas jsou neměnné; unikátní `(účet, zdroj, ID)` chrání replay. |
 
 ## Produktová pravidla MVP
 
 | ID | Stav | Rozhodnutí a důvod |
 | --- | --- | --- |
-| D-01 | Schváleno zadavatelem | MVP používá demo simulátor banky. Skutečné Fio API a práce s jeho tokenem jsou mimo MVP. Obrazovka Fio průvodce může být navržena, nesmí předstírat funkční napojení. Demo instalace se nesmí vydávat za ostré automatické ověření převodů. |
-| D-02 | Pracovní pravidlo | Standardní CZK QR ukazuje platební údaje konfigurovaného účtu; vedle něj je samostatné jasně označené tlačítko „Simulovat platbu“. QR nikdy nevede na simulátor. Demo stránka u QR upozorní, že skutečný převod se v aplikaci neověří. Simulovaná úhrada je jako demo označená v UI, e-mailu, potvrzení a exportu. |
+| D-01 | Nahrazeno D-19 | Původní MVP používalo demo simulátor. Novější výslovný požadavek implementuje skutečné čtení příchozích pohybů z Fio; historické demo záznamy se nemažou ani nepřejmenovávají. |
+| D-02 | Nahrazeno D-18 a následně D-19 | QR se vrací ke standardní české QR Platbě `SPD*1.0`. Dřívější veřejné simulační odkazy se zneplatní; jejich historický původ zůstane dohledatelný. |
 | D-03 | Pracovní pravidlo | Klub zadává jeden výchozí účet. Tým může později nastavit vlastní účet; více týmů smí sdílet klubový účet. Stejné normalizované číslo účtu nelze v demu registrovat pod různými kluby. VS je unikátní na fyzický účet napříč klubovými i týmovými dluhy. U sdíleného účtu vidí nespárované syrové pohyby a spravuje technickou konfiguraci synchronizace pouze správce klubu; trenér vidí vlastní spárované platby a ruční hlášení. U výhradního týmového účtu může trenér zpracovat nespárované pohyby. Ruční evidence zůstává dostupná bez ohledu na konfiguraci synchronizace. Celoklubový předpis používá výchozí účet, každému unikátnímu sportovci vystaví jeden dluh a v exportu má tým „Celý klub“; spravuje jej klubový správce. |
 | D-04 | Schváleno zadavatelem + pracovní detail | Platná e-mailová pozvánka dá po registraci nebo přihlášení přímý přístup do týmu bez schvalování. Jednorázový odkaz doručený na pozvanou adresu slouží jako ověření držení adresy; e-mail účtu se musí shodovat s pozvánkou, další ověřovací krok není. Přeposlaný odkaz může před vypršením využít jiný držitel, proto má krátkou platnost, jednorázové použití a možnost zrušení. Vstup přes sdílený týmový kód vytvoří žádost ke schválení trenérem. Přesnou délku platnosti zvolí Lead Agent při implementaci. |
 | D-05 | Pracovní pravidlo | Částečné úhrady se evidují; částka přiřazená nad výši dluhu vede ke stavu „přeplaceno“, ale automaticky nezakládá kredit. Nepřiřazená část pohybu zůstává ve frontě do ručního rozhodnutí správce. Potvrzení je potvrzení evidence v aplikaci, nikoli daňový doklad. Omyly se opravují novou auditovanou korekcí, ne mazáním historie. Ochranu proti dvojímu započtení ruční a synchronizované evidence stanoví D-16. |
@@ -34,7 +35,7 @@ Stav k 2026-11-05. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 | D-12 | Pracovní pravidlo | Ruční hlášení, hotovost a zrušení neuhrazeného dluhu u celoklubového předpisu vyřizuje pouze správce klubu. Celoklubový dluh nemá týmový původ a nelze jej automaticky přidělit jednomu trenérovi; týmové dluhy nadále spravuje trenér svého týmu nebo správce klubu. |
 | D-13 | Pracovní pravidlo | Změna výchozího klubového či týmového bankovního účtu platí jen pro nově vystavené dluhy. Již vystavený dluh si ponechá původní účet, VS a QR platební údaje; použitý účet se z historie nemaže. Technická konfigurace synchronizace nemění účet ani platební údaje již vystaveného dluhu. |
 | D-14 | Pracovní pravidlo | E-mailová pozvánka trenéra nebo člena platí 48 hodin, je jednorázová, zrušitelná a vyžaduje přesnou shodu normalizovaného e-mailu účtu. Reset hesla platí 30 minut. Sdílený týmový kód platí 30 dní; nový kód starý zruší a kód vždy vytvoří pouze žádost ke schválení. Sportovce lze při pozvánce či kódu nově vytvořit nebo vybrat jen z vlastního účtu; shoda jména nikdy nepřevádí cizí záznam. |
-| D-15 | Pracovní pravidlo | VS se přiděluje transakční číselnou řadou zvlášť pro každý fyzický účet, od hodnoty `1000000001`, a nikdy se znovu nepoužije. QR Platba používá formát SPD 1.0, český IBAN odvozený z validovaného domácího účtu, přesnou CZK částku, VS a zprávu; neobsahuje odkaz na simulátor. |
+| D-15 | Aktualizováno D-19 | VS se přiděluje transakční číselnou řadou zvlášť pro každý fyzický účet, od hodnoty `1000000001`, a nikdy se znovu nepoužije. QR používá `SPD*1.0` s historickým účtem dluhu, aktuálním CZK zůstatkem, VS a zprávou. |
 | D-16 | Schváleno zadavatelem + pracovní detail | Bankovní účet nemá „ruční“ ani „automatický“ režim. Rodič může nahlásit každý nezaplacený dluh, ale jeho „Zaplatil jsem“ samo nepotvrzuje přijetí peněz. Oprávněná osoba může úhradu zaevidovat ručně; hotovost je jiný zdroj události. Technická konfigurace bankovní nebo demo synchronizace může patřit k účtu, nesmí však ruční evidenci vypnout. M5 uloží každý příchozí pohyb jednou podle účtu a stabilního ID poskytovatele. Pokud pohyb může odpovídat čekajícímu hlášení nebo již ručně evidované úhradě, systém jej automaticky podruhé nealokuje, ale nabídne oprávněné osobě rozhodnutí: spojit jej s existující událostí bez nové alokace, označit jako jinou platbu, nebo rozdělit jen dosud nealokovanou část. Rozhodnutí a původ zůstávají auditovatelné. Simulovaný pohyb není bankovně ověřený převod. |
 
 ## Vědomé rozdíly proti prototypu a původnímu seznamu
@@ -42,7 +43,7 @@ Stav k 2026-11-05. `Schváleno zadavatelem` je výslovná volba. `Pracovní prav
 - Prototyp používá angličtinu a eura; produkt používá češtinu a Kč.
 - Prototyp ukazuje e-mail u hráče, ale u dítěte je kontakt vždy na rodiče. Spoluhráči nevidí cizí kontakty ani platby.
 - „Upomínka odeslána“ na snímku není stav dluhu. Odchod z týmu neruší dluh automaticky.
-- T7 v původním zadání počítá s průvodcem a skutečným Fio tokenem. Ve schváleném demo MVP se ukáže pouze technická konfigurace demo synchronizace a připravený informační návrh obrazovky Fio; nejde o režim účtu a skutečné napojení je budoucí rozvoj.
+- T7 používá skutečné čtení Fio API. Aplikace ověřuje čitelnost, banku, účet/IBAN a CZK, ale netvrdí, že výpisová odpověď technicky dokládá rozsah práv tokenu „jen pro čtení“.
 - T8 se u sdíleného účtu vykonává správcem klubu kvůli izolaci dat týmů. Trenér ji může vykonat u výhradního účtu svého týmu.
 - C9 zmiňuje kredit, ale C12/C13 jej řadí až po MVP. Bez kreditní funkce se při odchodu zobrazuje upozornění na trvající dluhy, nikoli vymyšlený zůstatek kreditu.
 # D-17 — Trvalý osobní profil a výslovný profil dítěte
@@ -56,7 +57,30 @@ Stav: schváleno zadavatelem dne 2026-11-05.
 - Pozvánka i kód používají jedinou transakční resolver funkci. Řádek uživatele serializuje souběžné vytvoření profilu, částečný unikátní index chrání `self`, stabilní klíč formuláře chrání vytvoření dítěte a existující unikátní indexy chrání aktivní členství a čekající žádost.
 - Spravující účet zůstává adresátem finanční komunikace. Typ vazby nemění existující dluhy, platby ani auditní historii.
 
-# D-18 — Historie, potvrzení evidence a CSV export (M6)
+# D-18 — Jediný QR jako veřejný simulovaný platební odkaz (nahrazeno)
+
+Stav: schváleno zadavatelem dne 2026-11-06. Nahrazuje část D-02/D-03 a všech starších formulací, které vyžadovaly SPD QR pro skutečný převod.
+
+- QR obsahuje pouze veřejnou HTTPS URL. Účet, VS a aktuální zůstatek načítá veřejná stránka serverově z dluhu; nejsou důvěryhodným vstupem formuláře.
+- Vydání odkazu má náhodné UUID a HMAC token odvozený samostatným tajemstvím. Databáze drží pouze SHA-256 hash tokenu. Odkaz lze rekonstruovat, zrušit a vydat znovu.
+- `public_payment_links` drží vazbu na dluh, revokaci, spotřebu a výsledný pohyb. Aktivní vydání je na dluh nejvýše jedno.
+- Veřejné potvrzení zamyká dluh a následně vydání odkazu, kontroluje očekávaný zůstatek a stejnou transakcí přijme pohyb, provede párování, audit a spotřebuje odkaz.
+- `bank_transactions.ingestion_origin` a `payment_events.recorded_origin` rozlišují `public_qr` od přihlášené simulace. Odpovídající uživatelský aktér je nullable; anonymní návštěvník se nevydává za správce, trenéra ani rodiče.
+- Technická demo integrace účtu může vzniknout při vydání odkazu. Veřejný GET ji nikdy neaktivuje a samotná konfigurace nevypíná ruční evidenci ani rodičovské hlášení.
+
+# D-19 — Standardní SPD QR a skutečná Fio synchronizace
+
+Stav: schváleno zadavatelem dne 2026-11-06. Nahrazuje D-18, D-01 a všechny formulace odkládající Fio mimo aktuální rozsah.
+
+- Jediný QR na detailu dluhu i v e-mailu obsahuje standardní `SPD*1.0` s historicky přiřazeným účtem dluhu, aktuální zbývající částkou v CZK, VS a zprávou. Nevede na aplikaci ani simulátor.
+- Dopředná migrace zneplatní všechna aktivní vydání veřejného odkazu. Již vytvořené pohyby, alokace a audit s původem `public_qr`/`simulated` zůstávají beze změny.
+- Fio integrace patří fyzickému účtu a existuje vedle historické demo konfigurace. Sdílený účet konfiguruje a jeho syrové pohyby vidí pouze správce klubu; u výhradního týmového účtu také oprávněný trenér.
+- Aktivace ověří Fio banku 2010, čtení, účet nebo IBAN a CZK. Token se autentizovaně šifruje samostatným klíčem, nevrací se klientovi a není v logu, auditu ani e-mailu. Aplikace netvrdí, že z odpovědi ověřila přesný rozsah práv tokenu.
+- Worker serializuje plánované i ručně vyžádané kontroly, dodržuje nejméně 30 sekund pro stejný token a ukládá každý pohyb jednou podle účtu, zdroje `fio` a Fio ID. Kurzorem je poslední úspěšné období s překryvem, nikoli bankovní endpoint „od posledního stažení“.
+- Počátečních sedm dní jde pouze do fronty. Automaticky se alokuje jen nový kladný zaúčtovaný CZK příjem, který jednoznačně odpovídá účtu, VS a přesné zbývající částce bez čekajícího hlášení či možné ruční duplicity. Záporný pohyb původní alokaci automaticky neruší a vyžaduje rozhodnutí oprávněné osoby.
+- Fio událost má vlastní neměnný původ a bez lidského aktéra. Ruční žadatel synchronizace je jen auditní žadatel. E-mailová delivery vzniká s alokací v transakci a odesílá se až po commitu.
+
+# D-20 — Historie, potvrzení evidence a CSV export (M6)
 
 Stav: pracovní pravidlo schválené jako výchozí pro školní demo; vyžaduje kontrolu zadavatelem jen při přechodu k ostrému provozu.
 
@@ -67,7 +91,7 @@ Stav: pracovní pravidlo schválené jako výchozí pro školní demo; vyžaduje
 - Oprávnění: tým čte a exportuje trenér daného týmu nebo správce klubu; klubový rozsah jen správce (stejná `authorizeManagerRead` jako finanční přehled). Cizí rozsah vrací 404, nikoli prázdná data.
 - Audit: `payments.register_viewed`, `payments.exported` (filtry a počet řádků), `payment.confirmation_downloaded`, `club.finance_overview_viewed`. K3 počítá „po splatnosti“ jako zbývající neuhrazenou částku dluhů se splatností před dneškem (Europe/Prague), včetně částečně uhrazených a nahlášených; týmy jsou aktivní, klubové dluhy samostatný řádek „Celý klub“.
 - M6 nemění databázové schéma ani nevyžaduje migraci.
-# D-19 — Odchod, vyřazení, přesun, archivace a zrušení dluhu (M7)
+# D-21 — Odchod, vyřazení, přesun, archivace a zrušení dluhu (M7)
 
 Stav: pracovní pravidlo pro školní demo.
 
@@ -76,4 +100,4 @@ Stav: pracovní pravidlo pro školní demo.
 - Přesun ukončí staré členství a v téže transakci založí nové se zdrojem `transfer`. Zámky týmů se berou v pevném pořadí podle ID.
 - Archivace týmu (K6, jen správce klubu) nastaví `archived_at`, ukončí aktivní členství (`archived`), zamítne čekající žádosti a zruší aktivní pozvánky i týmový kód. Trenér, dluhy, platby a export zůstávají; archivovaný tým je v klubovém přehledu v samostatné sekci a v souhrnu K3 jako „Archivované týmy“. Nové předpisy pro něj server odmítne.
 - Zrušení dluhu (`receivables.cancelled_at`, autor a povinný důvod): týmový dluh smí zrušit trenér týmu nebo správce klubu, celoklubový jen správce (D-12). Zrušit lze jen dluh bez evidované úhrady (součet alokací 0) a bez čekajícího hlášení; dluh s úhradou se nejprve opraví protizápisem. Zrušení je nevratné (DB trigger), zrušený dluh nelze uhradit (DB trigger u kladných alokací i kontrola v hlášení, hotovosti a demo párování), nevstupuje do „očekáváno“, „zbývá“, „po splatnosti“ ani do upomínek, ale zůstává v historii s důvodem a stavem „Zrušeno“.
-- Migrace: `0022` přidává sloupce a omezení (její snapshot nově obsahuje i změny ručně psané `0021`, čímž je původní omezení generátoru vyřešeno), `0023` obsahuje DB pojistky a značku schématu `M7-0023`.
+- Migrace: `0028` přidává sloupce a omezení (zrušení dluhu, důvod ukončení členství), `0029` obsahuje DB pojistky a značku schématu `M7-0029`. Po sloučení s `origin/main` jsou přečíslované za Fio migrace `0022`–`0027`; snapshot `0028` navazuje na jejich `0027`.

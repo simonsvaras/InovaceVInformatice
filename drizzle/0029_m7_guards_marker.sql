@@ -28,6 +28,6 @@ CREATE TRIGGER receivables_cancellation_final
 BEFORE UPDATE ON receivables
 FOR EACH ROW EXECUTE FUNCTION prevent_cancelled_receivable_change();--> statement-breakpoint
 INSERT INTO app_metadata (key, value, updated_at)
-VALUES ('schema_version', 'M7-0023', now())
+VALUES ('schema_version', 'M7-0029', now())
 ON CONFLICT (key) DO UPDATE
 SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;

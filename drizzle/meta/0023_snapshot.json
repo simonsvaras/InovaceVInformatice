@@ -1,5 +1,5 @@
 {
-  "id": "c5f83cba-241f-434c-86ce-839938fd24f9",
+  "id": "9da92ffa-766e-4cfb-b234-b439ae9856fa",
   "prevId": "781142f4-3df8-4714-9aaf-58c8983340e5",
   "version": "7",
   "dialect": "postgresql",
@@ -640,6 +640,12 @@
           "notNull": true,
           "default": false
         },
+        "feed_exclusive_team_id": {
+          "name": "feed_exclusive_team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -758,7 +764,14 @@
           "name": "configured_by_user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "configuration_source": {
+          "name": "configuration_source",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
         },
         "last_processed_at": {
           "name": "last_processed_at",
@@ -861,6 +874,10 @@
         "bank_integrations_provider_demo": {
           "name": "bank_integrations_provider_demo",
           "value": "\"bank_integrations\".\"provider\" = 'demo'"
+        },
+        "bank_integrations_configuration_source_valid": {
+          "name": "bank_integrations_configuration_source_valid",
+          "value": "\"bank_integrations\".\"configuration_source\" in ('user', 'public_qr')"
         }
       },
       "isRLSEnabled": false
@@ -1029,7 +1046,13 @@
           "name": "integration_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "fio_integration_id": {
+          "name": "fio_integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "bank_account_id": {
           "name": "bank_account_id",
@@ -1056,9 +1079,59 @@
           "primaryKey": false,
           "notNull": true
         },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CZK'"
+        },
         "variable_symbol": {
           "name": "variable_symbol",
           "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "counter_account": {
+          "name": "counter_account",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "counter_bank_code": {
+          "name": "counter_bank_code",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "counterparty_name": {
+          "name": "counterparty_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recipient_message": {
+          "name": "recipient_message",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transaction_type": {
+          "name": "transaction_type",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "initial_import": {
+          "name": "initial_import",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "related_transaction_id": {
+          "name": "related_transaction_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1079,7 +1152,14 @@
           "name": "created_by_user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "ingestion_origin": {
+          "name": "ingestion_origin",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
         },
         "status": {
           "name": "status",
@@ -1119,6 +1199,12 @@
           "columns": [
             {
               "expression": "bank_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1176,6 +1262,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "bank_transactions_fio_integration_idx": {
+          "name": "bank_transactions_fio_integration_idx",
+          "columns": [
+            {
+              "expression": "fio_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "received_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1185,6 +1292,19 @@
           "tableTo": "bank_integrations",
           "columnsFrom": [
             "integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "bank_transactions_fio_integration_id_fio_integrations_id_fk": {
+          "name": "bank_transactions_fio_integration_id_fio_integrations_id_fk",
+          "tableFrom": "bank_transactions",
+          "tableTo": "fio_integrations",
+          "columnsFrom": [
+            "fio_integration_id"
           ],
           "columnsTo": [
             "id"
@@ -1236,13 +1356,25 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "bank_transactions_source_simulated": {
-          "name": "bank_transactions_source_simulated",
-          "value": "\"bank_transactions\".\"source\" = 'simulated'"
+        "bank_transactions_source_valid": {
+          "name": "bank_transactions_source_valid",
+          "value": "\"bank_transactions\".\"source\" in ('simulated', 'fio')"
         },
-        "bank_transactions_amount_positive": {
-          "name": "bank_transactions_amount_positive",
-          "value": "\"bank_transactions\".\"amount_halere\" > 0"
+        "bank_transactions_integration_source_valid": {
+          "name": "bank_transactions_integration_source_valid",
+          "value": "(\"bank_transactions\".\"source\" = 'simulated' and \"bank_transactions\".\"integration_id\" is not null and \"bank_transactions\".\"fio_integration_id\" is null)\n          or (\"bank_transactions\".\"source\" = 'fio' and \"bank_transactions\".\"integration_id\" is null and \"bank_transactions\".\"fio_integration_id\" is not null)"
+        },
+        "bank_transactions_ingestion_origin_valid": {
+          "name": "bank_transactions_ingestion_origin_valid",
+          "value": "\"bank_transactions\".\"ingestion_origin\" in ('user', 'public_qr', 'fio_sync')"
+        },
+        "bank_transactions_amount_nonzero": {
+          "name": "bank_transactions_amount_nonzero",
+          "value": "\"bank_transactions\".\"amount_halere\" <> 0"
+        },
+        "bank_transactions_currency_valid": {
+          "name": "bank_transactions_currency_valid",
+          "value": "\"bank_transactions\".\"currency\" ~ '^[A-Z]{3}$'"
         },
         "bank_transactions_vs_digits": {
           "name": "bank_transactions_vs_digits",
@@ -1418,6 +1550,541 @@
       },
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fio_integrations": {
+      "name": "fio_integrations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "bank_account_id": {
+          "name": "bank_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "token_ciphertext": {
+          "name": "token_ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_iv": {
+          "name": "token_iv",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_auth_tag": {
+          "name": "token_auth_tag",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_fingerprint": {
+          "name": "token_fingerprint",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "token_key_version": {
+          "name": "token_key_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "configured_by_user_id": {
+          "name": "configured_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "initial_import_completed_at": {
+          "name": "initial_import_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_attempt_at": {
+          "name": "last_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_success_at": {
+          "name": "last_success_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_new_movement_at": {
+          "name": "last_new_movement_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_successful_period_to": {
+          "name": "last_successful_period_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "next_allowed_at": {
+          "name": "next_allowed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lease_owner": {
+          "name": "lease_owner",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lease_until": {
+          "name": "lease_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error_code": {
+          "name": "last_error_code",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error_message": {
+          "name": "last_error_message",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fio_integrations_account_idx": {
+          "name": "fio_integrations_account_idx",
+          "columns": [
+            {
+              "expression": "bank_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fio_integrations_due_idx": {
+          "name": "fio_integrations_due_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_allowed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fio_integrations_bank_account_id_bank_accounts_id_fk": {
+          "name": "fio_integrations_bank_account_id_bank_accounts_id_fk",
+          "tableFrom": "fio_integrations",
+          "tableTo": "bank_accounts",
+          "columnsFrom": [
+            "bank_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fio_integrations_configured_by_user_id_users_id_fk": {
+          "name": "fio_integrations_configured_by_user_id_users_id_fk",
+          "tableFrom": "fio_integrations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "configured_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "fio_integrations_status_valid": {
+          "name": "fio_integrations_status_valid",
+          "value": "\"fio_integrations\".\"status\" in ('active', 'disabled', 'requires_token', 'intervention')"
+        },
+        "fio_integrations_token_state_valid": {
+          "name": "fio_integrations_token_state_valid",
+          "value": "(\"fio_integrations\".\"status\" = 'disabled' and \"fio_integrations\".\"token_ciphertext\" is null and \"fio_integrations\".\"token_iv\" is null and \"fio_integrations\".\"token_auth_tag\" is null and \"fio_integrations\".\"token_fingerprint\" is null)\n          or (\"fio_integrations\".\"status\" <> 'disabled' and \"fio_integrations\".\"token_ciphertext\" is not null and \"fio_integrations\".\"token_iv\" is not null and \"fio_integrations\".\"token_auth_tag\" is not null and \"fio_integrations\".\"token_fingerprint\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fio_sync_requests": {
+      "name": "fio_sync_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "integration_id": {
+          "name": "integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_by_user_id": {
+          "name": "requested_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "fio_sync_requests_one_open_idx": {
+          "name": "fio_sync_requests_one_open_idx",
+          "columns": [
+            {
+              "expression": "integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"fio_sync_requests\".\"status\" in ('pending', 'processing')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "fio_sync_requests_status_idx": {
+          "name": "fio_sync_requests_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requested_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fio_sync_requests_integration_id_fio_integrations_id_fk": {
+          "name": "fio_sync_requests_integration_id_fio_integrations_id_fk",
+          "tableFrom": "fio_sync_requests",
+          "tableTo": "fio_integrations",
+          "columnsFrom": [
+            "integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fio_sync_requests_requested_by_user_id_users_id_fk": {
+          "name": "fio_sync_requests_requested_by_user_id_users_id_fk",
+          "tableFrom": "fio_sync_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "fio_sync_requests_status_valid": {
+          "name": "fio_sync_requests_status_valid",
+          "value": "\"fio_sync_requests\".\"status\" in ('pending', 'processing', 'completed', 'failed')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fio_token_call_leases": {
+      "name": "fio_token_call_leases",
+      "schema": "",
+      "columns": {
+        "token_fingerprint": {
+          "name": "token_fingerprint",
+          "type": "varchar(64)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "next_allowed_at": {
+          "name": "next_allowed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lease_owner": {
+          "name": "lease_owner",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lease_until": {
+          "name": "lease_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fio_verification_attempts": {
+      "name": "fio_verification_attempts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "bank_account_id": {
+          "name": "bank_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_by_user_id": {
+          "name": "requested_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_fingerprint": {
+          "name": "token_fingerprint",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_integration_updated_at": {
+          "name": "expected_integration_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fio_verification_attempts_account_idx": {
+          "name": "fio_verification_attempts_account_idx",
+          "columns": [
+            {
+              "expression": "bank_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fio_verification_attempts_bank_account_id_bank_accounts_id_fk": {
+          "name": "fio_verification_attempts_bank_account_id_bank_accounts_id_fk",
+          "tableFrom": "fio_verification_attempts",
+          "tableTo": "bank_accounts",
+          "columnsFrom": [
+            "bank_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fio_verification_attempts_requested_by_user_id_users_id_fk": {
+          "name": "fio_verification_attempts_requested_by_user_id_users_id_fk",
+          "tableFrom": "fio_verification_attempts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "fio_verification_attempts_purpose_valid": {
+          "name": "fio_verification_attempts_purpose_valid",
+          "value": "\"fio_verification_attempts\".\"purpose\" in ('activate', 'replace')"
+        },
+        "fio_verification_attempts_status_valid": {
+          "name": "fio_verification_attempts_status_valid",
+          "value": "\"fio_verification_attempts\".\"status\" in ('pending', 'completed', 'failed', 'expired')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.invitations": {
@@ -1842,12 +2509,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "ended_reason": {
-          "name": "ended_reason",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -1920,12 +2581,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "memberships_ended_reason_valid": {
-          "name": "memberships_ended_reason_valid",
-          "value": "\"memberships\".\"ended_reason\" is null or \"memberships\".\"ended_reason\" in ('left', 'removed', 'moved', 'archived')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.notification_deliveries": {
@@ -2034,6 +2690,12 @@
             },
             {
               "expression": "reference_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2492,7 +3154,14 @@
           "name": "recorded_by_user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "recorded_origin": {
+          "name": "recorded_origin",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
         },
         "source_claim_id": {
           "name": "source_claim_id",
@@ -2681,11 +3350,173 @@
           "name": "payment_events_amount_positive",
           "value": "\"payment_events\".\"amount_halere\" > 0"
         },
+        "payment_events_recorded_origin_valid": {
+          "name": "payment_events_recorded_origin_valid",
+          "value": "\"payment_events\".\"recorded_origin\" in ('user', 'public_qr', 'fio_sync')"
+        },
         "payment_events_kind_valid": {
           "name": "payment_events_kind_valid",
-          "value": "\"payment_events\".\"kind\" in ('manual_claim', 'cash', 'correction', 'simulated')"
+          "value": "\"payment_events\".\"kind\" in ('manual_claim', 'cash', 'correction', 'simulated', 'fio')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.public_payment_links": {
+      "name": "public_payment_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "receivable_id": {
+          "name": "receivable_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issued_by_user_id": {
+          "name": "issued_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_transaction_id": {
+          "name": "bank_transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "public_payment_links_active_receivable_idx": {
+          "name": "public_payment_links_active_receivable_idx",
+          "columns": [
+            {
+              "expression": "receivable_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"public_payment_links\".\"revoked_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "public_payment_links_receivable_idx": {
+          "name": "public_payment_links_receivable_idx",
+          "columns": [
+            {
+              "expression": "receivable_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "public_payment_links_transaction_idx": {
+          "name": "public_payment_links_transaction_idx",
+          "columns": [
+            {
+              "expression": "bank_transaction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"public_payment_links\".\"bank_transaction_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "public_payment_links_receivable_id_receivables_id_fk": {
+          "name": "public_payment_links_receivable_id_receivables_id_fk",
+          "tableFrom": "public_payment_links",
+          "tableTo": "receivables",
+          "columnsFrom": [
+            "receivable_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "public_payment_links_issued_by_user_id_users_id_fk": {
+          "name": "public_payment_links_issued_by_user_id_users_id_fk",
+          "tableFrom": "public_payment_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "issued_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "public_payment_links_bank_transaction_id_bank_transactions_id_fk": {
+          "name": "public_payment_links_bank_transaction_id_bank_transactions_id_fk",
+          "tableFrom": "public_payment_links",
+          "tableTo": "bank_transactions",
+          "columnsFrom": [
+            "bank_transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "public_payment_links_token_hash_unique": {
+          "name": "public_payment_links_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.rate_limit_buckets": {
@@ -2766,24 +3597,6 @@
           "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true
-        },
-        "cancelled_at": {
-          "name": "cancelled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancelled_by_user_id": {
-          "name": "cancelled_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancellation_reason": {
-          "name": "cancellation_reason",
-          "type": "varchar(300)",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2904,29 +3717,12 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
-        },
-        "receivables_cancelled_by_user_id_users_id_fk": {
-          "name": "receivables_cancelled_by_user_id_users_id_fk",
-          "tableFrom": "receivables",
-          "tableTo": "users",
-          "columnsFrom": [
-            "cancelled_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "receivables_cancellation_complete": {
-          "name": "receivables_cancellation_complete",
-          "value": "(\"receivables\".\"cancelled_at\" is null and \"receivables\".\"cancelled_by_user_id\" is null and \"receivables\".\"cancellation_reason\" is null)\n        or (\"receivables\".\"cancelled_at\" is not null and \"receivables\".\"cancelled_by_user_id\" is not null and \"receivables\".\"cancellation_reason\" is not null)"
-        },
         "receivables_amount_positive": {
           "name": "receivables_amount_positive",
           "value": "\"receivables\".\"amount_halere\" > 0"

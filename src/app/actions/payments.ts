@@ -56,7 +56,7 @@ export async function reportManualPaymentAction(formData: FormData) {
     redirect(`/dluhy/${receivableId}?error=${encodeURIComponent(message(error))}`);
   }
   redirect(
-    `/dluhy/${receivableId}?success=${encodeURIComponent("Hlášení bylo uloženo. Jde o vaše tvrzení a čeká na potvrzení oprávněnou osobou; není bankovně ověřené.")}`,
+    `/dluhy/${receivableId}?success=${encodeURIComponent("Hlášení bylo uloženo a čeká na potvrzení.")}`,
   );
 }
 

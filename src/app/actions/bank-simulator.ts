@@ -52,7 +52,7 @@ export async function activateDemoIntegrationAction(formData: FormData) {
   } catch (error) {
     redirect(`${path}&error=${encodeURIComponent(errorMessage(error))}`);
   }
-  redirect(`${path}&success=${encodeURIComponent("Demo synchronizace byla technicky aktivována. Ruční hlášení a evidence zůstávají dostupné.")}`);
+  redirect(`${path}&success=${encodeURIComponent("Synchronizace byla aktivována.")}`);
 }
 
 export async function simulateBankPaymentAction(formData: FormData) {
@@ -74,10 +74,10 @@ export async function simulateBankPaymentAction(formData: FormData) {
     redirect(`${path}&error=${encodeURIComponent(errorMessage(error))}`);
   }
   const success = !result.created
-    ? "Tento demo pohyb už byl přijat; nevznikla druhá alokace. Případné nedoručené oznámení bylo bezpečně zopakováno."
+    ? "Tento pohyb už byl přijat."
     : result.autoAllocated
-      ? "Demo pohyb byl přijat a jednoznačně přiřazen. Nejde o skutečný ani bankovně ověřený převod."
-      : "Demo pohyb byl přijat do fronty smíření. Nejde o skutečný ani bankovně ověřený převod.";
+      ? "Pohyb byl přijat a přiřazen."
+      : "Pohyb byl přijat a čeká na vyřešení.";
   redirect(`${path}&success=${encodeURIComponent(success)}`);
 }
 
@@ -95,7 +95,7 @@ export async function markSimulatedTransactionDifferentAction(formData: FormData
   } catch (error) {
     redirect(`${path}&error=${encodeURIComponent(errorMessage(error))}`);
   }
-  redirect(`${path}&success=${encodeURIComponent("Rozhodnutí „jiná platba“ bylo auditováno; pohyb zůstává dostupný k ručnímu přiřazení.")}`);
+  redirect(`${path}&success=${encodeURIComponent("Pohyb zůstává dostupný k ručnímu přiřazení.")}`);
 }
 
 export async function ignoreSimulatedTransactionAction(formData: FormData) {
@@ -130,7 +130,7 @@ export async function linkSimulatedTransactionAction(formData: FormData) {
   } catch (error) {
     redirect(`${path}&error=${encodeURIComponent(errorMessage(error))}`);
   }
-  redirect(`${path}&success=${encodeURIComponent("Demo pohyb byl spojen s existující ruční úhradou bez nové alokace.")}`);
+  redirect(`${path}&success=${encodeURIComponent("Pohyb byl spojen s existující úhradou.")}`);
 }
 
 export async function allocateSimulatedTransactionAction(formData: FormData) {
@@ -151,5 +151,5 @@ export async function allocateSimulatedTransactionAction(formData: FormData) {
   } catch (error) {
     redirect(`${path}&error=${encodeURIComponent(errorMessage(error))}`);
   }
-  redirect(`${path}&success=${encodeURIComponent("Dosud volná část demo pohybu byla auditovaně přiřazena.")}`);
+  redirect(`${path}&success=${encodeURIComponent("Volná část pohybu byla přiřazena.")}`);
 }

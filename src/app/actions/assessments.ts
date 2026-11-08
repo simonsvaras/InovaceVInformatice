@@ -18,6 +18,7 @@ import {
   setTeamBankAccount,
 } from "@/modules/assessments/service";
 import { requireUser } from "@/modules/auth/service";
+import { sendBulkReminders, type PaymentScope } from "@/modules/payments/service";
 
 function message(error: unknown) {
   return error instanceof InputError
@@ -100,4 +101,43 @@ export async function retryReceivableDeliveryAction(formData: FormData) {
   redirect(
     `/predpisy/${assessmentId}?success=${encodeURIComponent("Opakované doručení bylo zpracováno; stav je uveden u dluhu.")}`,
   );
+}
+
+export async function sendAssessmentReminderAction(formData: FormData) {
+  const user = await requireUser();
+  const assessmentId = validateUuid(formText(formData, "assessmentId"), "Předpis");
+  const receivableId = validateUuid(formText(formData, "receivableId"), "Dluh");
+  const rawTeamId = formText(formData, "teamId");
+  const rawClubId = formText(formData, "clubId");
+  let scope: PaymentScope;
+
+  if (rawTeamId && !rawClubId) {
+    scope = { teamId: validateUuid(rawTeamId, "Tým") };
+  } else if (rawClubId && !rawTeamId) {
+    scope = { clubId: validateUuid(rawClubId, "Klub") };
+  } else {
+    redirect(
+      `/predpisy/${assessmentId}?error=${encodeURIComponent("Finanční rozsah není platný.")}`,
+    );
+  }
+
+  let created = false;
+  try {
+    const result = await sendBulkReminders({
+      actorUserId: user.id,
+      scope,
+      idempotencyKey: validateUuid(
+        formText(formData, "idempotencyKey"),
+        "Klíč formuláře",
+      ),
+      target: { assessmentId, receivableId },
+    });
+    created = result.created;
+  } catch (error) {
+    redirect(`/predpisy/${assessmentId}?error=${encodeURIComponent(message(error))}`);
+  }
+  const success = created
+    ? "Oznámení k nezaplacenému dluhu bylo zpracováno."
+    : "Tento požadavek na oznámení už byl zpracován.";
+  redirect(`/predpisy/${assessmentId}?success=${encodeURIComponent(success)}`);
 }

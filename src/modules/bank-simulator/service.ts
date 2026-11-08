@@ -18,6 +18,7 @@ import {
 } from "@/modules/notifications/email";
 import { requireClubAdminAccess, requireTeamManagementAccess } from "@/modules/authorization/service";
 import type { PaymentScope } from "@/modules/payments/service";
+import { buildFioPaymentEmail } from "@/modules/fio/email";
 
 import { buildSimulatedPaymentEmail } from "./email";
 
@@ -35,6 +36,8 @@ type Delivery = {
   teamName: string | null;
   amountHalere: number;
   sourceTransactionId: string;
+  recordedOrigin: "user" | "public_qr" | "fio_sync";
+  source: "simulated" | "fio";
 };
 
 const retryableDelivery = sql`(
@@ -48,9 +51,14 @@ async function sendDeliveries(deliveries: Delivery[]) {
       await sendRecordedTransactionalEmail(delivery.deliveryId, {
         userId: delivery.guardianUserId,
         recipient: delivery.guardianEmail,
-        kind: "simulated_payment_recorded",
+        kind: delivery.source === "fio" ? "fio_payment_recorded" : "simulated_payment_recorded",
         referenceId: delivery.allocationId,
-        ...buildSimulatedPaymentEmail(delivery),
+        ...(delivery.source === "fio"
+          ? buildFioPaymentEmail(delivery)
+          : buildSimulatedPaymentEmail({
+              ...delivery,
+              recordedOrigin: delivery.recordedOrigin === "public_qr" ? "public_qr" : "user",
+            })),
       });
     } catch {
       await failRecordedDelivery(delivery.deliveryId, "message_build_failed");
@@ -64,11 +72,12 @@ async function retryableDeliveries(bankTransactionId: string) {
            u.id as "guardianUserId", u.email as "guardianEmail",
            ath.full_name as "athleteName",
            a.title as "assessmentTitle", c.name as "clubName", t.name as "teamName",
-           pa.amount_halere as "amountHalere", bt.source_transaction_id as "sourceTransactionId"
+           pa.amount_halere as "amountHalere", bt.source_transaction_id as "sourceTransactionId",
+           pe.recorded_origin as "recordedOrigin", bt.source
       from payment_events pe
       join payment_allocations pa on pa.payment_event_id=pe.id
       join notification_deliveries nd
-        on nd.kind='simulated_payment_recorded' and nd.reference_id=pa.id
+        on nd.kind in ('simulated_payment_recorded', 'fio_payment_recorded') and nd.reference_id=pa.id
       join receivables r on r.id=pa.receivable_id
       join assessments a on a.id=r.assessment_id
       join clubs c on c.id=a.club_id
@@ -94,6 +103,8 @@ async function createDelivery(
     teamName: string | null;
     amountHalere: number;
     sourceTransactionId: string;
+    recordedOrigin: "user" | "public_qr" | "fio_sync";
+    source: "simulated" | "fio";
   },
 ): Promise<Delivery> {
   const [delivery] = await transaction
@@ -101,7 +112,7 @@ async function createDelivery(
     .values({
       userId: input.guardianUserId,
       recipientEmail: input.guardianEmail,
-      kind: "simulated_payment_recorded",
+      kind: input.source === "fio" ? "fio_payment_recorded" : "simulated_payment_recorded",
       referenceId: input.allocationId,
       status: "pending",
     })
@@ -144,7 +155,7 @@ export async function getBankIntegrationOverview(userId: string, requestedScope:
     ? sql`t.id=${scope.teamId} and (
         ba.id=coalesce(t.bank_account_id, (select d.id from bank_accounts d where d.club_id=t.club_id and d.is_default=true))
         or (
-          bi.exclusive_team_id=${scope.teamId}
+          ba.feed_exclusive_team_id=${scope.teamId}
           and exists(select 1 from receivables historical where historical.bank_account_id=ba.id and historical.origin_team_id=${scope.teamId})
         )
       )`
@@ -157,12 +168,24 @@ export async function getBankIntegrationOverview(userId: string, requestedScope:
     enabled: boolean | null;
     exclusive_team_id: string | null;
     last_processed_at: Date | null;
+    fio_integration_id: string | null;
+    fio_status: string | null;
+    fio_last_attempt_at: Date | null;
+    fio_last_success_at: Date | null;
+    fio_last_new_movement_at: Date | null;
+    fio_last_error_code: string | null;
+    fio_last_error_message: string | null;
   }>(sql`
     select ba.id, ba.account_number, ba.is_default, bi.id as integration_id,
-           bi.enabled, bi.exclusive_team_id, bi.last_processed_at
+           bi.enabled, ba.feed_exclusive_team_id as exclusive_team_id, bi.last_processed_at,
+           fi.id as fio_integration_id, fi.status as fio_status,
+           fi.last_attempt_at as fio_last_attempt_at, fi.last_success_at as fio_last_success_at,
+           fi.last_new_movement_at as fio_last_new_movement_at,
+           fi.last_error_code as fio_last_error_code, fi.last_error_message as fio_last_error_message
       from bank_accounts ba
       ${scope.teamId ? sql`join teams t on t.club_id=ba.club_id` : sql``}
       left join bank_integrations bi on bi.bank_account_id=ba.id
+      left join fio_integrations fi on fi.bank_account_id=ba.id
      where ${condition}
      order by ba.is_default desc, ba.account_number
   `);
@@ -174,7 +197,7 @@ export async function getBankIntegrationOverview(userId: string, requestedScope:
       canConfigure: isAdmin || (
         Boolean(scope.teamId) &&
         !account.is_default &&
-        (!account.integration_id || account.exclusive_team_id === scope.teamId)
+        (!account.exclusive_team_id || account.exclusive_team_id === scope.teamId)
       ),
       canReadRaw: isAdmin || account.exclusive_team_id === scope.teamId,
     })),
@@ -234,6 +257,11 @@ export async function activateDemoIntegration(input: {
         configuredByUserId: input.actorUserId,
       })
       .returning({ id: bankIntegrations.id });
+    if (exclusiveTeamId) {
+      await transaction.execute(sql`
+        update bank_accounts set feed_exclusive_team_id=${exclusiveTeamId} where id=${account.id}
+      `);
+    }
     await transaction.insert(auditEvents).values({
       actorUserId: input.actorUserId,
       clubId: scope.clubId,
@@ -280,7 +308,9 @@ export async function getDemoSimulator(userId: string, receivableId: string) {
 async function allocateAutomatically(
   transaction: DbTransaction,
   input: {
-    actorUserId: string;
+    actorUserId: string | null;
+    recordedOrigin: "user" | "public_qr";
+    restrictedReceivableId?: string;
     bankTransactionId: string;
     bankAccountId: string;
     sourceTransactionId: string;
@@ -312,10 +342,14 @@ async function allocateAutomatically(
       join assessments a on a.id=r.assessment_id
       join clubs c on c.id=a.club_id
       join athletes ath on ath.id=r.athlete_id
-      join athlete_guardians ag on ag.athlete_id=ath.id and ag.user_id=${input.actorUserId}
+      join athlete_guardians ag on ag.athlete_id=ath.id
       join users u on u.id=ag.user_id
       left join teams t on t.id=r.origin_team_id
-     where r.bank_account_id=${input.bankAccountId} and r.variable_symbol=${input.variableSymbol}
+     where r.bank_account_id=${input.bankAccountId}
+       and r.variable_symbol=${input.variableSymbol}
+       and ${input.restrictedReceivableId
+         ? sql`r.id=${input.restrictedReceivableId}`
+         : sql`ag.user_id=${input.actorUserId}`}
   `);
   if (candidates.length !== 1) return { status: "unmatched", reasonCode: "unknown_vs", deliveries: [] as Delivery[] };
   const candidate = candidates[0];
@@ -352,6 +386,7 @@ async function allocateAutomatically(
     amountHalere: input.amountHalere,
     occurredOn: todayInPrague(input.occurredAt),
     recordedByUserId: input.actorUserId,
+    recordedOrigin: input.recordedOrigin,
     bankTransactionId: input.bankTransactionId,
   }).returning({ id: paymentEvents.id });
   const [allocation] = await transaction.insert(paymentAllocations).values({
@@ -366,9 +401,10 @@ async function allocateAutomatically(
     eventType: "bank_transaction.auto_allocated",
     targetType: "bank_transaction",
     targetId: input.bankTransactionId,
-    details: { paymentEventId: event.id, receivableId: candidate.id, amountHalere: input.amountHalere, source: "simulated" },
+    details: { paymentEventId: event.id, receivableId: candidate.id, amountHalere: input.amountHalere, source: "simulated", origin: input.recordedOrigin },
   });
   const delivery = await createDelivery(transaction, {
+    source: "simulated",
     allocationId: allocation.id,
     guardianUserId: candidate.guardian_user_id,
     guardianEmail: candidate.guardian_email,
@@ -378,6 +414,7 @@ async function allocateAutomatically(
     teamName: candidate.team_name,
     amountHalere: input.amountHalere,
     sourceTransactionId: input.sourceTransactionId,
+    recordedOrigin: input.recordedOrigin,
   });
   return { status: "allocated", reasonCode: "auto_allocated", deliveries: [delivery] };
 }
@@ -438,6 +475,7 @@ export async function ingestSimulatedTransaction(input: {
     }
     const allocation = await allocateAutomatically(transaction, {
       actorUserId: input.actorUserId,
+      recordedOrigin: "user",
       bankTransactionId: created.id,
       bankAccountId: source.bank_account_id,
       sourceTransactionId: input.sourceTransactionId,
@@ -511,14 +549,16 @@ async function lockMovementInScope(
     status: string;
     reason_code: string;
     resolution_reason: string | null;
+    ingestion_origin: string;
     occurred_at: Date;
+    source: "simulated" | "fio";
+    currency: string;
   }>(sql`
-    select bt.id, bt.bank_account_id, ba.club_id, bi.exclusive_team_id,
+    select bt.id, bt.bank_account_id, ba.club_id, ba.feed_exclusive_team_id as exclusive_team_id,
            bt.amount_halere, bt.source_transaction_id, bt.status, bt.reason_code, bt.resolution_reason,
-           bt.occurred_at
+           bt.occurred_at, bt.source, bt.currency
       from bank_transactions bt
       join bank_accounts ba on ba.id=bt.bank_account_id
-      join bank_integrations bi on bi.id=bt.integration_id
      where bt.id=${bankTransactionId}
      for update of bt
   `);
@@ -566,7 +606,7 @@ export async function markSimulatedTransactionDifferent(input: {
       eventType: "bank_transaction.marked_distinct",
       targetType: "bank_transaction",
       targetId: movement.id,
-      details: { reason: input.reason, source: "simulated" },
+      details: { reason: input.reason, source: movement.source },
     });
   });
 }
@@ -580,6 +620,9 @@ export async function linkSimulatedTransactionToManualEvent(input: {
 }) {
   await getDatabase().transaction(async (transaction) => {
     const { scope, movement } = await lockMovementInScope(transaction, input.actorUserId, input.scope, input.bankTransactionId);
+    if (movement.amount_halere <= 0) {
+      throw new InputError("negative_movement", "Záporný nebo opravný bankovní pohyb nelze spojit s úhradou.");
+    }
     const hasAllocations = await transaction.execute<{ exists: boolean }>(sql`
       select exists(select 1 from payment_events pe where pe.bank_transaction_id=${movement.id}) as exists
     `);
@@ -633,7 +676,7 @@ export async function linkSimulatedTransactionToManualEvent(input: {
       eventType: "bank_transaction.linked_to_manual_event",
       targetType: "bank_transaction",
       targetId: movement.id,
-      details: { paymentEventId: event.id, reason: input.reason, source: "simulated" },
+      details: { paymentEventId: event.id, reason: input.reason, source: movement.source },
     });
   });
 }
@@ -650,6 +693,9 @@ export async function allocateSimulatedTransaction(input: {
 }) {
   const result = await getDatabase().transaction(async (transaction) => {
     const { scope, movement } = await lockMovementInScope(transaction, input.actorUserId, input.scope, input.bankTransactionId);
+    if (movement.amount_halere <= 0 || movement.currency !== "CZK") {
+      throw new InputError("movement_not_allocatable", "Přiřadit lze jen kladný zaúčtovaný pohyb v CZK.");
+    }
     const existingRows = await transaction.execute<{
       id: string;
       recorded_by_user_id: string;
@@ -745,10 +791,11 @@ export async function allocateSimulatedTransaction(input: {
     const [event] = await transaction.insert(paymentEvents).values({
       clubId: debt.club_id,
       teamId: debt.assessment_team_id,
-      kind: "simulated",
+      kind: movement.source,
       amountHalere: input.amountHalere,
       occurredOn: todayInPrague(movement.occurred_at),
       recordedByUserId: input.actorUserId,
+      recordedOrigin: movement.source === "fio" ? "fio_sync" : "user",
       bankTransactionId: movement.id,
       idempotencyKey: input.idempotencyKey,
       correctionReason: input.reason,
@@ -784,10 +831,11 @@ export async function allocateSimulatedTransaction(input: {
           input.confirmDistinctFromManual &&
           (manualEvidence[0]?.pending_claim || manualEvidence[0]?.active_manual_payment),
         ),
-        source: "simulated",
+        source: movement.source,
       },
     });
     const delivery = await createDelivery(transaction, {
+      source: movement.source,
       allocationId: allocation.id,
       guardianUserId: debt.guardian_user_id,
       guardianEmail: debt.guardian_email,
@@ -797,6 +845,7 @@ export async function allocateSimulatedTransaction(input: {
       teamName: debt.team_name,
       amountHalere: input.amountHalere,
       sourceTransactionId: movement.source_transaction_id,
+      recordedOrigin: movement.source === "fio" ? "fio_sync" : "user",
     });
     return { eventId: event.id, delivery };
   });
@@ -827,14 +876,16 @@ export async function ignoreSimulatedTransaction(input: {
       eventType: "bank_transaction.ignored",
       targetType: "bank_transaction",
       targetId: movement.id,
-      details: { reason: input.reason, source: "simulated" },
+      details: { reason: input.reason, source: movement.source },
     });
   });
 }
 
 export async function getBankReconciliationDashboard(userId: string, requestedScope: PaymentScope) {
   const overview = await getBankIntegrationOverview(userId, requestedScope);
-  const readable = overview.accounts.filter((account) => account.canReadRaw && account.integration_id);
+  const readable = overview.accounts.filter((account) =>
+    account.canReadRaw && (account.integration_id || account.fio_integration_id),
+  );
   const accountIds = readable.map((account) => account.id);
   if (!accountIds.length) return { ...overview, movements: [], debts: [], manualEvents: [] };
   const identifiers = sql.join(accountIds.map((id) => sql`${id}::uuid`), sql`, `);
@@ -851,11 +902,21 @@ export async function getBankReconciliationDashboard(userId: string, requestedSc
     status: string;
     reason_code: string;
     resolution_reason: string | null;
+    ingestion_origin: string;
+    source: "simulated" | "fio";
+    currency: string;
+    initial_import: boolean;
+    counterparty_name: string | null;
+    recipient_message: string | null;
+    transaction_type: string | null;
+    related_transaction_id: string | null;
   }>(sql`
     select bt.id, bt.bank_account_id, ba.account_number, bt.amount_halere,
            coalesce((select sum(pa.amount_halere) from payment_events pe join payment_allocations pa on pa.payment_event_id=pe.id where pe.bank_transaction_id=bt.id), 0)::int as allocated_halere,
            bt.variable_symbol, bt.source_transaction_id, bt.occurred_at, bt.received_at,
-           bt.status, bt.reason_code, bt.resolution_reason
+           bt.status, bt.reason_code, bt.resolution_reason, bt.ingestion_origin,
+           bt.source, bt.currency, bt.initial_import, bt.counterparty_name,
+           bt.recipient_message, bt.transaction_type, bt.related_transaction_id
       from bank_transactions bt join bank_accounts ba on ba.id=bt.bank_account_id
      where bt.bank_account_id in (${identifiers})
        and bt.status in ('unmatched', 'partially_allocated')
@@ -877,7 +938,7 @@ export async function getBankReconciliationDashboard(userId: string, requestedSc
            coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere
       from receivables r join assessments a on a.id=r.assessment_id join athletes ath on ath.id=r.athlete_id
      where ${condition} and r.cancelled_at is null and r.bank_account_id in (${identifiers})
-     order by ath.last_name, ath.first_name, a.created_at
+      order by ath.full_name, a.created_at
   `);
   const manualEvents = await getDatabase().execute<{
     id: string;

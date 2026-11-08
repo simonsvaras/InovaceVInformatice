@@ -12,7 +12,7 @@ import {
 } from "@/modules/payments/service";
 import { paymentMethodLabel } from "@/modules/payments/status";
 
-export const registerMethods = ["manual_claim", "cash", "simulated", "correction"] as const;
+export const registerMethods = ["manual_claim", "cash", "simulated", "fio", "correction"] as const;
 export const registerStates = ["all", "valid", "corrected"] as const;
 
 export type RegisterFilters = {
@@ -60,7 +60,7 @@ type RegisterRow = {
   team_name: string | null;
   variable_symbol: string;
   account_number: string;
-  actor_name: string;
+  actor_name: string | null;
   correction_reason: string | null;
   corrected: boolean;
   source_transaction_id: string | null;
@@ -96,7 +96,7 @@ async function loadRegister(
     join assessments a on a.id=r.assessment_id
     join athletes ath on ath.id=r.athlete_id
     join bank_accounts ba on ba.id=r.bank_account_id
-    join users actor on actor.id=pe.recorded_by_user_id
+    left join users actor on actor.id=pe.recorded_by_user_id
     left join teams t on t.id=r.origin_team_id
     left join bank_transactions bt on bt.id=pe.bank_transaction_id
     where ${sql.join(conditions, sql` and `)}
@@ -153,6 +153,9 @@ function recordSource(row: RegisterRow) {
   if (row.kind === "simulated") {
     return `DEMO simulace, ID pohybu ${row.source_transaction_id ?? "-"}; nejde o bankovně ověřený převod`;
   }
+  if (row.kind === "fio") {
+    return `Bankovní pohyb načtený z Fio API, ID pohybu ${row.source_transaction_id ?? "-"}`;
+  }
   if (row.kind === "cash") return "Hotovost zapsaná v aplikaci";
   if (row.kind === "correction") return "Opravný protizápis";
   return "Hlášení rodiče potvrzené v aplikaci; bez ověření banky";
@@ -202,7 +205,11 @@ export async function exportPaymentRegisterCsv(
       { halere: row.amount_halere },
       paymentMethodLabel(row.kind),
       recordSource(row),
-      row.kind === "simulated" ? "Demo simulace" : row.actor_name,
+      row.kind === "simulated"
+        ? "Demo simulace"
+        : row.kind === "fio"
+          ? "Fio API"
+          : row.actor_name,
       row.variable_symbol,
       row.account_number,
       recordState(row),

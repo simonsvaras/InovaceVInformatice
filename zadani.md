@@ -35,7 +35,7 @@ Odchod nebo vyřazení z týmu dluh nemaže. Nezaplacené předpisy zůstávají
 Smazat tým = archivovat. Platby musí zůstat kvůli účetnictví.
 Soukromí: spoluhráči vidí jen jména, nikdy kontakty ani kdo co zaplatil. U dítěte jen jméno, příjmení a rok narození, kontakt je vždy na rodiče.
 Upomínky posílá aplikace neutrálním textem, ne trenér svým jménem.
-Čeština a koruny. QR Platba funguje jen s CZK.
+Čeština a koruny. Veřejná platební stránka pracuje jen s CZK.
 
 ### 4. Rozsah MVP
 Čísla odkazují na user stories v kapitole 03 architektury backendu.
@@ -97,7 +97,7 @@ K7	Vidět audit log	Dohledal, kdo co změnil	Filtr podle týmu, uživatele, typu
 Může se jedna o monolit aplikaci BE + FE v jednom stacku. Aplikaci budu nasazovat na AWS, bylo by dobré kdyby vše bylo v dockeru s postgreSQL databází.
 Emaily se budou posílat přes resend 
 
-Bankovní pohyby se budou pro školní demo nejspíš simulovat v logicky odděleném modulu, který půjde jednoduše vyjmout nebo nahradit. Standardní CZK QR obsahuje údaje pro skutečný převod přímo na klubový či týmový účet a nikdy neodkazuje na simulátor. Vedle něj může být samostatná jasně označená akce „Simulovat platbu“; ta vytvoří pouze demo pohyb, nikoli bankovně ověřený převod.
+Příchozí pohyby lze synchronizovat z Fio API. Integrace je oddělená od ruční evidence, token je uložen šifrovaně a pravidelnou kontrolu provádí samostatný worker. Historické pohyby simulátoru zůstávají pravdivě označené jako `simulated` a nikdy se nepřepisují na Fio. Jediný QR na dluhu a v e-mailu obsahuje standardní českou QR Platbu `SPD*1.0` pro převod přímo na historicky přiřazený klubový nebo týmový účet; aplikace peníze nepřevádí.
 # Upřesnění vstupu člena do týmu
 
 - Členem týmu je vždy sportovec; uživatelský účet pouze spravuje přístup, kontakt a komunikaci včetně platebních e-mailů.
@@ -106,4 +106,10 @@ Bankovní pohyby se budou pro školní demo nejspíš simulovat v logicky odděl
 - Sportovec má uložené celé jméno bez automatického dělení a nepovinný rok narození. Staré profily se podle jména neslučují. Vlastník je může jednorázově a výslovně označit „to jsem já“ nebo jako dítě.
 - E-mailová pozvánka vyžaduje shodný e-mail a po úspěšném zápisu aktivuje členství. Týmový kód vytváří pouze žádost ke schválení.
 - Trenér a správce vidí na soupisce jméno sportovce a oprávněný kontakt spravujícího účtu; u dítěte je kontakt označen „účet rodiče“. Běžný spoluhráč smí vidět pouze jméno sportovce.
+
+# Fio synchronizace a standardní QR Platba
+
+Toto nejnovější pravidlo nahrazuje veřejnou simulovanou QR platbu. QR na detailu dluhu i v e-mailu je česká QR Platba `SPD*1.0` s historickým účtem dluhu, aktuální zbývající částkou v CZK, VS a zprávou. Nevede na webový simulátor a potvrzení převodu probíhá až v bankovní aplikaci. Aktivní veřejné simulační odkazy se zneplatní; již vzniklé simulované pohyby, alokace a audit zůstávají beze změny.
+
+Fio token patří fyzickému bankovnímu účtu, po ověření shody banky 2010, účtu/IBANu a měny CZK se ukládá autentizovaně šifrovaný. Sdílený účet konfiguruje a jeho syrové pohyby řeší jen správce klubu; u výhradního týmového účtu také oprávněný trenér. Synchronizace ukládá pohyb idempotentně podle účtu, zdroje `fio` a Fio ID. Prvních sedm dní při aktivaci jde jen do fronty; další kladné CZK příjmy se automaticky přiřadí pouze při jednoznačném účtu, VS a přesné zbývající částce bez možné ruční duplicity. Záporné a nejasné pohyby vyžadují ruční rozhodnutí. Vypnutí ani výpadek Fio nevypíná ruční evidenci nebo rodičovské hlášení.
 

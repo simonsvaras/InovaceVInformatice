@@ -1,5 +1,5 @@
 import { absoluteAppUrl } from "@/modules/notifications/email";
-import { buildCzechPaymentDescriptor, formatCzk, paymentQrPng } from "@/modules/payments/qr";
+import { formatCzk, paymentQrPng } from "@/modules/payments/qr";
 
 type ReceivableEmailData = {
   receivableId: string;
@@ -25,17 +25,15 @@ function escapeHtml(value: string) {
 }
 
 export async function buildReceivableEmail(data: ReceivableEmailData) {
-  const qrData = {
+  const qrPng = await paymentQrPng({
     accountNumber: data.accountNumber,
     amountHalere: data.amountHalere,
     variableSymbol: data.variableSymbol,
     message: data.paymentMessage,
-  };
-  const qrPng = await paymentQrPng(qrData);
+  });
   const detailUrl = absoluteAppUrl(`/dluhy/${data.receivableId}`);
   const scope = data.teamName ?? "Celý klub";
   const amount = formatCzk(data.amountHalere);
-  const descriptor = buildCzechPaymentDescriptor(qrData);
   const text = [
     `Nový předpis: ${data.assessmentTitle}`,
     `Sportovec: ${data.athleteName}`,
@@ -45,9 +43,8 @@ export async function buildReceivableEmail(data: ReceivableEmailData) {
     `Účet: ${data.accountNumber}`,
     `Variabilní symbol: ${data.variableSymbol}`,
     `Zpráva pro příjemce: ${data.paymentMessage}`,
-    `Detail a QR: ${detailUrl}`,
-    `Řetězec QR Platby: ${descriptor}`,
-    "Aplikace peníze nepřijímá ani nepřevádí; platba směřuje přímo na uvedený účet.",
+    `Detail dluhu: ${detailUrl}`,
+    "QR obsahuje standardní platební údaje pro převod přímo na účet klubu nebo týmu. Aplikace peníze nepřijímá ani nepřevádí.",
   ].join("\n");
   const html = `
     <h1>${escapeHtml(data.assessmentTitle)}</h1>
@@ -60,9 +57,9 @@ export async function buildReceivableEmail(data: ReceivableEmailData) {
       <li>Variabilní symbol: ${escapeHtml(data.variableSymbol)}</li>
       <li>Zpráva: ${escapeHtml(data.paymentMessage)}</li>
     </ul>
-    <p><img src="cid:payment-qr" width="280" height="280" alt="QR Platba" /></p>
+    <p><img src="cid:payment-qr" width="280" height="280" alt="QR Platba s účtem, částkou a variabilním symbolem" /></p>
     <p><a href="${escapeHtml(detailUrl)}">Otevřít detail dluhu</a></p>
-    <p>Aplikace peníze nepřijímá ani nepřevádí; platba směřuje přímo na uvedený účet.</p>
+    <p>QR obsahuje standardní platební údaje pro převod přímo na účet klubu nebo týmu. Aplikace peníze nepřijímá ani nepřevádí.</p>
   `;
 
   return {

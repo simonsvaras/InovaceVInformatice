@@ -4,13 +4,21 @@ import { useActionState } from "react";
 
 import { inviteMembersAction } from "@/app/actions/memberships";
 
-export function MemberInviteForm({ teamId }: { teamId: string }) {
+export function MemberInviteForm({
+  initialIdempotencyKey,
+  teamId,
+}: {
+  initialIdempotencyKey: string;
+  teamId: string;
+}) {
   const [state, action, pending] = useActionState(inviteMembersAction, {});
+  const idempotencyKey = state.nextIdempotencyKey ?? initialIdempotencyKey;
 
   return (
     <div>
       <form action={action} className="form-stack">
         <input name="teamId" type="hidden" value={teamId} />
+        <input name="idempotencyKey" type="hidden" value={idempotencyKey} />
         <label>
           E-maily rodičů nebo členů
           <textarea
@@ -26,6 +34,7 @@ export function MemberInviteForm({ teamId }: { teamId: string }) {
         </button>
       </form>
       {state.error ? <p className="message message-error" role="alert">{state.error}</p> : null}
+      {state.warning ? <p className="message message-warning" role="status">{state.warning}</p> : null}
       {state.links?.length ? (
         <div className="message message-success" role="status">
           <strong>Jednorázové odkazy platné 48 hodin</strong>

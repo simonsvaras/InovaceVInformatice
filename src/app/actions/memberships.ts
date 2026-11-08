@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { redirect } from "next/navigation";
 
 import { requireUser } from "@/modules/auth/service";
@@ -28,7 +30,9 @@ import {
 
 type InviteMembersState = {
   error?: string;
+  warning?: string;
   links?: Array<{ email: string; link: string }>;
+  nextIdempotencyKey?: string;
 };
 
 type JoinCodeState = {
@@ -94,8 +98,18 @@ export async function inviteMembersAction(
       actorUserId: user.id,
       teamId: formText(formData, "teamId"),
       emails: parseInvitationEmails(formText(formData, "emails")),
+      idempotencyKey: validateUuid(
+        formText(formData, "idempotencyKey"),
+        "Klíč formuláře",
+      ),
     });
-    return { links: result.links };
+    return {
+      links: result.links,
+      nextIdempotencyKey: randomUUID(),
+      warning: result.failedEmails.length
+        ? `Pozvánka byla vytvořena, ale e-mail se nepodařilo odeslat na ${result.failedEmails.join(", ")}. Odkaz můžete zkopírovat níže.`
+        : undefined,
+    };
   } catch (error) {
     return { error: message(error) };
   }

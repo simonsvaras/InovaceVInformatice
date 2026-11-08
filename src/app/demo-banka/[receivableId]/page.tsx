@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { simulateBankPaymentAction } from "@/app/actions/bank-simulator";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { InputError } from "@/lib/validation";
 import { requireUser } from "@/modules/auth/service";
@@ -33,15 +33,23 @@ export default async function DemoBankPage({
 
   return (
     <main className="dashboard-shell">
-      <header className="topbar">
-        <Link className="brand-link" href="/prehled">Klubio</Link>
-        <Link href={`/dluhy/${receivableId}`}>Zpět na skutečné platební údaje</Link>
-      </header>
+      <AppHeader
+        backLink={{ href: `/dluhy/${receivableId}`, label: "Platební údaje" }}
+        context={{
+          kind: "Demo",
+          name: debt.title,
+          role: "Simulace pohybu",
+        }}
+        navigation={[
+          { href: `/dluhy/${receivableId}`, label: "Platební údaje" },
+          { href: `/demo-banka/${receivableId}`, label: "Demo banka", active: true },
+        ]}
+        user={user}
+      />
       <section className="content-stack narrow-content">
         <div>
-          <p className="eyebrow">Oddělený demo bankovní simulátor</p>
+          <p className="eyebrow">Platba</p>
           <h1>Simulovat příchozí pohyb</h1>
-          <p><strong>Neprobíhá žádný skutečný převod ani spojení s Fio.</strong> Formulář pouze vytvoří trvale označený demo pohyb pro školní ukázku automatické kontroly.</p>
         </div>
         <Message error={query.error} success={query.success} />
         <article className="panel">
@@ -53,13 +61,8 @@ export default async function DemoBankPage({
             <label>Cílový účet<input name="account" readOnly value={debt.account_number} /></label>
             <label>Částka v Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} min="0.01" name="amount" required step="0.01" type="number" /></label>
             <label>Variabilní symbol<input defaultValue={debt.variable_symbol} inputMode="numeric" maxLength={10} name="variableSymbol" /></label>
-            <p className="form-hint">Demo ID zdroje: <code>{sourceId}</code>. Opakované odeslání se stejným ID nevytvoří druhý pohyb ani alokaci.</p>
-            <button type="submit">Simulovat platbu (DEMO)</button>
+            <button type="submit">Simulovat platbu</button>
           </form>
-        </article>
-        <article className="panel">
-          <h2>Co se stane</h2>
-          <p>Jednoznačný pohyb se může automaticky zaevidovat. Nejasný VS, jiná částka, již uhrazený dluh nebo možná shoda s ruční evidencí skončí ve frontě oprávněné osoby. Výsledek nikdy není označen jako bankovně ověřený převod.</p>
         </article>
       </section>
     </main>

@@ -1,12 +1,5 @@
 import QRCode from "qrcode";
 
-type PaymentData = {
-  accountNumber: string;
-  amountHalere: number;
-  variableSymbol: string;
-  message: string;
-};
-
 function mod97(value: string) {
   let remainder = 0;
   for (const digit of value) {
@@ -34,21 +27,46 @@ export function formatCzk(amountHalere: number): string {
   }).format(amountHalere / 100);
 }
 
-export function buildCzechPaymentDescriptor(data: PaymentData): string {
-  const amount = (data.amountHalere / 100).toFixed(2);
-  const message = data.message.replace(/\*/g, " ").trim().slice(0, 60);
-  return [
-    "SPD*1.0",
-    `ACC:${domesticAccountToIban(data.accountNumber)}`,
-    `AM:${amount}`,
-    "CC:CZK",
-    `X-VS:${data.variableSymbol}`,
-    `MSG:${message}`,
-  ].join("*");
+export type CzkQrPayment = {
+  accountNumber: string;
+  amountHalere: number;
+  variableSymbol: string;
+  message: string;
+};
+
+function compactSpaydText(value: string, maxLength: number) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\*/g, "%2A")
+    .replace(/[^0-9A-Z $%+\-./:%]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
 }
 
-export async function paymentQrPng(data: PaymentData): Promise<Buffer> {
-  return QRCode.toBuffer(buildCzechPaymentDescriptor(data), {
+export function buildSpdPaymentString(payment: CzkQrPayment) {
+  if (!Number.isSafeInteger(payment.amountHalere) || payment.amountHalere <= 0) {
+    throw new Error("QR payment amount must be a positive integer in halere.");
+  }
+  if (!/^\d{1,10}$/.test(payment.variableSymbol)) {
+    throw new Error("QR payment variable symbol is invalid.");
+  }
+  const amount = (payment.amountHalere / 100).toFixed(2);
+  const message = compactSpaydText(payment.message, 60);
+  const fields = [
+    `ACC:${domesticAccountToIban(payment.accountNumber)}`,
+    `AM:${amount}`,
+    "CC:CZK",
+    ...(message ? [`MSG:${message}`] : []),
+    `X-VS:${payment.variableSymbol}`,
+  ];
+  return `SPD*1.0*${fields.join("*")}`;
+}
+
+export async function paymentQrPng(payment: CzkQrPayment): Promise<Buffer> {
+  return QRCode.toBuffer(buildSpdPaymentString(payment), {
     type: "png",
     errorCorrectionLevel: "M",
     margin: 2,
@@ -56,8 +74,8 @@ export async function paymentQrPng(data: PaymentData): Promise<Buffer> {
   });
 }
 
-export async function paymentQrDataUrl(data: PaymentData): Promise<string> {
-  return QRCode.toDataURL(buildCzechPaymentDescriptor(data), {
+export async function paymentQrDataUrl(payment: CzkQrPayment): Promise<string> {
+  return QRCode.toDataURL(buildSpdPaymentString(payment), {
     errorCorrectionLevel: "M",
     margin: 2,
     width: 420,

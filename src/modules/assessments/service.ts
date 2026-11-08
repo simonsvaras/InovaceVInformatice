@@ -477,13 +477,13 @@ export async function setTeamBankAccount(input: {
         .returning({ id: bankAccounts.id });
       accountId = created.id;
     }
-    const integrationOwners = await transaction.execute<{ exclusive_team_id: string | null }>(sql`
-      select exclusive_team_id from bank_integrations
-       where bank_account_id=${accountId} for update
+    const integrationOwners = await transaction.execute<{ feed_exclusive_team_id: string | null }>(sql`
+      select feed_exclusive_team_id from bank_accounts
+       where id=${accountId} for update
     `);
     if (
-      integrationOwners[0]?.exclusive_team_id &&
-      integrationOwners[0].exclusive_team_id !== input.teamId
+      integrationOwners[0]?.feed_exclusive_team_id &&
+      integrationOwners[0].feed_exclusive_team_id !== input.teamId
     ) {
       throw new InputError(
         "exclusive_account_in_use",
@@ -561,7 +561,7 @@ export async function getGuardianPaymentHistory(userId: string, teamId?: string)
       paymentEvents,
       eq(paymentEvents.id, paymentAllocations.paymentEventId),
     )
-    .innerJoin(users, eq(users.id, paymentEvents.recordedByUserId))
+    .leftJoin(users, eq(users.id, paymentEvents.recordedByUserId))
     .innerJoin(
       receivables,
       eq(receivables.id, paymentAllocations.receivableId),
@@ -651,10 +651,17 @@ export async function getGuardianReceivable(userId: string, receivableId: string
       cancelledAt: receivables.cancelledAt,
       pendingClaimAmountHalere: sql<number | null>`(select ${paymentClaims.amountHalere} from ${paymentClaims} where ${paymentClaims.receivableId}=${receivables.id} and ${paymentClaims.status}='pending' limit 1)`,
       demoIntegrationEnabled: sql<boolean>`exists(select 1 from bank_integrations bi where bi.bank_account_id=${receivables.bankAccountId} and bi.enabled=true)`,
+      fioIntegrationEnabled: sql<boolean>`exists(select 1 from fio_integrations fi where fi.bank_account_id=${receivables.bankAccountId} and fi.status='active')`,
       hasSimulatedPayment: sql<boolean>`exists(
         select 1 from payment_events pe
         join payment_allocations pa on pa.payment_event_id=pe.id
         where pa.receivable_id=${receivables.id} and pe.kind='simulated'
+          and not exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id)
+      )`,
+      hasFioPayment: sql<boolean>`exists(
+        select 1 from payment_events pe
+        join payment_allocations pa on pa.payment_event_id=pe.id
+        where pa.receivable_id=${receivables.id} and pe.kind='fio'
           and not exists(select 1 from payment_events correction where correction.reverses_event_id=pe.id)
       )`,
     })
@@ -681,15 +688,16 @@ export async function getGuardianReceivable(userId: string, receivableId: string
     targetType: "receivable",
     targetId: row.id,
   });
+  const debtState = deriveDebtState({
+    amountHalere: row.amountHalere,
+    allocatedHalere: row.allocatedHalere,
+    dueDate: row.dueDate,
+    hasPendingClaim: Boolean(row.pendingClaimId),
+    cancelled: Boolean(row.cancelledAt),
+  });
   return {
     ...row,
-    ...deriveDebtState({
-      amountHalere: row.amountHalere,
-      allocatedHalere: row.allocatedHalere,
-      dueDate: row.dueDate,
-      hasPendingClaim: Boolean(row.pendingClaimId),
-      cancelled: Boolean(row.cancelledAt),
-    }),
+    ...debtState,
   };
 }
 
@@ -738,6 +746,21 @@ export async function getAssessmentManagerView(userId: string, assessmentId: str
       guardianEmail: users.email,
       deliveryStatus: notificationDeliveries.status,
       deliveryError: notificationDeliveries.errorCode,
+      allocatedHalere: sql<number>`coalesce(
+        (select sum(${paymentAllocations.amountHalere})
+           from ${paymentAllocations}
+          where ${paymentAllocations.receivableId}=${receivables.id}),
+        0
+      )::int`,
+      lastReminderAt: sql<Date | string | null>`(
+        select max(delivery.sent_at)
+          from reminder_recipients reminder
+          join notification_deliveries delivery
+            on delivery.kind='payment_reminder'
+           and delivery.reference_id=reminder.id
+         where reminder.receivable_id=${receivables.id}
+           and delivery.status='sent'
+      )`,
     })
     .from(receivables)
     .innerJoin(athletes, eq(athletes.id, receivables.athleteId))
@@ -775,7 +798,15 @@ export async function retryReceivableDelivery(input: {
       clubName: clubs.name,
       teamName: teams.name,
       accountNumber: bankAccounts.accountNumber,
-      amountHalere: receivables.amountHalere,
+      amountHalere: sql<number>`greatest(
+        ${receivables.amountHalere} - coalesce(
+          (select sum(retry_allocation.amount_halere)
+             from payment_allocations retry_allocation
+            where retry_allocation.receivable_id=${receivables.id}),
+          0
+        ),
+        0
+      )::int`,
       variableSymbol: receivables.variableSymbol,
       paymentMessage: assessments.paymentMessage,
       dueDate: assessments.dueDate,
@@ -804,7 +835,12 @@ export async function retryReceivableDelivery(input: {
     )
     .limit(1);
   if (!recipient) notFound();
-
+  if (recipient.amountHalere <= 0) {
+    throw new InputError(
+      "receivable_already_paid",
+      "Dluh už nemá kladný zůstatek; nový platební QR se neposílá.",
+    );
+  }
   await getDatabase().insert(auditEvents).values({
     actorUserId: input.actorUserId,
     clubId: assessment.clubId,

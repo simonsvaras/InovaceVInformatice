@@ -26,7 +26,7 @@ type ConfirmationRow = {
   amount_halere: number;
   occurred_on: string;
   created_at: Date;
-  actor_name: string;
+  actor_name: string | null;
   athlete_name: string;
   assessment_title: string;
   club_id: string;
@@ -61,7 +61,7 @@ export async function getPaymentConfirmation(userId: string, allocationId: strin
     join athlete_guardians ag on ag.athlete_id=ath.id and ag.user_id=${userId}
     join bank_accounts ba on ba.id=r.bank_account_id
     join clubs c on c.id=a.club_id
-    join users actor on actor.id=pe.recorded_by_user_id
+    left join users actor on actor.id=pe.recorded_by_user_id
     left join teams t on t.id=r.origin_team_id
     left join bank_transactions bt on bt.id=pe.bank_transaction_id
     where pa.id=${allocationId}
@@ -98,7 +98,9 @@ export function buildPaymentConfirmationHtml(row: ConfirmationRow) {
     ["Variabilní symbol", row.variable_symbol],
     ["Cílový účet", row.account_number],
   ];
-  if (isDemo && row.source_transaction_id) lines.push(["ID demo pohybu", row.source_transaction_id]);
+  if ((isDemo || row.kind === "fio") && row.source_transaction_id) {
+    lines.push([isDemo ? "ID demo pohybu" : "ID bankovního pohybu", row.source_transaction_id]);
+  }
   lines.push(["Číslo záznamu", row.allocation_id]);
   const rows = lines
     .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)

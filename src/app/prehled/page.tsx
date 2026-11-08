@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { logoutAction } from "@/app/actions/auth";
 import { switchCoachTeamAction } from "@/app/actions/clubs";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import {
@@ -77,6 +77,18 @@ function teamRoles(team: TeamOverview) {
   return roles;
 }
 
+function teamCountLabel(count: number) {
+  if (count === 1) return `${count} tým`;
+  if (count >= 2 && count <= 4) return `${count} týmy`;
+  return `${count} týmů`;
+}
+
+function activeTeamCountLabel(count: number) {
+  if (count === 1) return `${count} aktivní tým`;
+  if (count >= 2 && count <= 4) return `${count} aktivní týmy`;
+  return `${count} aktivních týmů`;
+}
+
 function TeamTile({
   team,
   activeTeamId,
@@ -87,15 +99,19 @@ function TeamTile({
   const canManage = team.isClubAdmin || team.isCoach;
   const hasMembership = team.isSelfMember || team.isGuardian;
   const roles = teamRoles(team);
+  const isActive = team.isCoach && activeTeamId === team.teamId;
 
   return (
-    <article className="dashboard-team-tile has-actions">
+    <article className={`dashboard-team-tile has-actions${isActive ? " is-active" : ""}`}>
       <div className="dashboard-team-tile-top">
         <span className="dashboard-team-monogram" aria-hidden="true">
           {team.teamName.trim().charAt(0).toLocaleUpperCase("cs") || "T"}
         </span>
         <div className="dashboard-team-title">
-          <h3>{team.teamName}</h3>
+          <div className="dashboard-team-title-heading">
+            <h3>{team.teamName}</h3>
+            {isActive ? <span className="dashboard-team-active">Aktivní tým</span> : null}
+          </div>
           <div className="dashboard-team-roles" aria-label="Vztah k týmu">
             {roles.map((role) => (
               <span key={role}>{role}</span>
@@ -116,21 +132,21 @@ function TeamTile({
       </dl>
 
       <div className="dashboard-team-actions">
-        <Link href={`/tymy/${team.teamId}`}>
+        <Link className="dashboard-team-open" href={`/tymy/${team.teamId}`}>
           {canManage ? "Otevřít správu týmu" : "Zobrazit detail týmu"}
         </Link>
         {canManage && hasMembership ? (
-          <Link href={`/tymy/${team.teamId}?view=member`}>Členský pohled</Link>
+          <Link className="dashboard-team-member-view" href={`/tymy/${team.teamId}?view=member`}>Členský pohled</Link>
         ) : null}
         {team.isCoach ? (
           <form action={switchCoachTeamAction}>
             <input name="teamId" type="hidden" value={team.teamId} />
             <button
               className="dashboard-team-switch"
-              disabled={activeTeamId === team.teamId}
+              disabled={isActive}
               type="submit"
             >
-              {activeTeamId === team.teamId
+              {isActive
                 ? "Aktivní tým"
                 : "Nastavit jako aktivní"}
             </button>
@@ -184,37 +200,35 @@ export default async function DashboardPage({
     club.isAdmin ||= team.isClubAdmin;
     clubs.set(team.clubId, club);
   }
+  const teamCount = [...clubs.values()].reduce(
+    (total, club) => total + club.teams.length,
+    0,
+  );
 
   return (
     <main className="dashboard-shell dashboard-home">
-      <header className="dashboard-topbar">
-        <Link
-          className="dashboard-brand"
-          href="/prehled"
-          aria-label="Klubio – přehled"
-        >
-          <span className="dashboard-brand-mark" aria-hidden="true">
-            K
-          </span>
-          <span>Klubio</span>
-        </Link>
-
-        <div className="dashboard-account">
-          <span>{user.email}</span>
-          <form action={logoutAction}>
-            <button className="dashboard-logout" type="submit">
-              Odhlásit se
-            </button>
-          </form>
-        </div>
-      </header>
+      <AppHeader user={user} />
 
       <section className="content-stack dashboard-content">
         <Message error={query.error} success={query.success} />
 
         <section className="dashboard-welcome" aria-labelledby="dashboard-title">
-          <h1 id="dashboard-title">Vítejte, {user.displayName}.</h1>
-          <p>{user.email}</p>
+          <div>
+            <h1 id="dashboard-title">Vítejte, {user.displayName}.</h1>
+            <p>{user.email}</p>
+          </div>
+          {clubs.size ? (
+            <dl className="dashboard-welcome-summary" aria-label="Souhrn přehledu">
+              <div>
+                <dt>Kluby</dt>
+                <dd>{clubs.size}</dd>
+              </div>
+              <div>
+                <dt>Týmy</dt>
+                <dd>{teamCount}</dd>
+              </div>
+            </dl>
+          ) : null}
         </section>
 
         {!hasExistingSetup ? (
@@ -225,11 +239,11 @@ export default async function DashboardPage({
           <section className="dashboard-clubs" aria-labelledby="my-clubs-title">
             <div className="dashboard-clubs-heading">
               <div>
-                <h2 id="my-clubs-title">Moje kluby</h2>
-                <p>Všechny týmy, ve kterých máte roli nebo spravujete člena.</p>
+                <h2 id="my-clubs-title">Moje kluby a týmy</h2>
+                <p>Vyberte tým podle své role a pokračujte přímo do jeho přehledu.</p>
               </div>
               <span>
-                {clubs.size} {clubs.size === 1 ? "klub" : clubs.size < 5 ? "kluby" : "klubů"}
+                {clubs.size} {clubs.size === 1 ? "klub" : clubs.size < 5 ? "kluby" : "klubů"} · {teamCountLabel(teamCount)}
               </span>
             </div>
 
@@ -242,12 +256,15 @@ export default async function DashboardPage({
                         {club.name.trim().charAt(0).toLocaleUpperCase("cs") || "K"}
                       </span>
                       <div>
-                        <span>{club.teams.length} {club.teams.length === 1 ? "tým" : club.teams.length < 5 ? "týmy" : "týmů"}</span>
+                        <span className="dashboard-club-label">Klub</span>
                         <h3>{club.name}</h3>
+                        <span className="dashboard-club-team-count">
+                          {activeTeamCountLabel(club.teams.length)}
+                        </span>
                       </div>
                     </div>
                     {club.isAdmin ? (
-                      <Link href={`/kluby/${club.id}`}>Správa klubu</Link>
+                      <Link className="dashboard-club-action" href={`/kluby/${club.id}`}>Otevřít klub</Link>
                     ) : null}
                   </header>
 

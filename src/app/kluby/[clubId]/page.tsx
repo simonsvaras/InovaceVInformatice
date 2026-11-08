@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { archiveTeamAction, inviteCoachAction } from "@/app/actions/clubs";
-import { logoutAction } from "@/app/actions/auth";
+import { AppHeader } from "@/components/app-header";
 import { CreateTeamModal } from "@/components/create-team-modal";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
@@ -37,30 +37,24 @@ export default async function ClubPage({
 
   return (
     <main className="dashboard-shell dashboard-home club-admin-page">
-      <header className="dashboard-topbar">
-        <Link
-          className="dashboard-brand"
-          href="/prehled"
-          aria-label="Klubio – přehled"
-        >
-          <span className="dashboard-brand-mark" aria-hidden="true">
-            K
-          </span>
-          <span>Klubio</span>
-        </Link>
-
-        <div className="dashboard-account">
-          <Link className="club-topbar-link" href="/prehled">
-            Přehled
-          </Link>
-          <span>{user.email}</span>
-          <form action={logoutAction}>
-            <button className="dashboard-logout" type="submit">
-              Odhlásit se
-            </button>
-          </form>
-        </div>
-      </header>
+      <AppHeader
+        context={{
+          kind: "Klub",
+          name: club.name,
+          role: "Správce klubu",
+          href: `/kluby/${club.id}`,
+        }}
+        navigation={[
+          { href: `/kluby/${club.id}`, label: "Přehled klubu", active: true },
+          { href: `#teams-title`, label: "Týmy" },
+          { href: `/finance?clubId=${club.id}`, label: "Finance" },
+        ]}
+        primaryAction={{
+          href: `/predpisy/novy?clubId=${club.id}`,
+          label: "Nový předpis",
+        }}
+        user={user}
+      />
 
       <section className="club-admin-content">
         <Message error={query.error} success={query.success} />

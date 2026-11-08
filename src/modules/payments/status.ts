@@ -56,21 +56,23 @@ export function debtStatusLabel(status: DebtStatus) {
   }[status];
 }
 
-export type PaymentKind = "manual_claim" | "cash" | "simulated" | "correction";
+export type PaymentKind = "manual_claim" | "cash" | "simulated" | "fio" | "correction";
 
 export function paymentMethodLabel(kind: string) {
   return ({
     manual_claim: "Ručně potvrzená úhrada",
     cash: "Hotovost",
     simulated: "Demo pohyb (simulace)",
+    fio: "Bankovní pohyb z Fio",
     correction: "Oprava evidence (protizápis)",
   } as Record<string, string>)[kind] ?? "Evidovaná úhrada";
 }
 
 /** Kdo záznam potvrdil; u demo pohybu nejde o ověření banky ani trenéra. */
-export function paymentConfirmedByLabel(kind: string, actorName: string) {
+export function paymentConfirmedByLabel(kind: string, actorName: string | null) {
   if (kind === "simulated") return "Demo simulace (nejde o bankovně ověřený převod)";
-  if (kind === "cash") return `Hotovost zapsal(a) ${actorName}`;
-  if (kind === "correction") return `Opravil(a) ${actorName}`;
-  return `Potvrdil(a) ${actorName}`;
+  if (kind === "fio") return "Načteno z Fio API a spárováno systémem";
+  if (kind === "cash") return `Hotovost zapsal(a) ${actorName ?? "systém"}`;
+  if (kind === "correction") return `Opravil(a) ${actorName ?? "systém"}`;
+  return `Potvrdil(a) ${actorName ?? "systém"}`;
 }

@@ -107,7 +107,11 @@ export const notificationDeliveries = pgTable(
     uniqueIndex("notification_kind_reference_idx").on(
       table.kind,
       table.referenceId,
+      table.userId,
     ),
+    uniqueIndex("notification_kind_reference_anonymous_idx")
+      .on(table.kind, table.referenceId)
+      .where(sql`${table.userId} is null and ${table.referenceId} is not null`),
   ],
 );
 
@@ -150,6 +154,7 @@ export const bankAccounts = pgTable(
       .references(() => clubs.id, { onDelete: "restrict" }),
     accountNumber: varchar("account_number", { length: 32 }).notNull(),
     isDefault: boolean("is_default").notNull().default(false),
+    feedExclusiveTeamId: uuid("feed_exclusive_team_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -198,8 +203,10 @@ export const bankIntegrations = pgTable(
     provider: varchar("provider", { length: 20 }).notNull().default("demo"),
     enabled: boolean("enabled").notNull().default(true),
     configuredByUserId: uuid("configured_by_user_id")
-      .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    configurationSource: varchar("configuration_source", { length: 20 })
+      .notNull()
+      .default("user"),
     lastProcessedAt: timestamp("last_processed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -212,6 +219,139 @@ export const bankIntegrations = pgTable(
     uniqueIndex("bank_integrations_account_idx").on(table.bankAccountId),
     index("bank_integrations_exclusive_team_idx").on(table.exclusiveTeamId),
     check("bank_integrations_provider_demo", sql`${table.provider} = 'demo'`),
+    check(
+      "bank_integrations_configuration_source_valid",
+      sql`${table.configurationSource} in ('user', 'public_qr')`,
+    ),
+  ],
+);
+
+export const fioIntegrations = pgTable(
+  "fio_integrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    status: varchar("status", { length: 30 }).notNull().default("active"),
+    tokenCiphertext: text("token_ciphertext"),
+    tokenIv: varchar("token_iv", { length: 24 }),
+    tokenAuthTag: varchar("token_auth_tag", { length: 32 }),
+    tokenFingerprint: varchar("token_fingerprint", { length: 64 }),
+    tokenKeyVersion: integer("token_key_version").notNull().default(1),
+    configuredByUserId: uuid("configured_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    activatedAt: timestamp("activated_at", { withTimezone: true }).notNull(),
+    initialImportCompletedAt: timestamp("initial_import_completed_at", {
+      withTimezone: true,
+    }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastNewMovementAt: timestamp("last_new_movement_at", { withTimezone: true }),
+    lastSuccessfulPeriodTo: date("last_successful_period_to", { mode: "string" }),
+    nextAllowedAt: timestamp("next_allowed_at", { withTimezone: true }),
+    leaseOwner: uuid("lease_owner"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    lastErrorCode: varchar("last_error_code", { length: 80 }),
+    lastErrorMessage: varchar("last_error_message", { length: 300 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("fio_integrations_account_idx").on(table.bankAccountId),
+    index("fio_integrations_due_idx").on(table.status, table.nextAllowedAt),
+    check(
+      "fio_integrations_status_valid",
+      sql`${table.status} in ('active', 'disabled', 'requires_token', 'intervention')`,
+    ),
+    check(
+      "fio_integrations_token_state_valid",
+      sql`(${table.status} = 'disabled' and ${table.tokenCiphertext} is null and ${table.tokenIv} is null and ${table.tokenAuthTag} is null and ${table.tokenFingerprint} is null)
+          or (${table.status} <> 'disabled' and ${table.tokenCiphertext} is not null and ${table.tokenIv} is not null and ${table.tokenAuthTag} is not null and ${table.tokenFingerprint} is not null)`,
+    ),
+  ],
+);
+
+export const fioTokenCallLeases = pgTable("fio_token_call_leases", {
+  tokenFingerprint: varchar("token_fingerprint", { length: 64 }).primaryKey(),
+  nextAllowedAt: timestamp("next_allowed_at", { withTimezone: true }),
+  leaseOwner: uuid("lease_owner"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const fioVerificationAttempts = pgTable(
+  "fio_verification_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    tokenFingerprint: varchar("token_fingerprint", { length: 64 }).notNull(),
+    purpose: varchar("purpose", { length: 20 }).notNull(),
+    expectedIntegrationUpdatedAt: timestamp("expected_integration_updated_at", {
+      withTimezone: true,
+    }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("fio_verification_attempts_account_idx").on(
+      table.bankAccountId,
+      table.createdAt,
+    ),
+    check(
+      "fio_verification_attempts_purpose_valid",
+      sql`${table.purpose} in ('activate', 'replace')`,
+    ),
+    check(
+      "fio_verification_attempts_status_valid",
+      sql`${table.status} in ('pending', 'completed', 'failed', 'expired')`,
+    ),
+  ],
+);
+
+export const fioSyncRequests = pgTable(
+  "fio_sync_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    integrationId: uuid("integration_id")
+      .notNull()
+      .references(() => fioIntegrations.id, { onDelete: "restrict" }),
+    requestedByUserId: uuid("requested_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    errorCode: varchar("error_code", { length: 80 }),
+  },
+  (table) => [
+    uniqueIndex("fio_sync_requests_one_open_idx")
+      .on(table.integrationId)
+      .where(sql`${table.status} in ('pending', 'processing')`),
+    index("fio_sync_requests_status_idx").on(table.status, table.requestedAt),
+    check(
+      "fio_sync_requests_status_valid",
+      sql`${table.status} in ('pending', 'processing', 'completed', 'failed')`,
+    ),
   ],
 );
 
@@ -254,6 +394,7 @@ export const invitations = pgTable(
       .references(() => teams.id, { onDelete: "restrict" }),
     email: varchar("email", { length: 320 }).notNull(),
     tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    idempotencyKey: uuid("idempotency_key"),
     replaceExistingCoach: boolean("replace_existing_coach")
       .notNull()
       .default(false),
@@ -273,6 +414,9 @@ export const invitations = pgTable(
   (table) => [
     index("invitations_team_id_idx").on(table.teamId),
     index("invitations_email_idx").on(table.email),
+    uniqueIndex("invitations_request_email_idx")
+      .on(table.teamId, table.kind, table.idempotencyKey, table.email)
+      .where(sql`${table.idempotencyKey} is not null`),
   ],
 );
 
@@ -589,22 +733,35 @@ export const bankTransactions = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     integrationId: uuid("integration_id")
-      .notNull()
       .references(() => bankIntegrations.id, { onDelete: "restrict" }),
+    fioIntegrationId: uuid("fio_integration_id").references(
+      () => fioIntegrations.id,
+      { onDelete: "restrict" },
+    ),
     bankAccountId: uuid("bank_account_id")
       .notNull()
       .references(() => bankAccounts.id, { onDelete: "restrict" }),
     source: varchar("source", { length: 20 }).notNull().default("simulated"),
     sourceTransactionId: varchar("source_transaction_id", { length: 80 }).notNull(),
     amountHalere: integer("amount_halere").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("CZK"),
     variableSymbol: varchar("variable_symbol", { length: 10 }),
+    counterAccount: varchar("counter_account", { length: 64 }),
+    counterBankCode: varchar("counter_bank_code", { length: 10 }),
+    counterpartyName: varchar("counterparty_name", { length: 255 }),
+    recipientMessage: varchar("recipient_message", { length: 255 }),
+    transactionType: varchar("transaction_type", { length: 255 }),
+    initialImport: boolean("initial_import").notNull().default(false),
+    relatedTransactionId: uuid("related_transaction_id"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
     createdByUserId: uuid("created_by_user_id")
-      .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    ingestionOrigin: varchar("ingestion_origin", { length: 20 })
+      .notNull()
+      .default("user"),
     status: varchar("status", { length: 30 }).notNull().default("unmatched"),
     reasonCode: varchar("reason_code", { length: 40 }).notNull(),
     resolutionReason: varchar("resolution_reason", { length: 300 }),
@@ -616,6 +773,7 @@ export const bankTransactions = pgTable(
   (table) => [
     uniqueIndex("bank_transactions_account_source_idx").on(
       table.bankAccountId,
+      table.source,
       table.sourceTransactionId,
     ),
     index("bank_transactions_integration_received_idx").on(
@@ -623,8 +781,25 @@ export const bankTransactions = pgTable(
       table.receivedAt,
     ),
     index("bank_transactions_status_idx").on(table.status, table.receivedAt),
-    check("bank_transactions_source_simulated", sql`${table.source} = 'simulated'`),
-    check("bank_transactions_amount_positive", sql`${table.amountHalere} > 0`),
+    index("bank_transactions_fio_integration_idx").on(
+      table.fioIntegrationId,
+      table.receivedAt,
+    ),
+    check(
+      "bank_transactions_source_valid",
+      sql`${table.source} in ('simulated', 'fio')`,
+    ),
+    check(
+      "bank_transactions_integration_source_valid",
+      sql`(${table.source} = 'simulated' and ${table.integrationId} is not null and ${table.fioIntegrationId} is null)
+          or (${table.source} = 'fio' and ${table.integrationId} is null and ${table.fioIntegrationId} is not null)`,
+    ),
+    check(
+      "bank_transactions_ingestion_origin_valid",
+      sql`${table.ingestionOrigin} in ('user', 'public_qr', 'fio_sync')`,
+    ),
+    check("bank_transactions_amount_nonzero", sql`${table.amountHalere} <> 0`),
+    check("bank_transactions_currency_valid", sql`${table.currency} ~ '^[A-Z]{3}$'`),
     check(
       "bank_transactions_vs_digits",
       sql`${table.variableSymbol} is null or ${table.variableSymbol} ~ '^[0-9]{1,10}$'`,
@@ -633,6 +808,38 @@ export const bankTransactions = pgTable(
       "bank_transactions_status_valid",
       sql`${table.status} in ('unmatched', 'partially_allocated', 'allocated', 'linked', 'ignored')`,
     ),
+  ],
+);
+
+export const publicPaymentLinks = pgTable(
+  "public_payment_links",
+  {
+    id: uuid("id").primaryKey(),
+    receivableId: uuid("receivable_id")
+      .notNull()
+      .references(() => receivables.id, { onDelete: "restrict" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    issuedByUserId: uuid("issued_by_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    bankTransactionId: uuid("bank_transaction_id").references(
+      () => bankTransactions.id,
+      { onDelete: "restrict" },
+    ),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("public_payment_links_active_receivable_idx")
+      .on(table.receivableId)
+      .where(sql`${table.revokedAt} is null`),
+    index("public_payment_links_receivable_idx").on(table.receivableId),
+    uniqueIndex("public_payment_links_transaction_idx")
+      .on(table.bankTransactionId)
+      .where(sql`${table.bankTransactionId} is not null`),
   ],
 );
 
@@ -650,8 +857,10 @@ export const paymentEvents = pgTable(
     amountHalere: integer("amount_halere").notNull(),
     occurredOn: date("occurred_on", { mode: "string" }).notNull(),
     recordedByUserId: uuid("recorded_by_user_id")
-      .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    recordedOrigin: varchar("recorded_origin", { length: 20 })
+      .notNull()
+      .default("user"),
     sourceClaimId: uuid("source_claim_id").references(() => paymentClaims.id, {
       onDelete: "restrict",
     }),
@@ -672,8 +881,12 @@ export const paymentEvents = pgTable(
     index("payment_events_team_created_idx").on(table.teamId, table.createdAt),
     check("payment_events_amount_positive", sql`${table.amountHalere} > 0`),
     check(
+      "payment_events_recorded_origin_valid",
+      sql`${table.recordedOrigin} in ('user', 'public_qr', 'fio_sync')`,
+    ),
+    check(
       "payment_events_kind_valid",
-      sql`${table.kind} in ('manual_claim', 'cash', 'correction', 'simulated')`,
+      sql`${table.kind} in ('manual_claim', 'cash', 'correction', 'simulated', 'fio')`,
     ),
   ],
 );

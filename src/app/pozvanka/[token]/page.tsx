@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { acceptCoachInvitationAction } from "@/app/actions/clubs";
 import { acceptMemberInvitationAction } from "@/app/actions/memberships";
+import { AppHeader } from "@/components/app-header";
 import { Message } from "@/components/message";
 import { AthleteEntryFields } from "@/components/athlete-entry-fields";
 import { getCurrentUser } from "@/modules/auth/service";
@@ -35,9 +36,21 @@ export default async function InvitationPage({
     invitation.expiresAt <= new Date();
 
   return (
-    <main className="auth-shell">
-      <section className="panel auth-card">
-        <Link className="brand-link" href="/">Klubio</Link>
+    <div className="auth-page">
+      <AppHeader
+        context={invitation && !invalid ? {
+          kind: "Pozvánka",
+          name: invitation.teamName,
+          role: invitation.kind === "coach" ? "Trenér" : "Člen / rodič",
+        } : undefined}
+        guestAction={{
+          href: `/prihlaseni?next=${encodeURIComponent(next)}`,
+          label: "Přihlásit se",
+        }}
+        user={user}
+      />
+      <main className="auth-shell">
+        <section className="panel auth-card">
         <p className="eyebrow">Jednorázová pozvánka</p>
         {invalid ? (
           <>
@@ -90,7 +103,8 @@ export default async function InvitationPage({
             )}
           </>
         )}
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
   );
 }
