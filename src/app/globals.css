@@ -3324,3 +3324,164 @@ button.home-header-action {
     text-align: left;
   }
 }
+
+.payments-filter {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 0.9rem;
+  align-items: end;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 1rem;
+  background: var(--dashboard-white);
+}
+
+.payments-filter label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--dashboard-muted);
+  font-size: 0.78rem;
+}
+
+.payments-filter input,
+.payments-filter select {
+  min-height: 2.6rem;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 0.65rem;
+  padding: 0.5rem 0.7rem;
+  background: #fff;
+  color: var(--dashboard-ink);
+}
+
+.payments-method-summary {
+  font-size: 0.85rem !important;
+  line-height: 1.5;
+  letter-spacing: 0 !important;
+}
+
+.payments-register {
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 1rem;
+  background: var(--dashboard-white);
+}
+
+.payments-register-row {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--dashboard-line);
+}
+
+.payments-register-row > span,
+.payments-register-row small {
+  color: var(--dashboard-muted);
+  font-size: 0.75rem;
+}
+
+.payments-register-row > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.payments-register-row > div strong {
+  color: var(--dashboard-ink);
+  font-size: 0.88rem;
+}
+
+.payments-register-row > strong {
+  color: #23794f;
+  font-size: 0.92rem;
+}
+
+.payments-register-row .is-correction,
+.member-team-history-row .is-correction-note {
+  color: #b33d46;
+}
+
+.member-team-history-download {
+  width: fit-content;
+  color: var(--dashboard-blue-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.club-finance-table {
+  overflow: hidden;
+  border: 1px solid var(--dashboard-line);
+  border-radius: 1rem;
+  background: var(--dashboard-white);
+}
+
+.club-finance-table-head,
+.club-finance-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)) 5rem;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+}
+
+.club-finance-table-head {
+  color: var(--dashboard-muted);
+  font-size: 0.75rem;
+}
+
+.club-finance-table-row {
+  border-top: 1px solid var(--dashboard-line);
+  font-size: 0.88rem;
+}
+
+.club-finance-table-row .is-overdue {
+  color: #b33d46;
+  font-weight: 700;
+}
+
+@media (max-width: 42rem) {
+  .payments-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .payments-register-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .club-finance-table-head {
+    display: none;
+  }
+
+  .club-finance-table-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 1rem;
+  }
+}
+
+.club-archived-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+  border-top: 1px solid var(--dashboard-line);
+  font-size: 0.88rem;
+}
+
+.club-archived-row:first-child {
+  border-top: 0;
+}
+
+.club-archive,
+.member-team-leave {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.club-archive summary,
+.member-team-leave summary {
+  cursor: pointer;
+  color: var(--dashboard-blue-dark);
+  font-weight: 700;
+}

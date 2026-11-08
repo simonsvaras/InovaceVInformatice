@@ -57,7 +57,7 @@ type MembershipTransaction = PostgresJsTransaction<
   ExtractTablesWithRelations<typeof schema>
 >;
 
-type LockedTeamAccess = {
+export type LockedTeamAccess = {
   club_id: string;
   team_name: string;
   club_name: string;
@@ -65,7 +65,7 @@ type LockedTeamAccess = {
   is_coach: boolean;
 };
 
-function lockedTeamAccessQuery(actorUserId: string, teamId: string) {
+export function lockedTeamAccessQuery(actorUserId: string, teamId: string) {
   return sql<LockedTeamAccess>`
     select t.club_id,
            t.name as team_name,
@@ -87,7 +87,7 @@ function lockedTeamAccessQuery(actorUserId: string, teamId: string) {
   `;
 }
 
-function assertLockedTeamAccess(access: LockedTeamAccess | undefined) {
+export function assertLockedTeamAccess(access: LockedTeamAccess | undefined) {
   if (!access || (!access.is_admin && !access.is_coach)) {
     throw new InputError("access_denied", "K této týmové akci nemáte oprávnění.");
   }

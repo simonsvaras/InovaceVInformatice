@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/modules/auth/service";
 import {
+  leaveTeam,
+  removeMember,
+  transferMember,
+} from "@/modules/memberships/lifecycle";
+import {
   acceptMemberInvitation,
   createMemberInvitations,
   generateTeamJoinCode,
@@ -188,4 +193,74 @@ export async function revokeInvitationAction(formData: FormData) {
   }
 
   redirect(`/tymy/${teamId}?success=${encodeURIComponent("Pozvánka byla zrušena.")}`);
+}
+
+function debtNote(openDebts: { count: number; halere: number }) {
+  if (!openDebts.count) return "";
+  const amount = new Intl.NumberFormat("cs-CZ", {
+    style: "currency",
+    currency: "CZK",
+  }).format(openDebts.halere / 100);
+  return ` Nezaplacené předpisy zůstávají evidované: ${openDebts.count} (${amount}).`;
+}
+
+function requireConfirmation(formData: FormData) {
+  if (formText(formData, "confirm") !== "yes") {
+    throw new InputError("confirm_required", "Potvrďte změnu členství.");
+  }
+}
+
+export async function leaveTeamAction(formData: FormData) {
+  const user = await requireUser();
+  const teamId = validateUuid(formText(formData, "teamId"), "Tým");
+  let success: string;
+  try {
+    requireConfirmation(formData);
+    const result = await leaveTeam({
+      actorUserId: user.id,
+      teamId,
+      athleteId: validateUuid(formText(formData, "athleteId"), "Sportovec"),
+    });
+    success = `${result.athleteName} byl(a) odhlášen(a) z týmu.${debtNote(result.openDebts)}`;
+  } catch (error) {
+    redirect(`/tymy/${teamId}?error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(`/prehled?success=${encodeURIComponent(success)}`);
+}
+
+export async function removeMemberAction(formData: FormData) {
+  const user = await requireUser();
+  const teamId = validateUuid(formText(formData, "teamId"), "Tým");
+  let success: string;
+  try {
+    requireConfirmation(formData);
+    const result = await removeMember({
+      actorUserId: user.id,
+      teamId,
+      athleteId: validateUuid(formText(formData, "athleteId"), "Sportovec"),
+    });
+    success = `${result.athleteName} byl(a) vyřazen(a) z týmu. Rodič dostane oznámení.${debtNote(result.openDebts)}`;
+  } catch (error) {
+    redirect(`/tymy/${teamId}?error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(`/tymy/${teamId}?success=${encodeURIComponent(success)}`);
+}
+
+export async function transferMemberAction(formData: FormData) {
+  const user = await requireUser();
+  const teamId = validateUuid(formText(formData, "teamId"), "Tým");
+  let success: string;
+  try {
+    requireConfirmation(formData);
+    const result = await transferMember({
+      actorUserId: user.id,
+      teamId,
+      targetTeamId: validateUuid(formText(formData, "targetTeamId"), "Cílový tým"),
+      athleteId: validateUuid(formText(formData, "athleteId"), "Sportovec"),
+    });
+    success = `${result.athleteName} byl(a) přesunut(a) do týmu ${result.targetTeamName}.${debtNote(result.openDebts)}`;
+  } catch (error) {
+    redirect(`/tymy/${teamId}?error=${encodeURIComponent(message(error))}`);
+  }
+  redirect(`/tymy/${teamId}?success=${encodeURIComponent(success)}`);
 }

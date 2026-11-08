@@ -9,9 +9,16 @@ import {
   getUserTeamOverview,
 } from "@/modules/clubs/service";
 import { getGuardianMemberships } from "@/modules/memberships/service";
-import { getGuardianReceivables } from "@/modules/assessments/service";
+import {
+  getGuardianPaymentHistory,
+  getGuardianReceivables,
+} from "@/modules/assessments/service";
 import { formatCzk } from "@/modules/payments/qr";
-import { debtStatusLabel } from "@/modules/payments/status";
+import {
+  debtStatusLabel,
+  paymentConfirmedByLabel,
+  paymentMethodLabel,
+} from "@/modules/payments/status";
 
 function GettingStartedPanel({
   isAdditional,
@@ -140,11 +147,12 @@ export default async function DashboardPage({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
   const user = await requireUser();
-  const [contexts, guardianMemberships, teamOverview, receivables, query] = await Promise.all([
+  const [contexts, guardianMemberships, teamOverview, receivables, paymentHistory, query] = await Promise.all([
     getUserContexts(user.id),
     getGuardianMemberships(user.id),
     getUserTeamOverview(user.id),
     getGuardianReceivables(user.id),
+    getGuardianPaymentHistory(user.id),
     searchParams,
   ]);
   const hasExistingSetup =
@@ -278,6 +286,29 @@ export default async function DashboardPage({
                   </section>
                 );
               })}
+            </div>
+          </article>
+        ) : null}
+        {paymentHistory.length ? (
+          <article className="panel dashboard-section">
+            <h2>Historie plateb</h2>
+            <p>Úhrady evidované u vašich sportovců. Potvrzení dokládá pouze evidenci v aplikaci.</p>
+            <div className="list-stack">
+              {paymentHistory.map((event) => (
+                <section className="subcard" key={event.allocationId}>
+                  <strong>{event.assessmentTitle} · {formatCzk(event.amountHalere)}</strong>
+                  <span>{event.athleteName} · {event.clubName} · {event.teamName ?? "celý klub"}</span>
+                  <span>{event.occurredOn.split("-").reverse().join(". ")} · {paymentMethodLabel(event.kind)}</span>
+                  <span>{paymentConfirmedByLabel(event.kind, event.recordedByName)}</span>
+                  {event.corrected ? <span className="status-overdue">Opraveno protizápisem</span> : null}
+                  {event.correctionReason ? <span>Důvod opravy: {event.correctionReason}</span> : null}
+                  {event.kind !== "correction" && !event.corrected ? (
+                    <a className="button-link button-secondary" href={`/potvrzeni/${event.allocationId}`}>
+                      Stáhnout potvrzení evidence
+                    </a>
+                  ) : null}
+                </section>
+              ))}
             </div>
           </article>
         ) : null}

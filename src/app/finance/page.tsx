@@ -11,6 +11,7 @@ import {
   markSimulatedTransactionDifferentAction,
 } from "@/app/actions/bank-simulator";
 import {
+  cancelReceivableAction,
   recordCashPaymentAction,
   reversePaymentEventAction,
   reviewPaymentClaimsAction,
@@ -39,6 +40,7 @@ function reconciliationReason(code: string) {
     unknown_vs: "VS nepatří jednoznačně oprávněnému dluhu",
     amount_mismatch: "částka neodpovídá zbývající částce",
     already_paid: "dluh už je podle evidence uhrazen",
+    cancelled: "dluh byl zrušen",
     pending_claim: "čeká rodičovské hlášení",
     possible_manual_duplicate: "možná shoda s ručně evidovanou úhradou",
     reviewed_distinct: "oprávněná osoba potvrdila, že jde o další platbu",
@@ -138,11 +140,13 @@ export default async function FinancePage({
       recipientCount: 0,
     };
     if (debt.team_name) current.teamNames.add(debt.team_name);
-    current.amounts.add(debt.amount_halere);
-    current.expectedHalere += debt.amount_halere;
-    current.collectedHalere += debt.allocated_halere;
-    current.recipientCount += 1;
-    if (debt.remainingHalere <= 0) current.settledCount += 1;
+    if (!debt.cancelled_at) {
+      current.amounts.add(debt.amount_halere);
+      current.expectedHalere += debt.amount_halere;
+      current.collectedHalere += debt.allocated_halere;
+      current.recipientCount += 1;
+      if (debt.remainingHalere <= 0) current.settledCount += 1;
+    }
     assessmentMap.set(debt.assessment_id, current);
   }
 
@@ -452,17 +456,36 @@ export default async function FinancePage({
                                   {new Intl.DateTimeFormat("cs-CZ", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Prague" }).format(new Date(debt.last_reminder_at))}
                                 </span>
                               ) : null}
-                              <details>
-                                <summary>Zapsat hotovost</summary>
-                                <form action={recordCashPaymentAction} className="form-stack compact-form">
-                                  <ScopeFields scope={scope} />
-                                  <input name="receivableId" type="hidden" value={debt.id} />
-                                  <input name="idempotencyKey" type="hidden" value={randomUUID()} />
-                                  <label>Částka Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} name="amount" required /></label>
-                                  <label>Datum<input defaultValue={today} max={today} name="occurredOn" required type="date" /></label>
-                                  <button type="submit">Zaplaceno hotově</button>
-                                </form>
-                              </details>
+                              {debt.cancelled_at ? (
+                                <span>Důvod zrušení: {debt.cancellation_reason}</span>
+                              ) : (
+                                <>
+                                  <details>
+                                    <summary>Zapsat hotovost</summary>
+                                    <form action={recordCashPaymentAction} className="form-stack compact-form">
+                                      <ScopeFields scope={scope} />
+                                      <input name="receivableId" type="hidden" value={debt.id} />
+                                      <input name="idempotencyKey" type="hidden" value={randomUUID()} />
+                                      <label>Částka Kč<input defaultValue={(debt.remainingHalere / 100).toFixed(2)} name="amount" required /></label>
+                                      <label>Datum<input defaultValue={today} max={today} name="occurredOn" required type="date" /></label>
+                                      <button type="submit">Zaplaceno hotově</button>
+                                    </form>
+                                  </details>
+                                  {debt.allocated_halere === 0 && !debt.has_pending_claim ? (
+                                    <details>
+                                      <summary>Zrušit dluh</summary>
+                                      <form action={cancelReceivableAction} className="form-stack compact-form">
+                                        <ScopeFields scope={scope} />
+                                        <input name="receivableId" type="hidden" value={debt.id} />
+                                        <p>Dluh se nesmaže, jen přestane být očekávaný. Historie a audit zůstanou.</p>
+                                        <label>Důvod zrušení<input maxLength={300} name="reason" required /></label>
+                                        <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji zrušení dluhu</label>
+                                        <button className="button-secondary" type="submit">Zrušit dluh</button>
+                                      </form>
+                                    </details>
+                                  ) : null}
+                                </>
+                              )}
                               {debt.events.filter((event) => event.kind !== "correction").map((event) => (
                                 <details key={event.id}>
                                   <summary>{paymentEventLabel(event.kind)}: {formatCzk(event.amount_halere)}</summary>

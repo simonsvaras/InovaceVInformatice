@@ -2,8 +2,11 @@ import Link from "next/link";
 
 import { setTeamBankAccountAction } from "@/app/actions/assessments";
 import {
+  leaveTeamAction,
+  removeMemberAction,
   reviewJoinRequestAction,
   revokeInvitationAction,
+  transferMemberAction,
 } from "@/app/actions/memberships";
 import { JoinCodeForm } from "@/components/join-code-form";
 import { MemberInviteForm } from "@/components/member-invite-form";
@@ -12,16 +15,27 @@ import { getGuardianTeamFinance } from "@/modules/assessments/service";
 import { requireUser } from "@/modules/auth/service";
 import { requireTeamPageAccess } from "@/modules/authorization/service";
 import {
+  getAthleteOpenDebtsInTeam,
+  getTeamOpenDebtSummary,
+  getTransferTargets,
+} from "@/modules/memberships/lifecycle";
+import {
   getMemberTeamDashboard,
   getTeamMembershipDashboard,
 } from "@/modules/memberships/service";
 import { formatCzk } from "@/modules/payments/qr";
-import { debtStatusLabel } from "@/modules/payments/status";
+import {
+  debtStatusLabel,
+  paymentConfirmedByLabel,
+  paymentMethodLabel,
+} from "@/modules/payments/status";
 
 type Query = { success?: string; error?: string; view?: string };
 type ManagerTeam = Awaited<ReturnType<typeof getTeamMembershipDashboard>>;
 type MemberTeam = Awaited<ReturnType<typeof getMemberTeamDashboard>>;
 type MemberFinance = Awaited<ReturnType<typeof getGuardianTeamFinance>>;
+type OpenDebts = Awaited<ReturnType<typeof getTeamOpenDebtSummary>>;
+type TransferTargets = Awaited<ReturnType<typeof getTransferTargets>>;
 
 function formatDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);
@@ -42,28 +56,15 @@ function initials(name: string) {
     .join("");
 }
 
-function paymentKindLabel(kind: string) {
-  switch (kind) {
-    case "manual_claim":
-      return "Ručně potvrzená úhrada";
-    case "cash":
-      return "Hotovost";
-    case "simulated":
-      return "Demo pohyb";
-    case "correction":
-      return "Oprava evidence";
-    default:
-      return "Evidovaná úhrada";
-  }
-}
-
 function MemberTeamView({
   team,
   finance,
+  ownOpenDebts,
   query,
 }: {
   team: MemberTeam;
   finance: MemberFinance;
+  ownOpenDebts: OpenDebts;
   query: Query;
 }) {
   const openDebts = finance.debts.filter((debt) => debt.remainingHalere > 0);
@@ -162,6 +163,26 @@ function MemberTeamView({
                 </li>
               ))}
             </ul>
+            {team.managedMembers.map((member) => {
+              const debts = ownOpenDebts.get(member.athleteId);
+              return (
+                <details className="member-team-leave" key={`leave-${member.athleteId}`}>
+                  <summary>Odhlásit {member.fullName} z týmu</summary>
+                  <form action={leaveTeamAction} className="form-stack compact-form">
+                    <input name="teamId" type="hidden" value={team.id} />
+                    <input name="athleteId" type="hidden" value={member.athleteId} />
+                    <p>
+                      {debts
+                        ? `Nezaplacené předpisy zůstanou evidované u tohoto týmu: ${debts.count} (${formatCzk(debts.halere)}). Odhlášením se nezruší.`
+                        : "U tohoto týmu nemáte žádný nezaplacený předpis. Historie plateb zůstane zachována."}
+                      {" "}Nové předpisy tomuto členovi vznikat nebudou.
+                    </p>
+                    <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji odhlášení</label>
+                    <button className="button-secondary" type="submit">Odhlásit z týmu</button>
+                  </form>
+                </details>
+              );
+            })}
           </aside>
         </div>
 
@@ -176,11 +197,19 @@ function MemberTeamView({
           {finance.history.length ? (
             <div className="member-team-history-list">
               {finance.history.map((event) => (
-                <div className="member-team-history-row" key={`${event.eventId}-${event.athleteName}-${event.assessmentTitle}`}>
+                <div className="member-team-history-row" key={event.allocationId}>
                   <span>{formatDate(event.occurredOn)}</span>
                   <div>
                     <strong>{event.assessmentTitle}</strong>
-                    <small>{event.athleteName} · {paymentKindLabel(event.kind)}</small>
+                    <small>{event.athleteName} · {paymentMethodLabel(event.kind)}</small>
+                    <small>{paymentConfirmedByLabel(event.kind, event.recordedByName)}</small>
+                    {event.corrected ? <small className="is-correction-note">Opraveno protizápisem</small> : null}
+                    {event.correctionReason ? <small>Důvod opravy: {event.correctionReason}</small> : null}
+                    {event.kind !== "correction" && !event.corrected ? (
+                      <a className="member-team-history-download" href={`/potvrzeni/${event.allocationId}`}>
+                        Stáhnout potvrzení evidence
+                      </a>
+                    ) : null}
                   </div>
                   <strong className={event.amountHalere < 0 ? "is-correction" : ""}>
                     {formatCzk(event.amountHalere)}
@@ -200,7 +229,17 @@ function MemberTeamView({
   );
 }
 
-function ManagerTeamView({ team, query }: { team: ManagerTeam; query: Query }) {
+function ManagerTeamView({
+  team,
+  openDebts,
+  transferTargets,
+  query,
+}: {
+  team: ManagerTeam;
+  openDebts: OpenDebts;
+  transferTargets: TransferTargets;
+  query: Query;
+}) {
   return (
     <main className="dashboard-shell">
       <header className="topbar">
@@ -216,6 +255,7 @@ function ManagerTeamView({ team, query }: { team: ManagerTeam; query: Query }) {
           <div className="button-row">
             <Link className="button-link" href={`/predpisy/novy?teamId=${team.id}`}>Nový týmový předpis</Link>
             <Link className="button-link button-secondary" href={`/finance?teamId=${team.id}`}>Platby a hlášení</Link>
+            <Link className="button-link button-secondary" href={`/platby?teamId=${team.id}`}>Příchozí platby a export</Link>
           </div>
           <form action={setTeamBankAccountAction} className="form-stack inline-form">
             <input name="teamId" type="hidden" value={team.id} />
@@ -250,6 +290,40 @@ function ManagerTeamView({ team, query }: { team: ManagerTeam; query: Query }) {
                 <section className="subcard" key={member.membershipId}>
                   <strong>{member.fullName}{member.birthYear ? ` (${member.birthYear})` : ""}</strong>
                   <span>{member.relationship === "child" ? "Účet rodiče" : member.relationship === "self" ? "Vlastní účet" : "Spravující účet"}: {member.guardianName} · {member.guardianEmail}</span>
+                  <span>
+                    {openDebts.get(member.athleteId)
+                      ? `Nezaplacené předpisy: ${openDebts.get(member.athleteId)!.count} (${formatCzk(openDebts.get(member.athleteId)!.halere)})`
+                      : "Bez nezaplacených předpisů"}
+                  </span>
+                  <details>
+                    <summary>Vyřadit z týmu</summary>
+                    <form action={removeMemberAction} className="form-stack compact-form">
+                      <input name="teamId" type="hidden" value={team.id} />
+                      <input name="athleteId" type="hidden" value={member.athleteId} />
+                      <p>Nezaplacené předpisy zůstanou u tohoto týmu a historie plateb se nemění. Rodič dostane oznámení. Nové předpisy členovi vznikat nebudou.</p>
+                      <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji vyřazení</label>
+                      <button className="button-secondary" type="submit">Vyřadit z týmu</button>
+                    </form>
+                  </details>
+                  {transferTargets.length ? (
+                    <details>
+                      <summary>Přesunout do jiného týmu</summary>
+                      <form action={transferMemberAction} className="form-stack compact-form">
+                        <input name="teamId" type="hidden" value={team.id} />
+                        <input name="athleteId" type="hidden" value={member.athleteId} />
+                        <p>Původní dluhy a platby zůstanou u tohoto týmu. Nové předpisy dostane člen od cílového týmu. Rodič dostane oznámení.</p>
+                        <label>Cílový tým
+                          <select name="targetTeamId" required>
+                            {transferTargets.map((target) => (
+                              <option key={target.id} value={target.id}>{target.name}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji přesun</label>
+                        <button className="button-secondary" type="submit">Přesunout</button>
+                      </form>
+                    </details>
+                  ) : null}
                 </section>
               ))}
             </div>
@@ -300,9 +374,18 @@ export default async function TeamPage({
       getMemberTeamDashboard(user.id, teamId),
       getGuardianTeamFinance(user.id, teamId),
     ]);
-    return <MemberTeamView finance={finance} query={query} team={team} />;
+    const ownOpenDebts = await getAthleteOpenDebtsInTeam(
+      user.id,
+      teamId,
+      team.managedMembers.map((member) => member.athleteId),
+    );
+    return <MemberTeamView finance={finance} ownOpenDebts={ownOpenDebts} query={query} team={team} />;
   }
 
-  const team = await getTeamMembershipDashboard(user.id, teamId);
-  return <ManagerTeamView query={query} team={team} />;
+  const [team, openDebts, transferTargets] = await Promise.all([
+    getTeamMembershipDashboard(user.id, teamId),
+    getTeamOpenDebtSummary(user.id, teamId),
+    getTransferTargets(user.id, teamId),
+  ]);
+  return <ManagerTeamView openDebts={openDebts} query={query} team={team} transferTargets={transferTargets} />;
 }

@@ -56,3 +56,24 @@ Stav: schváleno zadavatelem dne 2026-11-05.
 - Pozvánka i kód používají jedinou transakční resolver funkci. Řádek uživatele serializuje souběžné vytvoření profilu, částečný unikátní index chrání `self`, stabilní klíč formuláře chrání vytvoření dítěte a existující unikátní indexy chrání aktivní členství a čekající žádost.
 - Spravující účet zůstává adresátem finanční komunikace. Typ vazby nemění existující dluhy, platby ani auditní historii.
 
+# D-18 — Historie, potvrzení evidence a CSV export (M6)
+
+Stav: pracovní pravidlo schválené jako výchozí pro školní demo; vyžaduje kontrolu zadavatelem jen při přechodu k ostrému provozu.
+
+- Rodičovská historie ukazuje alokace vlastních sportovců ze všech týmů i klubových předpisů: datum, částku, způsob, kdo úhradu zaevidoval (potvrzující trenér či správce, u hotovosti zapisující osoba), případnou opravu protizápisem a její důvod. U demo pohybu je místo osoby výslovně uvedeno „Demo simulace (nejde o bankovně ověřený převod)“.
+- Potvrzení ke stažení je jednoduchý samostatný HTML dokument (příloha, bez externích zdrojů, s přísnou CSP) pro jednu kladnou, neopravenou alokaci vlastního sportovce. Výslovně uvádí, že jde o evidenci v aplikaci, nikoli bankovní výpis či daňový doklad; demo pohyb nese označení DEMO. Opravenou alokaci ani protizápis potvrzovat nelze. PDF je odloženo, protože by vyžadovalo novou závislost.
+- Příchozí platby (`/platby`) vycházejí z `payment_allocations`: jeden řádek je jedna alokace včetně záporných opravných protizápisů. Filtr období se vztahuje k `occurred_on` události, takže oprava zapsaná později má pozdější datum než původní záznam. Stav „platné“ vynechá opravené záznamy i protizápisy; součet je čistý součet zobrazených řádků.
+- CSV: UTF-8 s BOM, oddělovač středník, desetinná čárka, CRLF; textové buňky začínající `= + - @` se předřadí apostrofem. Sloupec Tým obsahuje „Celý klub“ u klubových předpisů, hotovost, demo pohyb a ruční potvrzení se rozlišují sloupcem Způsob i Původ záznamu.
+- Oprávnění: tým čte a exportuje trenér daného týmu nebo správce klubu; klubový rozsah jen správce (stejná `authorizeManagerRead` jako finanční přehled). Cizí rozsah vrací 404, nikoli prázdná data.
+- Audit: `payments.register_viewed`, `payments.exported` (filtry a počet řádků), `payment.confirmation_downloaded`, `club.finance_overview_viewed`. K3 počítá „po splatnosti“ jako zbývající neuhrazenou částku dluhů se splatností před dneškem (Europe/Prague), včetně částečně uhrazených a nahlášených; týmy jsou aktivní, klubové dluhy samostatný řádek „Celý klub“.
+- M6 nemění databázové schéma ani nevyžaduje migraci.
+# D-19 — Odchod, vyřazení, přesun, archivace a zrušení dluhu (M7)
+
+Stav: pracovní pravidlo pro školní demo.
+
+- Členství se nemaže: ukončí se `ended_at` s důvodem `left` (odchod rodičem), `removed` (vyřazení), `moved` (přesun) nebo `archived` (archivace týmu). Dluhy, platby, hlášení a historie zůstávají u původního týmu (`origin_team_id`); nové předpisy vznikají jen aktivním členům, takže bývalý člen je nedostane.
+- Odchod dítěte může provést jen spravující účet; potvrzovací formulář uvádí počet a součet nezaplacených předpisů, které odchodem nezanikají. Vyřazení provádí trenér týmu nebo správce klubu, přesun pouze správce klubu do jiného nearchivovaného týmu stejného klubu. Vyřazení a přesun vytvoří ve stejné transakci `pending` oznámení rodiči (`membership_removed`/`membership_moved`); e-mail se odešle až po commitu, selhání je evidováno. Odchod rodičem sám oznámení nevytváří.
+- Přesun ukončí staré členství a v téže transakci založí nové se zdrojem `transfer`. Zámky týmů se berou v pevném pořadí podle ID.
+- Archivace týmu (K6, jen správce klubu) nastaví `archived_at`, ukončí aktivní členství (`archived`), zamítne čekající žádosti a zruší aktivní pozvánky i týmový kód. Trenér, dluhy, platby a export zůstávají; archivovaný tým je v klubovém přehledu v samostatné sekci a v souhrnu K3 jako „Archivované týmy“. Nové předpisy pro něj server odmítne.
+- Zrušení dluhu (`receivables.cancelled_at`, autor a povinný důvod): týmový dluh smí zrušit trenér týmu nebo správce klubu, celoklubový jen správce (D-12). Zrušit lze jen dluh bez evidované úhrady (součet alokací 0) a bez čekajícího hlášení; dluh s úhradou se nejprve opraví protizápisem. Zrušení je nevratné (DB trigger), zrušený dluh nelze uhradit (DB trigger u kladných alokací i kontrola v hlášení, hotovosti a demo párování), nevstupuje do „očekáváno“, „zbývá“, „po splatnosti“ ani do upomínek, ale zůstává v historii s důvodem a stavem „Zrušeno“.
+- Migrace: `0022` přidává sloupce a omezení (její snapshot nově obsahuje i změny ručně psané `0021`, čímž je původní omezení generátoru vyřešeno), `0023` obsahuje DB pojistky a značku schématu `M7-0023`.

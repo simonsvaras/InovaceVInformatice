@@ -1,0 +1,195 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { Message } from "@/components/message";
+import { InputError, validateUuid } from "@/lib/validation";
+import { requireUser } from "@/modules/auth/service";
+import { formatCzk } from "@/modules/payments/qr";
+import {
+  getPaymentRegister,
+  parseRegisterFilters,
+  registerMethods,
+  registerStates,
+  type RegisterFilters,
+} from "@/modules/payments/reports";
+import type { PaymentScope } from "@/modules/payments/service";
+import {
+  paymentConfirmedByLabel,
+  paymentMethodLabel,
+} from "@/modules/payments/status";
+
+const stateLabels: Record<(typeof registerStates)[number], string> = {
+  all: "Všechny záznamy",
+  valid: "Pouze platné",
+  corrected: "Opravené a protizápisy",
+};
+
+function formatDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("cs-CZ", {
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+    timeZone: "Europe/Prague",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+export default async function PaymentRegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    teamId?: string;
+    clubId?: string;
+    from?: string;
+    to?: string;
+    method?: string;
+    state?: string;
+  }>;
+}) {
+  const user = await requireUser();
+  const query = await searchParams;
+  if ((!query.teamId && !query.clubId) || (query.teamId && query.clubId)) notFound();
+
+  let scope: PaymentScope;
+  try {
+    scope = query.teamId
+      ? { teamId: validateUuid(query.teamId) }
+      : { clubId: validateUuid(query.clubId!) };
+  } catch {
+    notFound();
+  }
+
+  let filters: RegisterFilters = { from: null, to: null, method: null, state: "all" };
+  let filterError: string | undefined;
+  try {
+    filters = parseRegisterFilters(query);
+  } catch (error) {
+    if (!(error instanceof InputError)) throw error;
+    filterError = error.message;
+  }
+
+  const register = await getPaymentRegister(user.id, scope, filters);
+  const scopeQuery = scope.teamId
+    ? `teamId=${encodeURIComponent(scope.teamId)}`
+    : `clubId=${encodeURIComponent(scope.clubId!)}`;
+  const filterQuery = new URLSearchParams();
+  if (filters.from) filterQuery.set("from", filters.from);
+  if (filters.to) filterQuery.set("to", filters.to);
+  if (filters.method) filterQuery.set("method", filters.method);
+  if (filters.state !== "all") filterQuery.set("state", filters.state);
+  const exportHref = `/platby/export?${scopeQuery}${filterQuery.size ? `&${filterQuery}` : ""}`;
+  const back = scope.teamId ? `/tymy/${scope.teamId}` : `/kluby/${scope.clubId!}`;
+
+  return (
+    <main className="dashboard-shell dashboard-home finance-admin-page">
+      <header className="dashboard-topbar">
+        <Link className="dashboard-brand" href="/prehled" aria-label="Klubio – přehled">
+          <span className="dashboard-brand-mark" aria-hidden="true">K</span>
+          <span>Klubio</span>
+        </Link>
+        <Link className="club-topbar-link" href={back}>Zpět</Link>
+      </header>
+      <section className="content-stack finance-admin-content">
+        <header className="finance-admin-hero">
+          <div>
+            <p className="finance-admin-role">Správa financí</p>
+            <h1>Příchozí platby</h1>
+            <p>
+              {register.name}. Úhrady evidované v aplikaci; demo pohyby a ruční
+              potvrzení nejsou bankovně ověřené převody.
+            </p>
+          </div>
+          <a className="club-primary-action" href={exportHref}>Export CSV</a>
+        </header>
+        <Message error={filterError} />
+
+        <form className="payments-filter" method="get">
+          <input name={scope.teamId ? "teamId" : "clubId"} type="hidden" value={scope.teamId ?? scope.clubId} />
+          <label>
+            Od
+            <input defaultValue={filters.from ?? ""} name="from" type="date" />
+          </label>
+          <label>
+            Do
+            <input defaultValue={filters.to ?? ""} name="to" type="date" />
+          </label>
+          <label>
+            Způsob
+            <select defaultValue={filters.method ?? ""} name="method">
+              <option value="">Všechny způsoby</option>
+              {registerMethods.map((method) => (
+                <option key={method} value={method}>{paymentMethodLabel(method)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Stav záznamu
+            <select defaultValue={filters.state} name="state">
+              {registerStates.map((state) => (
+                <option key={state} value={state}>{stateLabels[state]}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit">Filtrovat</button>
+        </form>
+
+        <section className="finance-overview" aria-label="Souhrn plateb">
+          <div>
+            <span>Součet za výběr</span>
+            <strong>{formatCzk(register.summary.totalHalere)}</strong>
+          </div>
+          <div>
+            <span>Počet záznamů</span>
+            <strong>{register.rows.length}</strong>
+          </div>
+          <div>
+            <span>Podle způsobu</span>
+            <strong className="payments-method-summary">
+              {register.summary.byMethod.length
+                ? register.summary.byMethod
+                    .map((item) => `${paymentMethodLabel(item.method)}: ${formatCzk(item.totalHalere)}`)
+                    .join(" · ")
+                : "—"}
+            </strong>
+          </div>
+        </section>
+
+        <section className="payments-register" aria-labelledby="register-title">
+          <header className="finance-assessments-header">
+            <div>
+              <h2 id="register-title">Úhrady</h2>
+              <p>Nejnovější datum úhrady nahoře. Opravy jsou samostatné záporné záznamy.</p>
+            </div>
+            <span>{register.rows.length}</span>
+          </header>
+          {register.rows.length ? (
+            <div className="payments-register-list">
+              {register.rows.map((row) => (
+                <article className="payments-register-row" key={row.allocation_id}>
+                  <span>{formatDate(row.occurred_on)}</span>
+                  <div>
+                    <strong>{row.athlete_name} · {row.assessment_title}</strong>
+                    <small>
+                      {row.team_name ?? "Celý klub"} · {paymentMethodLabel(row.kind)} · VS {row.variable_symbol}
+                    </small>
+                    <small>{paymentConfirmedByLabel(row.kind, row.actor_name)}</small>
+                    {row.corrected ? <small className="is-correction">Opraveno protizápisem</small> : null}
+                    {row.correction_reason ? <small>Důvod opravy: {row.correction_reason}</small> : null}
+                  </div>
+                  <strong className={row.amount_halere < 0 ? "is-correction" : ""}>
+                    {formatCzk(row.amount_halere)}
+                  </strong>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="finance-empty-state">
+              <strong>Pro zvolený výběr nejsou žádné úhrady.</strong>
+              <span>Zkuste upravit období, způsob nebo stav záznamu.</span>
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}

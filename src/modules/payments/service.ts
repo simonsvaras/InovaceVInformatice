@@ -48,7 +48,7 @@ function scopeFingerprint(scope: PaymentScope) {
     .digest("hex");
 }
 
-async function lockManagerScope(
+export async function lockManagerScope(
   transaction: DbTransaction,
   actorUserId: string,
   scope: PaymentScope,
@@ -61,9 +61,9 @@ async function lockManagerScope(
     }>(sql`
       select t.club_id, t.id as team_id,
              (exists(select 1 from club_admins ca where ca.club_id=t.club_id and ca.user_id=${actorUserId})
-              or exists(select 1 from team_coaches tc where tc.team_id=t.id and tc.user_id=${actorUserId} and tc.ended_at is null)) as allowed
+              or (t.archived_at is null and exists(select 1 from team_coaches tc where tc.team_id=t.id and tc.user_id=${actorUserId} and tc.ended_at is null))) as allowed
       from teams t
-      where t.id=${scope.teamId} and t.archived_at is null
+      where t.id=${scope.teamId}
       for update of t
     `);
     const row = rows[0];
@@ -90,7 +90,7 @@ async function lockManagerScope(
   return { clubId: row.club_id, teamId: null };
 }
 
-function assertDebtInScope(
+export function assertDebtInScope(
   row: { club_id: string; assessment_team_id: string | null; origin_team_id: string | null },
   scope: LockedScope,
 ) {
@@ -137,7 +137,7 @@ function requireAllocatedHalere(
   return amount;
 }
 
-async function authorizeManagerRead(userId: string, scope: PaymentScope) {
+export async function authorizeManagerRead(userId: string, scope: PaymentScope) {
   if ("teamId" in scope) {
     const team = await requireTeamManagementAccess(userId, scope.teamId!);
     return { clubId: team.clubId, teamId: team.id, name: team.name };
@@ -160,8 +160,9 @@ export async function reportManualPayment(input: {
         amount_halere: number;
         allocated_halere: number;
         allowed: boolean;
+        cancelled_at: Date | null;
       }>(sql`
-        select r.id, a.club_id, a.team_id, r.amount_halere,
+        select r.id, a.club_id, a.team_id, r.amount_halere, r.cancelled_at,
                coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0)::int as allocated_halere,
                exists(select 1 from athlete_guardians ag where ag.athlete_id=r.athlete_id and ag.user_id=${input.actorUserId}) as allowed
         from receivables r
@@ -172,6 +173,9 @@ export async function reportManualPayment(input: {
       const debt = rows[0];
       if (!debt?.allowed) {
         throw new InputError("access_denied", "Tento dluh nepatří vašemu účtu.");
+      }
+      if (debt.cancelled_at) {
+        throw new InputError("cancelled", "Dluh byl zrušen, nelze k němu nahlásit platbu.");
       }
       if (debt.allocated_halere >= debt.amount_halere) {
         throw new InputError("already_paid", "Dluh je už podle evidence uhrazen.");
@@ -429,8 +433,9 @@ export async function recordCashPayment(input: {
         club_id: string;
         assessment_team_id: string | null;
         origin_team_id: string | null;
+        cancelled_at: Date | null;
       }>(sql`
-        select r.id, a.club_id, a.team_id as assessment_team_id, r.origin_team_id
+        select r.id, a.club_id, a.team_id as assessment_team_id, r.origin_team_id, r.cancelled_at
         from receivables r
         join assessments a on a.id=r.assessment_id
         where r.id=${input.receivableId}
@@ -439,6 +444,9 @@ export async function recordCashPayment(input: {
       const debt = rows[0];
       if (!debt) throw new InputError("invalid_debt", "Dluh nebyl nalezen.");
       assertDebtInScope(debt, scope);
+      if (debt.cancelled_at) {
+        throw new InputError("cancelled", "Dluh byl zrušen, nelze k němu zapsat platbu.");
+      }
       const allocatedBeforeHalere = requireAllocatedHalere(
         await loadAllocatedHalere(transaction, [debt.id]),
         debt.id,
@@ -676,6 +684,8 @@ export async function getManagerFinanceDashboard(
     last_reminder_at: Date | null;
     last_reminder_status: string | null;
     team_name: string | null;
+    cancelled_at: Date | null;
+    cancellation_reason: string | null;
   }>(sql`
     select r.id, a.id as assessment_id, a.title as assessment_title, a.due_date::text,
            ath.id as athlete_id, ath.full_name as athlete_name,
@@ -689,7 +699,7 @@ export async function getManagerFinanceDashboard(
              where rr.receivable_id=r.id
              order by rr.created_at desc
              limit 1) as last_reminder_status,
-           t.name as team_name
+           t.name as team_name, r.cancelled_at, r.cancellation_reason
     from receivables r
     join assessments a on a.id=r.assessment_id
     join athletes ath on ath.id=r.athlete_id
@@ -748,6 +758,7 @@ export async function getManagerFinanceDashboard(
       allocatedHalere: debt.allocated_halere,
       dueDate: debt.due_date,
       hasPendingClaim: debt.has_pending_claim,
+      cancelled: Boolean(debt.cancelled_at),
       today,
     }),
     events: events.filter((event) => event.receivable_id === debt.id),
@@ -765,8 +776,8 @@ export async function getManagerFinanceDashboard(
     debts: derivedDebts,
     pendingClaims,
     totals: {
-      expectedHalere: derivedDebts.reduce((sum, debt) => sum + debt.amount_halere, 0),
-      collectedHalere: derivedDebts.reduce((sum, debt) => sum + debt.allocated_halere, 0),
+      expectedHalere: derivedDebts.reduce((sum, debt) => sum + (debt.cancelled_at ? 0 : debt.amount_halere), 0),
+      collectedHalere: derivedDebts.reduce((sum, debt) => sum + (debt.cancelled_at ? 0 : debt.allocated_halere), 0),
       remainingHalere: derivedDebts.reduce((sum, debt) => sum + debt.remainingHalere, 0),
     },
   };
@@ -852,6 +863,7 @@ async function loadRetryableReminderRecipients(batchId: string) {
            and (nd.attempt_started_at is null or nd.attempt_started_at < now() - interval '5 minutes')
          )
        )
+       and r.cancelled_at is null
        and r.amount_halere - coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0) > 0
      order by rr.created_at
   `);
@@ -920,6 +932,7 @@ export async function sendBulkReminders(input: {
         join users u on u.id=ag.user_id
         left join teams t on t.id=r.origin_team_id
         where ${condition}
+          and r.cancelled_at is null
           and r.amount_halere - coalesce((select sum(pa.amount_halere) from payment_allocations pa where pa.receivable_id=r.id), 0) > 0
         order by u.email, a.due_date
       `);

@@ -1,11 +1,17 @@
 import Link from "next/link";
 
-import { inviteCoachAction } from "@/app/actions/clubs";
+import { archiveTeamAction, inviteCoachAction } from "@/app/actions/clubs";
 import { logoutAction } from "@/app/actions/auth";
 import { CreateTeamModal } from "@/components/create-team-modal";
 import { Message } from "@/components/message";
 import { requireUser } from "@/modules/auth/service";
 import { getClubAdminDashboard } from "@/modules/clubs/service";
+import {
+  getArchiveImpact,
+  getArchivedTeams,
+} from "@/modules/memberships/lifecycle";
+import { formatCzk } from "@/modules/payments/qr";
+import { getClubTeamFinanceOverview } from "@/modules/payments/reports";
 
 export default async function ClubPage({
   params,
@@ -21,7 +27,12 @@ export default async function ClubPage({
   const user = await requireUser();
   const { clubId } = await params;
   const query = await searchParams;
-  const club = await getClubAdminDashboard(user.id, clubId);
+  const [club, financeOverview, archiveImpact, archivedTeams] = await Promise.all([
+    getClubAdminDashboard(user.id, clubId),
+    getClubTeamFinanceOverview(user.id, clubId),
+    getArchiveImpact(user.id, clubId),
+    getArchivedTeams(user.id, clubId),
+  ]);
   const teamsWithCoach = club.teams.filter((team) => team.coachName).length;
 
   return (
@@ -101,6 +112,12 @@ export default async function ClubPage({
               Zobrazit platby
             </Link>
             <Link
+              className="club-secondary-action"
+              href={`/platby?clubId=${club.id}`}
+            >
+              Příchozí platby a export
+            </Link>
+            <Link
               className="club-primary-action"
               href={`/predpisy/novy?clubId=${club.id}`}
             >
@@ -121,6 +138,56 @@ export default async function ClubPage({
             <code className="share-code">{query.inviteLink}</code>
           </article>
         ) : null}
+
+        <section className="club-teams-section" aria-labelledby="team-finance-title">
+          <div className="club-section-heading">
+            <div>
+              <h2 id="team-finance-title">Stav plateb týmů</h2>
+              <p>Vybráno, očekáváno a po splatnosti podle evidence v aplikaci.</p>
+            </div>
+          </div>
+          <div className="club-finance-table" role="table" aria-label="Stav plateb týmů">
+            <div className="club-finance-table-head" role="row">
+              <span role="columnheader">Tým</span>
+              <span role="columnheader">Vybráno</span>
+              <span role="columnheader">Očekáváno</span>
+              <span role="columnheader">Po splatnosti</span>
+              <span role="columnheader" />
+            </div>
+            {[
+              ...financeOverview.teams.map((team) => ({
+                key: team.id,
+                href: `/finance?teamId=${team.id}`,
+                ...team,
+              })),
+              {
+                key: "club",
+                name: "Celý klub",
+                href: `/finance?clubId=${club.id}`,
+                ...financeOverview.clubWide,
+              },
+              ...(financeOverview.archived.debtCount
+                ? [{
+                    key: "archived",
+                    name: "Archivované týmy",
+                    href: `/finance?clubId=${club.id}`,
+                    ...financeOverview.archived,
+                  }]
+                : []),
+            ].map((row) => (
+              <div className="club-finance-table-row" key={row.key} role="row">
+                <strong role="cell">{row.name}</strong>
+                <span role="cell">{formatCzk(row.collectedHalere)}</span>
+                <span role="cell">{formatCzk(row.expectedHalere)}</span>
+                <span className={row.overdueHalere > 0 ? "is-overdue" : ""} role="cell">
+                  {formatCzk(row.overdueHalere)}
+                  {row.overdueCount > 0 ? ` (${row.overdueCount})` : ""}
+                </span>
+                <Link href={row.href} role="cell">Otevřít</Link>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="club-teams-section" aria-labelledby="teams-title">
           <div className="club-section-heading">
@@ -189,11 +256,49 @@ export default async function ClubPage({
                     {team.coachName ? "Pozvat nového trenéra" : "Pozvat trenéra"}
                   </button>
                 </form>
+
+                <details className="club-archive">
+                  <summary>Archivovat tým</summary>
+                  <form action={archiveTeamAction} className="club-coach-form">
+                    <input name="clubId" type="hidden" value={club.id} />
+                    <input name="teamId" type="hidden" value={team.id} />
+                    <p>
+                      Tým zmizí z aktivních přehledů a jeho {archiveImpact.get(team.id)?.memberCount ?? 0} členů bude odhlášeno.
+                      Nezaplacené předpisy zůstanou evidované ({archiveImpact.get(team.id)?.openCount ?? 0}
+                      {" "}za {formatCzk(archiveImpact.get(team.id)?.openHalere ?? 0)}), platby, historie i export zůstanou dostupné.
+                    </p>
+                    <label className="checkbox-label">
+                      <input name="confirm" required type="checkbox" value="yes" />
+                      Potvrzuji archivaci týmu
+                    </label>
+                    <button className="club-secondary-action" type="submit">Archivovat tým</button>
+                  </form>
+                </details>
               </article>
             ))}
           </div>
         </section>
 
+        {archivedTeams.length ? (
+          <section className="club-teams-section" aria-labelledby="archived-title">
+            <div className="club-section-heading">
+              <div>
+                <h2 id="archived-title">Archivované týmy</h2>
+                <p>Finanční historie a export zůstávají dostupné.</p>
+              </div>
+              <span>{archivedTeams.length}</span>
+            </div>
+            <div className="club-finance-table">
+              {archivedTeams.map((team) => (
+                <div className="club-archived-row" key={team.id}>
+                  <strong>{team.name}</strong>
+                  <Link href={`/finance?teamId=${team.id}`}>Platby</Link>
+                  <Link href={`/platby?teamId=${team.id}`}>Příchozí platby a export</Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </section>
     </main>
   );
