@@ -124,6 +124,7 @@ export default async function FinancePage({
       collectedHalere: number;
       settledCount: number;
       recipientCount: number;
+      cancelledCount: number;
     }
   >();
 
@@ -138,7 +139,9 @@ export default async function FinancePage({
       collectedHalere: 0,
       settledCount: 0,
       recipientCount: 0,
+      cancelledCount: 0,
     };
+    if (debt.cancelled_at) current.cancelledCount += 1;
     if (debt.team_name) current.teamNames.add(debt.team_name);
     if (!debt.cancelled_at) {
       current.amounts.add(debt.amount_halere);
@@ -236,16 +239,20 @@ export default async function FinancePage({
                 const perMember = assessment.amounts.size === 1
                   ? formatCzk(Array.from(assessment.amounts)[0])
                   : "Různé částky";
+                const allCancelled = assessment.recipientCount === 0 && assessment.cancelledCount > 0;
 
                 return (
                   <Link
-                    className="finance-assessment-row"
+                    className={`finance-assessment-row${allCancelled ? " is-cancelled" : ""}`}
                     href={`/predpisy/${assessment.id}`}
                     key={assessment.id}
                   >
                     <div className="finance-assessment-title">
                       <span>{teamLabel}</span>
-                      <strong>{assessment.title}</strong>
+                      <strong>
+                        {assessment.title}
+                        {allCancelled ? <em className="finance-cancelled-badge">Zrušeno</em> : null}
+                      </strong>
                     </div>
                     <div className="finance-assessment-date">
                       <span>Splatnost</span>
@@ -253,20 +260,30 @@ export default async function FinancePage({
                     </div>
                     <div className="finance-assessment-amount">
                       <span>Na člena</span>
-                      <strong>{perMember}</strong>
+                      <strong>{allCancelled ? "—" : perMember}</strong>
                     </div>
                     <div className="finance-assessment-progress">
-                      <div>
-                        <strong>
-                          {formatCzk(assessment.collectedHalere)} / {formatCzk(assessment.expectedHalere)}
-                        </strong>
-                        <span>
-                          {assessment.settledCount}/{assessment.recipientCount}
-                        </span>
-                      </div>
-                      <span className="finance-progress-track">
-                        <span style={{ width: `${progress}%` }} />
-                      </span>
+                      {allCancelled ? (
+                        <div>
+                          <strong>Všechny dluhy zrušeny</strong>
+                          <span>{assessment.cancelledCount}×</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <strong>
+                              {formatCzk(assessment.collectedHalere)} / {formatCzk(assessment.expectedHalere)}
+                            </strong>
+                            <span>
+                              {assessment.settledCount}/{assessment.recipientCount}
+                              {assessment.cancelledCount > 0 ? ` · zrušeno ${assessment.cancelledCount}` : ""}
+                            </span>
+                          </div>
+                          <span className="finance-progress-track">
+                            <span style={{ width: `${progress}%` }} />
+                          </span>
+                        </>
+                      )}
                     </div>
                     <span className="finance-assessment-open" aria-hidden="true">›</span>
                   </Link>

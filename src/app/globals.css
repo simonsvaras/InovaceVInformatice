@@ -3485,3 +3485,18 @@ button.home-header-action {
   color: var(--dashboard-blue-dark);
   font-weight: 700;
 }
+
+.finance-assessment-row.is-cancelled {
+  opacity: 0.6;
+}
+
+.finance-cancelled-badge {
+  margin-left: 0.6rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  background: #eef0f4;
+  color: var(--dashboard-muted);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 700;
+}

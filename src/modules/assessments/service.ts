@@ -733,6 +733,8 @@ export async function getAssessmentManagerView(userId: string, assessmentId: str
       id: receivables.id,
       athleteName: athletes.fullName,
       variableSymbol: receivables.variableSymbol,
+      cancelledAt: receivables.cancelledAt,
+      cancellationReason: receivables.cancellationReason,
       guardianEmail: users.email,
       deliveryStatus: notificationDeliveries.status,
       deliveryError: notificationDeliveries.errorCode,

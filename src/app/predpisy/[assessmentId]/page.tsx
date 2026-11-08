@@ -60,7 +60,8 @@ export default async function AssessmentPage({
   const deliveryRate = assessment.debts.length
     ? Math.round((deliveredCount / assessment.debts.length) * 100)
     : 0;
-  const totalExpectedHalere = assessment.amountHalere * assessment.debts.length;
+  const activeDebtCount = assessment.debts.filter((debt) => !debt.cancelledAt).length;
+  const totalExpectedHalere = assessment.amountHalere * activeDebtCount;
 
   return (
     <main className="dashboard-shell dashboard-home assessment-detail-page">
@@ -108,7 +109,7 @@ export default async function AssessmentPage({
             <span>Celkem očekáváno</span>
             <strong>{formatCzk(totalExpectedHalere)}</strong>
             <small>
-              {assessment.debts.length} × {formatCzk(assessment.amountHalere)}
+              {activeDebtCount} × {formatCzk(assessment.amountHalere)}
             </small>
           </article>
           <article>
@@ -177,14 +178,23 @@ export default async function AssessmentPage({
                     <strong>{debt.variableSymbol}</strong>
                   </div>
                   <div className="assessment-member-delivery">
-                    <span className={delivery.className}>{delivery.label}</span>
-                    {debt.deliveryError ? <small>{debt.deliveryError}</small> : null}
+                    {debt.cancelledAt ? (
+                      <>
+                        <span className="finance-cancelled-badge">Zrušeno</span>
+                        <small>{debt.cancellationReason}</small>
+                      </>
+                    ) : (
+                      <>
+                        <span className={delivery.className}>{delivery.label}</span>
+                        {debt.deliveryError ? <small>{debt.deliveryError}</small> : null}
+                      </>
+                    )}
                   </div>
                   <strong className="assessment-member-amount">
-                    {formatCzk(assessment.amountHalere)}
+                    {debt.cancelledAt ? "—" : formatCzk(assessment.amountHalere)}
                   </strong>
                   <div className="assessment-member-action">
-                    {debt.deliveryStatus !== "sent" ? (
+                    {!debt.cancelledAt && debt.deliveryStatus !== "sent" ? (
                       <form action={retryReceivableDeliveryAction}>
                         <input name="assessmentId" type="hidden" value={assessment.id} />
                         <input name="receivableId" type="hidden" value={debt.id} />
