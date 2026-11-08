@@ -500,34 +500,6 @@ function ManagerTeamView({
               </section>
             ) : null}
 
-            <section className="team-admin-invite" aria-labelledby="team-invite-title">
-              <header className="team-admin-section-heading">
-                <div>
-                  <h2 id="team-invite-title">Přidat členy</h2>
-                  <p>Pošlete jednorázovou pozvánku rodičům nebo hráčům.</p>
-                </div>
-              </header>
-              <div className="team-admin-invite-body">
-                <MemberInviteForm
-                  initialIdempotencyKey={randomUUID()}
-                  teamId={team.id}
-                />
-              </div>
-              {team.pendingInvitations.length ? (
-                <div className="team-admin-invitation-list">
-                  <strong>Aktivní pozvánky</strong>
-                  {team.pendingInvitations.map((invitation) => (
-                    <form action={revokeInvitationAction} key={invitation.id}>
-                      <input name="teamId" type="hidden" value={team.id} />
-                      <input name="invitationId" type="hidden" value={invitation.id} />
-                      <span>{invitation.email}</span>
-                      <button type="submit">Zrušit</button>
-                    </form>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-
             <section className="team-admin-tools" aria-labelledby="team-tools-title">
               <header className="team-admin-section-heading">
                 <div><h2 id="team-tools-title">Nastavení týmu</h2><p>Vstupní kód a účet pro nové předpisy.</p></div>
@@ -553,6 +525,35 @@ function ManagerTeamView({
             </section>
           </aside>
         </div>
+        <section className="team-admin-invite" aria-labelledby="team-invite-title">
+          <header className="team-admin-section-heading">
+            <div>
+              <h2 id="team-invite-title">Přidat členy</h2>
+              <p>Pošlete jednorázovou pozvánku rodičům nebo hráčům.</p>
+            </div>
+          </header>
+          <div className={`team-admin-invite-layout${team.pendingInvitations.length ? " has-invitations" : ""}`}>
+            <div className="team-admin-invite-body">
+              <MemberInviteForm
+                initialIdempotencyKey={randomUUID()}
+                teamId={team.id}
+              />
+            </div>
+            {team.pendingInvitations.length ? (
+              <div className="team-admin-invitation-list">
+                <strong>Aktivní pozvánky</strong>
+                {team.pendingInvitations.map((invitation) => (
+                  <form action={revokeInvitationAction} key={invitation.id}>
+                    <input name="teamId" type="hidden" value={team.id} />
+                    <input name="invitationId" type="hidden" value={invitation.id} />
+                    <span>{invitation.email}</span>
+                    <button type="submit">Zrušit</button>
+                  </form>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </section>
       </section>
     </main>
   );

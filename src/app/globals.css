@@ -6122,3 +6122,38 @@ button.home-header-action {
   color: var(--dashboard-muted);
   font-size: 0.8rem;
 }
+
+.team-admin-invite-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--dashboard-line);
+}
+
+.team-admin-invite-layout .team-admin-invite-body {
+  border-top: 0;
+}
+
+.team-admin-invite-layout .team-admin-invite textarea,
+.team-admin-invite textarea {
+  min-height: 7.5rem;
+}
+
+.team-admin-invite-layout .team-admin-invitation-list {
+  border-top: 1px solid var(--dashboard-line);
+}
+
+@media (min-width: 56rem) {
+  .team-admin-invite-layout.has-invitations {
+    grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
+  }
+
+  .team-admin-invite-layout.has-invitations .team-admin-invitation-list {
+    border-top: 0;
+    border-left: 1px solid var(--dashboard-line);
+  }
+
+  .team-admin-invite button[type="submit"] {
+    width: fit-content;
+    min-width: 16rem;
+  }
+}
