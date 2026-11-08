@@ -4983,15 +4983,23 @@ h3 {
 
 .checkbox-label {
   display: flex !important;
-  grid-template-columns: auto 1fr;
   align-items: flex-start;
+  gap: 0.6rem;
   font-size: 0.9rem;
   font-weight: 400 !important;
+  line-height: 1.4;
 }
 
-.checkbox-label input {
-  width: auto;
-  margin-top: 0.2rem;
+input[type="checkbox"] {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  /* první řádek textu má výšku 1.26rem, zaškrtávátko se vystředí vůči němu */
+  margin-top: 0.08rem;
 }
 
 .share-code {
@@ -6324,4 +6332,10 @@ button.home-header-action {
 .action-disclosure > form,
 .action-disclosure > .form-stack {
   margin-top: 0;
+}
+
+button:disabled,
+.button-link[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }

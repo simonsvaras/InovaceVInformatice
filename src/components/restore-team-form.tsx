@@ -51,7 +51,7 @@ export function RestoreTeamForm({
       ) : (
         <p className="restore-sub-note">Archivací nebyl odhlášen žádný člen, který by šel obnovit.</p>
       )}
-      <button className="club-secondary-action" type="submit">
+      <button className="club-secondary-action" disabled={!confirmed} type="submit">
         <span className="icon-label"><ArchiveRestore aria-hidden="true" size={16} />{confirmed && restorableMembers > 0 && !withMembers ? "Obnovit tým bez členů" : "Obnovit tým"}</span>
       </button>
     </form>

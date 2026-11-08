@@ -17,6 +17,7 @@ import { ManagementHeader } from "@/components/management-header";
 import { MemberInviteForm } from "@/components/member-invite-form";
 import { Message } from "@/components/message";
 import { IconLabel } from "@/components/icon-label";
+import { ConfirmForm } from "@/components/confirm-form";
 import { getGuardianTeamFinance } from "@/modules/assessments/service";
 import { requireUser } from "@/modules/auth/service";
 import { requireTeamPageAccess } from "@/modules/authorization/service";
@@ -191,7 +192,13 @@ function MemberTeamView({
               return (
                 <details className="member-team-leave action-disclosure is-danger" key={`leave-${member.athleteId}`}>
                   <summary><IconLabel icon={LogOut} size={15}>Odhlásit {member.fullName} z týmu</IconLabel></summary>
-                  <form action={leaveTeamAction} className="form-stack compact-form">
+                  <ConfirmForm
+                    action={leaveTeamAction}
+                    className="form-stack compact-form"
+                    confirmLabel="Potvrzuji odhlášení"
+                    submit={<IconLabel icon={LogOut} size={15}>Odhlásit z týmu</IconLabel>}
+                    submitClassName="button-secondary"
+                  >
                     <input name="teamId" type="hidden" value={team.id} />
                     <input name="athleteId" type="hidden" value={member.athleteId} />
                     <p>
@@ -200,9 +207,7 @@ function MemberTeamView({
                         : "U tohoto týmu nemáte žádný nezaplacený předpis. Historie plateb zůstane zachována."}
                       {" "}Nové předpisy tomuto členovi vznikat nebudou.
                     </p>
-                    <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji odhlášení</label>
-                    <button className="button-secondary" type="submit"><IconLabel icon={LogOut} size={15}>Odhlásit z týmu</IconLabel></button>
-                  </form>
+                  </ConfirmForm>
                 </details>
               );
             })}
@@ -419,18 +424,28 @@ function ManagerTeamView({
                       </span>
                       <details className="action-disclosure is-danger">
                         <summary><IconLabel icon={UserMinus} size={15}>Vyřadit z týmu</IconLabel></summary>
-                        <form action={removeMemberAction} className="form-stack compact-form">
+                        <ConfirmForm
+                          action={removeMemberAction}
+                          className="form-stack compact-form"
+                          confirmLabel="Potvrzuji vyřazení"
+                          submit={<IconLabel icon={UserMinus} size={15}>Vyřadit z týmu</IconLabel>}
+                          submitClassName="button-secondary"
+                        >
                           <input name="teamId" type="hidden" value={team.id} />
                           <input name="athleteId" type="hidden" value={player.athleteId} />
                           <p>Nezaplacené předpisy zůstanou u tohoto týmu a historie plateb se nemění. Rodič dostane oznámení. Nové předpisy členovi vznikat nebudou.</p>
-                          <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji vyřazení</label>
-                          <button className="button-secondary" type="submit"><IconLabel icon={UserMinus} size={15}>Vyřadit z týmu</IconLabel></button>
-                        </form>
+                        </ConfirmForm>
                       </details>
                       {transferTargets.length ? (
                         <details className="action-disclosure">
                           <summary><IconLabel icon={ArrowRightLeft} size={15}>Přesunout do jiného týmu</IconLabel></summary>
-                          <form action={transferMemberAction} className="form-stack compact-form">
+                          <ConfirmForm
+                            action={transferMemberAction}
+                            className="form-stack compact-form"
+                            confirmLabel="Potvrzuji přesun"
+                            submit={<IconLabel icon={ArrowRightLeft} size={15}>Přesunout</IconLabel>}
+                            submitClassName="button-secondary"
+                          >
                             <input name="teamId" type="hidden" value={team.id} />
                             <input name="athleteId" type="hidden" value={player.athleteId} />
                             <p>Původní dluhy a platby zůstanou u tohoto týmu. Nové předpisy dostane člen od cílového týmu. Rodič dostane oznámení.</p>
@@ -441,9 +456,7 @@ function ManagerTeamView({
                                 ))}
                               </select>
                             </label>
-                            <label className="checkbox-label"><input name="confirm" required type="checkbox" value="yes" />Potvrzuji přesun</label>
-                            <button className="button-secondary" type="submit"><IconLabel icon={ArrowRightLeft} size={15}>Přesunout</IconLabel></button>
-                          </form>
+                          </ConfirmForm>
                         </details>
                       ) : null}
                     </div>

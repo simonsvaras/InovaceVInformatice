@@ -2,6 +2,7 @@ import { Ban, Banknote, Check, History, Undo2 } from "lucide-react";
 import { randomUUID } from "node:crypto";
 
 import { IconLabel } from "@/components/icon-label";
+import { ConfirmForm } from "@/components/confirm-form";
 import Link from "next/link";
 
 import {
@@ -198,7 +199,13 @@ function AssessmentCard({
         {assessment.allocatedHalere === 0 && !assessment.hasPendingClaim ? (
           <details className="member-ledger-tool">
             <summary><IconLabel icon={Ban} size={15}>Zrušit dluh</IconLabel></summary>
-            <form action={cancelReceivableAction} className="member-ledger-form">
+            <ConfirmForm
+              action={cancelReceivableAction}
+              className="member-ledger-form"
+              confirmLabel="Potvrzuji zrušení dluhu"
+              submit={<IconLabel icon={Ban} size={15}>Zrušit dluh</IconLabel>}
+              submitClassName="button-secondary"
+            >
               <ScopeFields scope={scope} />
               <input name="receivableId" type="hidden" value={assessment.id} />
               <p>Dluh se nesmaže, jen přestane být očekávaný. Historie a audit zůstanou.</p>
@@ -206,12 +213,7 @@ function AssessmentCard({
                 Důvod zrušení
                 <input maxLength={300} name="reason" required />
               </label>
-              <label className="checkbox-label">
-                <input name="confirm" required type="checkbox" value="yes" />
-                Potvrzuji zrušení dluhu
-              </label>
-              <button className="button-secondary" type="submit"><IconLabel icon={Ban} size={15}>Zrušit dluh</IconLabel></button>
-            </form>
+            </ConfirmForm>
           </details>
         ) : null}
 

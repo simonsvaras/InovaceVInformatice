@@ -11,6 +11,7 @@ import { CreateTeamModal } from "@/components/create-team-modal";
 import { RestoreTeamForm } from "@/components/restore-team-form";
 import { IconLabel } from "@/components/icon-label";
 import { Message } from "@/components/message";
+import { ConfirmForm } from "@/components/confirm-form";
 import { requireUser } from "@/modules/auth/service";
 import { getClubAdminDashboard } from "@/modules/clubs/service";
 import {
@@ -245,7 +246,13 @@ export default async function ClubPage({
 
                 <details className="club-archive action-disclosure is-danger">
                   <summary><IconLabel icon={Archive}>Archivovat tým</IconLabel></summary>
-                  <form action={archiveTeamAction} className="club-coach-form">
+                  <ConfirmForm
+                    action={archiveTeamAction}
+                    className="club-coach-form"
+                    confirmLabel="Potvrzuji archivaci týmu"
+                    submit={<IconLabel icon={Archive}>Archivovat tým</IconLabel>}
+                    submitClassName="club-secondary-action"
+                  >
                     <input name="clubId" type="hidden" value={club.id} />
                     <input name="teamId" type="hidden" value={team.id} />
                     <p>
@@ -253,12 +260,7 @@ export default async function ClubPage({
                       Nezaplacené předpisy zůstanou evidované ({archiveImpact.get(team.id)?.openCount ?? 0}
                       {" "}za {formatCzk(archiveImpact.get(team.id)?.openHalere ?? 0)}), platby, historie i export zůstanou dostupné.
                     </p>
-                    <label className="checkbox-label">
-                      <input name="confirm" required type="checkbox" value="yes" />
-                      Potvrzuji archivaci týmu
-                    </label>
-                    <button className="club-secondary-action" type="submit"><IconLabel icon={Archive}>Archivovat tým</IconLabel></button>
-                  </form>
+                  </ConfirmForm>
                 </details>
               </article>
             ))}
